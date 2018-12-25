@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name ht7333-a)(type Legacy)(uri ${KIPRJMOD}/libs/ht7333-a.lib)(options "")(descr ""))
+)
