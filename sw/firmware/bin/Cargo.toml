@@ -1,0 +1,26 @@
+[package]
+authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
+edition = "2018"
+readme = "../README.md"
+name = "kroneum-bin"
+version = "0.1.0"
+keywords = ["arm", "cortex-m"]
+categories = ["embedded", "no-std"]
+license = "MIT"
+repository = "https://github.com/azasypkin/kroneum"
+
+[dependencies]
+cortex-m = "0.5.8"
+cortex-m-rt = "0.6.7"
+cortex-m-semihosting = "0.3.2"
+panic-semihosting = "0.5.1"
+stm32f0x2 = { version = "0.1.0", optional = true, path = "../stm32f0x2" }
+
+# this lets you use `cargo fix`!
+[[bin]]
+name = "kroneum-bin"
+test = false
+bench = false
+
+[features]
+default = ["stm32f0x2", "stm32f0x2/rt"]
