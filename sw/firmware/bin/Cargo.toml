@@ -15,6 +15,7 @@ cortex-m-rt = "0.6.7"
 cortex-m-semihosting = "0.3.2"
 panic-semihosting = "0.5.1"
 stm32f0x2 = { version = "0.1.0", optional = true, path = "../stm32f0x2" }
+vcell = "0.1.0"
 
 # this lets you use `cargo fix`!
 [[bin]]

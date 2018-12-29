@@ -1,7 +1,7 @@
 use crate::config;
+use crate::systick::SysTick;
 use cortex_m::Peripherals as CorePeripherals;
 use stm32f0x2::Peripherals;
-use crate::systick::SysTick;
 
 const EIGHTH_NOTE: u32 = 150;
 const QUARTER_DOT_NOTE: u32 = 450;
