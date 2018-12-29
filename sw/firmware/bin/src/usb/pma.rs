@@ -47,8 +47,7 @@ impl PacketMemoryAreaAccessor {
     }
 }
 
-pub struct PacketMemoryArea {
-}
+pub struct PacketMemoryArea {}
 
 impl PacketMemoryArea {
     #[doc = r" Returns a pointer to the register block"]

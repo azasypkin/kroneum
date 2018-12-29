@@ -76,11 +76,11 @@ fn system_init(peripherals: &Peripherals) {
 fn main() -> ! {
     free(|cs| {
         let peripherals = Peripherals::take().unwrap();
-        let mut core_peripherals = cortex_m::Peripherals::take().unwrap();
+        let core_peripherals = cortex_m::Peripherals::take().unwrap();
 
         system_init(&peripherals);
 
-        USB::configure(&peripherals, &mut core_peripherals);
+        USB::configure(&peripherals);
         Beeper::configure(&peripherals);
 
         *PERIPHERALS.borrow(cs).borrow_mut() = Some(peripherals);
@@ -89,7 +89,7 @@ fn main() -> ! {
 
     interrupt_free(|mut cp, p| {
         USB::acquire(&mut cp, p, |mut usb| {
-            usb.reset();
+            usb.start();
         });
 
         Beeper::acquire(&mut cp, p, |mut beeper| {
@@ -119,7 +119,7 @@ where
 #[interrupt]
 fn USB() {
     interrupt_free(|mut cp, p| {
-        USB::acquire(&mut cp, p, |mut usb| {
+        USB::acquire(&mut cp, p, |usb| {
             usb.interrupt();
         });
     });
