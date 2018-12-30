@@ -2,11 +2,11 @@ mod pma;
 
 use core::cell::RefCell;
 use core::mem::transmute;
-use core::ops::{Index, IndexMut};
 use cortex_m::{
     interrupt::{free, Mutex},
     Peripherals as CorePeripherals,
 };
+
 use stm32f0x2::Interrupt;
 use stm32f0x2::Peripherals;
 
@@ -138,30 +138,65 @@ pub const CONF_DESC: [u8; 41] = [
     0x04, // bDescriptorType (Interface)
     0x00, // bInterfaceNumber 0
     0x00, // bAlternateSetting
-    0x01, // bNumEndpoints 1
+    0x02, // bNumEndpoints 2
     0x03, // bInterfaceClass
-    0x01, // bInterfaceSubClass
-    0x01, // bInterfaceProtocol
-    0x05, // iInterface (String Index)
+    0x00, // bInterfaceSubClass 1=BOOT, 0=no boot
+    0x00, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
+    0x00, // iInterface (String Index)
+    // HID descriptor
     0x09, // bLength
     0x21, // bDescriptorType (HID)
     0x11, 0x01, // bcdHID 1.11
     0x00, // bCountryCode
     0x01, // bNumDescriptors
     0x22, // bDescriptorType[0] (HID)
-    0x3f, 0x00, // wDescriptorLength[0] 63
+    0x20, 0x00, // wDescriptorLength[0] 32
+    // IN endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
     0x81, // bEndpointAddress (IN/D2H)
     0x03, // bmAttributes (Interrupt)
     0x40, 0x00, // wMaxPacketSize 64
-    0x01, // bInterval 1 (unit depends on device speed)
+    0x20, // bInterval 1 (unit depends on device speed)
+    // OUT endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
-    0x01, // bEndpointAddress (OUT/D2H)
+    0x01, // bEndpointAddress (OUT/H2D)
     0x03, // bmAttributes (Interrupt)
     0x40, 0x00, // wMaxPacketSize 64
-    0x01, // bInterval 1 (unit depends on device speed)
+    0x20, // bInterval 1 (unit depends on device speed)
+];
+
+// The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
+pub const HID_DESC: [u8; 9] = [
+    0x09, // bLength: CUSTOM_HID Descriptor size
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (HID)
+    0x20, 0x00, // wDescriptorLength[0] 32
+];
+
+pub const REPORT_DESC: [u8; 32] = [
+    0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+    0x09, 0x00, // USAGE (Undefined)
+    0xa1, 0x01, // COLLECTION (Application)
+    0x15, 0x00, //   LOGICAL_MINIMUM (0)
+    0x26, 0xff, 0x00, //   LOGICAL_MAXIMUM (255)
+    // IN report
+    0x85, 0x01, //   REPORT_ID (1)
+    0x75, 0x08, //   REPORT_SIZE (8)
+    0x95, 0x3f, // REPORT_COUNT (this is the byte length)
+    0x09, 0x00, //   USAGE (Undefined)
+    0x81, 0x82, //   INPUT (Data,Var,Abs,Vol)
+    // OUT report
+    0x85, 0x02, //   REPORT_ID (2)
+    0x75, 0x08, //   REPORT_SIZE (8)
+    0x95, 0x3f, // REPORT_COUNT (this is the byte length)
+    0x09, 0x00, //   USAGE (Undefined)
+    0x91, 0x82, //   OUTPUT (Data,Var,Abs,Vol)
+    0xc0, // END_COLLECTION
 ];
 
 pub enum UsbRequestDirection {
@@ -196,7 +231,7 @@ pub struct UsbRequestType {
 pub enum UsbRequest {
     GetStatus = 0x00,
     ClearFeature = 0x01,
-    Two = 0x2,
+    Two = 0x02,
     SetFeature = 0x03,
     SetAddress = 0x05,
     GetDescriptor = 0x06,
@@ -204,8 +239,8 @@ pub enum UsbRequest {
     GetConfiguration = 0x08,
     SetConfiguration = 0x09,
     GetInterface = 0x0A,
-    SetInterface = 0x11,
-    SynchFrame = 0x12,
+    SetInterface = 0x0B,
+    SynchFrame = 0x0C,
 }
 
 struct UsbRequestHeader {
@@ -305,48 +340,16 @@ enum ControlEndpointState {
 }
 
 #[derive(Copy, Clone)]
-struct UsbInEndpointData<'a> {
-    remaining: u16,
-    total: u16,
-    pma_address: u16,
-    data: Option<&'a [u8]>,
-}
-
-#[derive(Copy, Clone)]
-struct UsbInEndpointsData<'a> {
-    control: Option<UsbInEndpointData<'a>>,
-    device: Option<UsbInEndpointData<'a>>,
-}
-
-impl<'a> Index<EndpointType> for UsbInEndpointsData<'a> {
-    type Output = Option<UsbInEndpointData<'a>>;
-
-    fn index(&self, index: EndpointType) -> &Option<UsbInEndpointData<'a>> {
-        match index {
-            EndpointType::Control => &self.control,
-            _ => &self.device,
-        }
-    }
-}
-
-impl<'a> IndexMut<EndpointType> for UsbInEndpointsData<'a> {
-    fn index_mut<'b>(&'b mut self, index: EndpointType) -> &'b mut Option<UsbInEndpointData<'a>> {
-        match index {
-            EndpointType::Control => &mut self.control,
-            _ => &mut self.device,
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-struct UsbState<'a> {
+struct UsbState {
     device_state: DeviceState,
     suspended_device_state: Option<DeviceState>,
     control_endpoint_state: ControlEndpointState,
     setup_data_length: u16,
     address: u8,
-    in_endpoint_data: UsbInEndpointsData<'a>,
     configuration_index: u8,
+    protocol: u8,
+    idle_state: u8,
+    alt_setting: u8,
 }
 
 /*
@@ -374,11 +377,10 @@ static USB_STATE: Mutex<RefCell<UsbState>> = Mutex::new(RefCell::new(UsbState {
     control_endpoint_state: ControlEndpointState::Idle,
     setup_data_length: 0,
     address: 0,
-    in_endpoint_data: UsbInEndpointsData {
-        control: None,
-        device: None,
-    },
     configuration_index: 0,
+    protocol: 0,
+    idle_state: 0,
+    alt_setting: 0,
 }));
 
 impl<'a> USB<'a> {
@@ -642,47 +644,16 @@ impl<'a> USB<'a> {
         let endpoint = &self.peripherals.USB.ep0r;
         endpoint.write(|w| w.ctr_tx().clear_bit());
 
-        let endpoint_data = self.get_in_endpoint_data(EndpointType::Control);
-        let remaining = endpoint_data.map_or(0, |data| data.remaining);
-
         if let ControlEndpointState::DataIn = self.get_control_endpoint_state() {
-            if remaining > 0 {
-                // Continue sending the next in the multi-packet transfer.
-                self.continue_send_data(EndpointType::Control);
+            self.set_control_endpoint_state(ControlEndpointState::DataOut);
 
-                // Prepare for premature end of transfer.
-                self.pma.set_u16(6, 0);
-                self.set_rx_endpoint_status(
-                    &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-                    EndpointStatus::Valid,
-                );
-            } else {
-                let total = endpoint_data.map_or(0, |data| data.total);
-                if total % 64 == 0 && total > 64 && total < self.get_setup_data_length() {
-                    // Send zero length packet.
-                    self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, None);
-
-                    // Prepare for premature end of transfer.
-                    self.pma.set_u16(6, 0);
-                    self.set_rx_endpoint_status(
-                        &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-                        EndpointStatus::Valid,
-                    );
-                } else {
-                    self.set_control_endpoint_state(ControlEndpointState::DataOut);
-
-                    // Prepare for premature end of transfer.
-                    self.pma.set_u16(6, 0);
-                    self.set_rx_endpoint_status(
-                        &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-                        EndpointStatus::Valid,
-                    );
-                }
-            }
+            // Prepare for premature end of transfer.
+            self.pma.set_u16(6, 0);
+            self.set_rx_endpoint_status(&Endpoint::Endpoint0(&endpoint), EndpointStatus::Valid);
         }
 
         let address = self.get_address();
-        if address > 0 && remaining == 0 {
+        if address > 0 {
             self.peripherals
                 .USB
                 .daddr
@@ -705,7 +676,7 @@ impl<'a> USB<'a> {
     }
 
     fn handle_get_descriptor(&self, request_header: UsbRequestHeader) {
-        let data_to_send: Option<&'static [u8]> = match (&request_header.value >> 8) as u16 {
+        let data_to_send: Option<&[u8]> = match (&request_header.value >> 8) as u16 {
             1 => Some(&DEV_DESC),
             2 => Some(&CONF_DESC),
             3 => self.get_descriptor_string(&request_header),
@@ -721,7 +692,7 @@ impl<'a> USB<'a> {
                 } else {
                     request_header.length as usize
                 };
-                self.send_control_data(&data[..data_to_send_length]);
+                self.send_control_data(Some(&data[..data_to_send_length]));
             }
         } else {
             self.control_endpoint_error();
@@ -776,7 +747,7 @@ impl<'a> USB<'a> {
                     } else {
                         self.send_control_zero_length_packet();
                     }
-                },
+                }
                 DeviceState::Configured => {
                     if configuration_index == 0 {
                         self.close_control_endpoints();
@@ -785,7 +756,7 @@ impl<'a> USB<'a> {
                     } else {
                         self.send_control_zero_length_packet();
                     }
-                },
+                }
                 _ => self.control_endpoint_error(),
             }
         }
@@ -798,27 +769,237 @@ impl<'a> USB<'a> {
             match self.get_device_state() {
                 DeviceState::Addressed => {
                     self.set_configuration_index(0);
-                    self.send_control_data(&[0]);
-                },
-                DeviceState::Configured => self.send_control_data(&[self.get_configuration_index()]),
+                    self.send_control_data(Some([0].as_ref()));
+                }
+                DeviceState::Configured => {
+                    self.send_control_data(Some([self.get_configuration_index()].as_ref()));
+                }
                 _ => self.control_endpoint_error(),
             }
         }
     }
 
-    fn handle_get_status(&self) {}
+    fn handle_get_status(&self) {
+        match self.get_device_state() {
+            DeviceState::Addressed | DeviceState::Configured => {
+                self.send_control_data(Some([3].as_ref()))
+            }
+            _ => {}
+        }
+    }
 
-    fn handle_set_feature(&self, request_header: UsbRequestHeader) {}
+    fn handle_set_feature(&self, request_header: UsbRequestHeader) {
+        if request_header.value == 1 {
+            // ACK
+            self.send_control_zero_length_packet();
+        }
+    }
 
-    fn handle_clear_feature(&self, request_header: UsbRequestHeader) {}
+    fn handle_clear_feature(&self, request_header: UsbRequestHeader) {
+        match self.get_device_state() {
+            DeviceState::Addressed | DeviceState::Configured => {
+                if request_header.value == 1 {
+                    // ACK
+                    self.send_control_zero_length_packet();
+                }
+            }
+            _ => self.control_endpoint_error(),
+        }
+    }
 
-    fn handle_interface_request(&self, request_header: UsbRequestHeader) {}
+    fn handle_interface_request(&self, request_header: UsbRequestHeader) {
+        match self.get_device_state() {
+            DeviceState::Configured if (request_header.index & 0xff) <= 1 => {
+                self.handle_setup(request_header);
+            }
+            _ => self.control_endpoint_error(),
+        }
+    }
 
-    fn handle_endpoint_request(&self, request_header: UsbRequestHeader) {}
+    fn handle_setup(&self, request_header: UsbRequestHeader) {
+        match request_header.kind {
+            UsbRequestKind::Class => self.handle_class_setup(request_header),
+            UsbRequestKind::Standard => self.handle_standard_setup(request_header),
+            _ => {}
+        }
+    }
 
-    fn handle_device_out_transfer(&self) {}
+    fn handle_class_setup(&self, request_header: UsbRequestHeader) {
+        match request_header.request {
+            // CUSTOM_HID_REQ_SET_PROTOCOL
+            UsbRequest::SetInterface => {
+                self.set_protocol(request_header.value as u8);
+                self.send_control_zero_length_packet();
+            }
+            // CUSTOM_HID_REQ_GET_PROTOCOL
+            UsbRequest::SetFeature => self.send_control_data(Some([self.get_protocol()].as_ref())),
+            // CUSTOM_HID_REQ_SET_IDLE
+            UsbRequest::GetInterface => {
+                self.set_idle_state((request_header.value >> 8) as u8);
+                self.send_control_zero_length_packet();
+            }
+            // CUSTOM_HID_REQ_GET_IDLE
+            UsbRequest::Two => self.send_control_data(Some([self.get_idle_state()].as_ref())),
+            // CUSTOM_HID_REQ_SET_REPORT
+            UsbRequest::SetConfiguration => {
+                self.set_control_endpoint_state(ControlEndpointState::DataOut);
+                self.pma.set_u16(6, request_header.length);
+                self.set_rx_endpoint_status(
+                    &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
+                    EndpointStatus::Valid,
+                );
+                self.send_control_zero_length_packet();
+            }
+            _ => self.control_endpoint_error(),
+        }
+    }
 
-    fn handle_device_in_transfer(&self) {}
+    fn handle_standard_setup(&self, request_header: UsbRequestHeader) {
+        match request_header.request {
+            UsbRequest::GetDescriptor => {
+                let data = match request_header.value >> 8 {
+                    // USB_DESC_TYPE_HID_REPORT
+                    0x22 => Some(if (request_header.length as usize) < REPORT_DESC.len() {
+                        &REPORT_DESC[..request_header.length as usize]
+                    } else {
+                        &REPORT_DESC
+                    }),
+                    // USB_DESC_TYPE_HID_DESCRIPTOR
+                    0x21 => Some(if (request_header.length as usize) < HID_DESC.len() {
+                        &HID_DESC[..request_header.length as usize]
+                    } else {
+                        &HID_DESC
+                    }),
+                    _ => None,
+                };
+
+                self.send_control_data(data);
+            }
+            UsbRequest::SetInterface => {
+                self.set_alt_setting(request_header.value as u8);
+                self.send_control_zero_length_packet();
+            }
+            UsbRequest::GetInterface => {
+                self.send_control_data(Some([self.get_alt_setting()].as_ref()))
+            }
+            _ => self.control_endpoint_error(),
+        }
+    }
+
+    fn handle_endpoint_request(&self, request_header: UsbRequestHeader) {
+        if let UsbRequestKind::Class = request_header.kind {
+            self.handle_setup(request_header);
+            return;
+        }
+
+        let endpoint_address = request_header.index as u8;
+        let device_state = self.get_device_state();
+        match request_header.request {
+            UsbRequest::SetFeature => {
+                match device_state {
+                    DeviceState::Addressed => {
+                        if endpoint_address & 0x7f != 0 {
+                            self.stall_endpoint(endpoint_address);
+                        }
+                    }
+                    DeviceState::Configured => {
+                        // USB_FEATURE_EP_HALT
+                        if request_header.value == 0 && endpoint_address & 0x7f != 0 {
+                            self.stall_endpoint(endpoint_address);
+                        }
+
+                        self.handle_setup(request_header);
+                        self.send_control_zero_length_packet();
+                    }
+                    _ => self.control_endpoint_error()
+                }
+            }
+            UsbRequest::ClearFeature => {
+                match device_state {
+                    DeviceState::Addressed => {
+                        if endpoint_address & 0x7f != 0 {
+                            self.stall_endpoint(endpoint_address);
+                        }
+                    }
+                    DeviceState::Configured => {
+                        // USB_FEATURE_EP_HALT
+                        if request_header.value == 0 && endpoint_address & 0x7f != 0 {
+                            self.unstall_endpoint(endpoint_address);
+                            self.handle_setup(request_header);
+                        }
+                    }
+                    _ => self.control_endpoint_error()
+                }
+            }
+            UsbRequest::GetStatus => {
+                match device_state {
+                    DeviceState::Addressed => {
+                        if endpoint_address & 0x7f != 0 {
+                            self.stall_endpoint(endpoint_address);
+                        }
+                    }
+                    DeviceState::Configured => {
+                        // SHOULD BE:  status=isStalled(ep_addr) ? 1 : 0; sendControlData(&status,2);
+                        self.send_control_data(Some([0x0, 0x0].as_ref()));
+                    }
+                    _ => self.control_endpoint_error()
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_device_out_transfer(&self) {
+        // Clear the 'correct transfer for reception' bit for this endpoint.
+        let endpoint = &self.peripherals.USB.ep1r;
+        endpoint.write(|w| w.ctr_rx().clear_bit());
+
+        // Here we can check the amount of data and do smth with it....
+
+        self.pma
+            .set_u16(14, 0x8000 | (1 << 10) /* 32 byte size, 1 block */);
+
+        self.set_rx_endpoint_status(&Endpoint::Endpoint1(endpoint), EndpointStatus::Valid);
+    }
+
+    fn handle_device_in_transfer(&self) {
+        // Clear the 'correct transfer for reception' bit for this endpoint.
+        self.peripherals.USB.ep1r.write(|w| w.ctr_tx().clear_bit());
+    }
+
+    fn stall_endpoint(&self, endpoint_address: u8) {
+        let endpoint_index = endpoint_address & 0x7f;
+        if endpoint_index == 0 {
+            self.control_endpoint_error();
+        } else {
+            let endpoint = match endpoint_index {
+                0 => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
+                1 => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
+                _ => panic!("AAA")
+            };
+
+            if endpoint_address & 0x80 == 0x80 {
+                self.set_tx_endpoint_status(&endpoint, EndpointStatus::Stall);
+            } else {
+                self.set_rx_endpoint_status(&endpoint, EndpointStatus::Stall);
+            }
+        }
+    }
+
+    fn unstall_endpoint(&self, endpoint_address: u8) {
+        let endpoint_index = endpoint_address & 0x7f;
+        let endpoint = match endpoint_index {
+            0 => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
+            1 => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
+            _ => panic!("BBBB")
+        };
+
+        if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {
+            self.set_tx_endpoint_status(&endpoint, EndpointStatus::Stall);
+        } else if endpoint_address & 0x80 == 0x0 {
+            self.set_rx_endpoint_status(&endpoint, EndpointStatus::Stall);
+        }
+    }
 
     fn control_endpoint_error(&self) {
         let endpoint = Endpoint::Endpoint0(&self.peripherals.USB.ep0r);
@@ -826,9 +1007,9 @@ impl<'a> USB<'a> {
         self.set_tx_endpoint_status(&endpoint, EndpointStatus::Stall);
     }
 
-    fn send_control_data(&self, data: &'static [u8]) {
+    fn send_control_data(&self, data: Option<&[u8]>) {
         self.set_control_endpoint_state(ControlEndpointState::DataIn);
-        self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, Some(data));
+        self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, data);
     }
 
     fn send_control_zero_length_packet(&self) {
@@ -836,33 +1017,13 @@ impl<'a> USB<'a> {
         self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, None);
     }
 
-    fn continue_send_data(&self, endpoint_type: EndpointType) {
-        let endpoint_data = self.get_in_endpoint_data(endpoint_type);
-        let remaining = endpoint_data.map_or(0, |data| data.remaining);
-
-        // Cut down the length if this will be a multi-packet transfer.
-        let length = if remaining > 64 { 64 } else { remaining };
-        if let Some(endpoint_data) = endpoint_data {
-            if let Some(data) = endpoint_data.data {
-                self.pma
-                    .write_buffer_u8(endpoint_data.pma_address as usize, &data[..length as usize]);
-
-                let remaining = endpoint_data.remaining - length;
-                self.set_in_endpoint_data(
-                    endpoint_type,
-                    UsbInEndpointData {
-                        total: endpoint_data.total,
-                        remaining,
-                        pma_address: endpoint_data.pma_address,
-                        data: if remaining > 0 {
-                            Some(&data[length as usize..])
-                        } else {
-                            None
-                        },
-                    },
-                );
-            }
-        }
+    fn send_data(&self, endpoint_type: EndpointType, pma_address: u16, data: Option<&[u8]>) {
+        let length = data
+            .and_then(|d| {
+                self.pma.write_buffer_u8(pma_address as usize, &d);
+                Some(d)
+            })
+            .map_or(0, |d| d.len() as u16);
 
         // Now that the PMA memory is prepared, set the length and tell the peripheral to send it.
         let (tx_count_offset, endpoint) = match endpoint_type {
@@ -872,28 +1033,6 @@ impl<'a> USB<'a> {
 
         self.pma.set_u16(tx_count_offset, length);
         self.set_tx_endpoint_status(&endpoint, EndpointStatus::Valid);
-    }
-
-    fn send_data(
-        &self,
-        endpoint_type: EndpointType,
-        pma_address: u16,
-        data: Option<&'static [u8]>,
-    ) {
-        let endpoint_data = self.get_in_endpoint_data(EndpointType::Control);
-
-        let length = data.map_or(0u16, |d| d.len() as u16);
-        self.set_in_endpoint_data(
-            endpoint_type,
-            UsbInEndpointData {
-                total: length,
-                remaining: length,
-                pma_address,
-                data,
-            },
-        );
-
-        self.continue_send_data(endpoint_type);
     }
 
     fn suspend(&self) {
@@ -998,19 +1137,6 @@ impl<'a> USB<'a> {
         free(|cs| (*USB_STATE.borrow(cs).borrow()).setup_data_length)
     }
 
-    fn get_in_endpoint_data(
-        &self,
-        endpoint_type: EndpointType,
-    ) -> Option<UsbInEndpointData<'static>> {
-        free(|cs| (*USB_STATE.borrow(cs).borrow()).in_endpoint_data[endpoint_type])
-    }
-
-    fn set_in_endpoint_data(&self, endpoint_type: EndpointType, data: UsbInEndpointData<'static>) {
-        free(|cs| {
-            (*USB_STATE.borrow(cs).borrow_mut()).in_endpoint_data[endpoint_type].replace(data);
-        });
-    }
-
     fn get_address(&self) -> u8 {
         free(|cs| (*USB_STATE.borrow(cs).borrow()).address)
     }
@@ -1023,6 +1149,36 @@ impl<'a> USB<'a> {
 
     fn get_configuration_index(&self) -> u8 {
         free(|cs| (*USB_STATE.borrow(cs).borrow()).configuration_index)
+    }
+
+    fn set_protocol(&self, protocol: u8) {
+        free(|cs| {
+            (*USB_STATE.borrow(cs).borrow_mut()).protocol = protocol;
+        });
+    }
+
+    fn get_protocol(&self) -> u8 {
+        free(|cs| (*USB_STATE.borrow(cs).borrow()).protocol)
+    }
+
+    fn set_idle_state(&self, idle_state: u8) {
+        free(|cs| {
+            (*USB_STATE.borrow(cs).borrow_mut()).idle_state = idle_state;
+        });
+    }
+
+    fn get_idle_state(&self) -> u8 {
+        free(|cs| (*USB_STATE.borrow(cs).borrow()).idle_state)
+    }
+
+    fn set_alt_setting(&self, alt_setting: u8) {
+        free(|cs| {
+            (*USB_STATE.borrow(cs).borrow_mut()).alt_setting = alt_setting;
+        });
+    }
+
+    fn get_alt_setting(&self) -> u8 {
+        free(|cs| (*USB_STATE.borrow(cs).borrow()).alt_setting)
     }
 
     fn set_address(&self, address: u8) {
