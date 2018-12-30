@@ -92,9 +92,9 @@ fn main() -> ! {
             usb.start();
         });
 
-        Beeper::acquire(&mut cp, p, |mut beeper| {
+        /*Beeper::acquire(&mut cp, p, |mut beeper| {
             beeper.beep_n(3);
-        });
+        });*/
     });
 
     loop {}
