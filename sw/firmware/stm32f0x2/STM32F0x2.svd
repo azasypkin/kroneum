@@ -10944,7 +10944,7 @@ xs:noNamespaceSchemaLocation="CMSIS-SVD_Schema_1_1.xsd">
               <bitWidth>1</bitWidth>
             </field>
             <field>
-              <name>USBRST</name>
+              <name>USBEN</name>
               <description>USB interface clock enable</description>
               <bitOffset>23</bitOffset>
               <bitWidth>1</bitWidth>
@@ -11342,10 +11342,15 @@ xs:noNamespaceSchemaLocation="CMSIS-SVD_Schema_1_1.xsd">
           <fields>
             <field>
               <name>MEM_MODE</name>
-              <description>Memory mapping selection
-              bits</description>
+              <description>Memory mapping selection bits</description>
               <bitOffset>0</bitOffset>
               <bitWidth>2</bitWidth>
+            </field>
+            <field>
+              <name>PA11_PA12_RMP</name>
+              <description>PA11 and PA12 remapping bit for small packages (28 and 20 pins). Available on STM32F04x devices only.</description>
+              <bitOffset>4</bitOffset>
+              <bitWidth>1</bitWidth>
             </field>
             <field>
               <name>ADC_DMA_RMP</name>

@@ -295,10 +295,10 @@ impl I2C2ENR {
     }
 }
 #[doc = r" Value of the field"]
-pub struct USBRSTR {
+pub struct USBENR {
     bits: bool,
 }
-impl USBRSTR {
+impl USBENR {
     #[doc = r" Value of the field as raw bits"]
     #[inline]
     pub fn bit(&self) -> bool {
@@ -697,10 +697,10 @@ impl<'a> _I2C2ENW<'a> {
     }
 }
 #[doc = r" Proxy"]
-pub struct _USBRSTW<'a> {
+pub struct _USBENW<'a> {
     w: &'a mut W,
 }
-impl<'a> _USBRSTW<'a> {
+impl<'a> _USBENW<'a> {
     #[doc = r" Sets the field bit"]
     pub fn set_bit(self) -> &'a mut W {
         self.bit(true)
@@ -962,13 +962,13 @@ impl R {
     }
     #[doc = "Bit 23 - USB interface clock enable"]
     #[inline]
-    pub fn usbrst(&self) -> USBRSTR {
+    pub fn usben(&self) -> USBENR {
         let bits = {
             const MASK: bool = true;
             const OFFSET: u8 = 23;
             ((self.bits >> OFFSET) & MASK as u32) != 0
         };
-        USBRSTR { bits }
+        USBENR { bits }
     }
     #[doc = "Bit 25 - CAN interface clock enable"]
     #[inline]
@@ -1095,8 +1095,8 @@ impl W {
     }
     #[doc = "Bit 23 - USB interface clock enable"]
     #[inline]
-    pub fn usbrst(&mut self) -> _USBRSTW {
-        _USBRSTW { w: self }
+    pub fn usben(&mut self) -> _USBENW {
+        _USBENW { w: self }
     }
     #[doc = "Bit 25 - CAN interface clock enable"]
     #[inline]

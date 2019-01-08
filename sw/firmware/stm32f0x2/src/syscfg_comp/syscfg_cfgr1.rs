@@ -54,6 +54,27 @@ impl MEM_MODER {
     }
 }
 #[doc = r" Value of the field"]
+pub struct PA11_PA12_RMPR {
+    bits: bool,
+}
+impl PA11_PA12_RMPR {
+    #[doc = r" Value of the field as raw bits"]
+    #[inline]
+    pub fn bit(&self) -> bool {
+        self.bits
+    }
+    #[doc = r" Returns `true` if the bit is clear (0)"]
+    #[inline]
+    pub fn bit_is_clear(&self) -> bool {
+        !self.bit()
+    }
+    #[doc = r" Returns `true` if the bit is set (1)"]
+    #[inline]
+    pub fn bit_is_set(&self) -> bool {
+        self.bit()
+    }
+}
+#[doc = r" Value of the field"]
 pub struct ADC_DMA_RMPR {
     bits: bool,
 }
@@ -441,6 +462,29 @@ impl<'a> _MEM_MODEW<'a> {
     pub unsafe fn bits(self, value: u8) -> &'a mut W {
         const MASK: u8 = 3;
         const OFFSET: u8 = 0;
+        self.w.bits &= !((MASK as u32) << OFFSET);
+        self.w.bits |= ((value & MASK) as u32) << OFFSET;
+        self.w
+    }
+}
+#[doc = r" Proxy"]
+pub struct _PA11_PA12_RMPW<'a> {
+    w: &'a mut W,
+}
+impl<'a> _PA11_PA12_RMPW<'a> {
+    #[doc = r" Sets the field bit"]
+    pub fn set_bit(self) -> &'a mut W {
+        self.bit(true)
+    }
+    #[doc = r" Clears the field bit"]
+    pub fn clear_bit(self) -> &'a mut W {
+        self.bit(false)
+    }
+    #[doc = r" Writes raw bits to the field"]
+    #[inline]
+    pub fn bit(self, value: bool) -> &'a mut W {
+        const MASK: bool = true;
+        const OFFSET: u8 = 4;
         self.w.bits &= !((MASK as u32) << OFFSET);
         self.w.bits |= ((value & MASK) as u32) << OFFSET;
         self.w
@@ -876,6 +920,16 @@ impl R {
         };
         MEM_MODER { bits }
     }
+    #[doc = "Bit 4 - PA11 and PA12 remapping bit for small packages (28 and 20 pins). Available on STM32F04x devices only."]
+    #[inline]
+    pub fn pa11_pa12_rmp(&self) -> PA11_PA12_RMPR {
+        let bits = {
+            const MASK: bool = true;
+            const OFFSET: u8 = 4;
+            ((self.bits >> OFFSET) & MASK as u32) != 0
+        };
+        PA11_PA12_RMPR { bits }
+    }
     #[doc = "Bit 8 - ADC DMA remapping bit"]
     #[inline]
     pub fn adc_dma_rmp(&self) -> ADC_DMA_RMPR {
@@ -1073,6 +1127,11 @@ impl W {
     #[inline]
     pub fn mem_mode(&mut self) -> _MEM_MODEW {
         _MEM_MODEW { w: self }
+    }
+    #[doc = "Bit 4 - PA11 and PA12 remapping bit for small packages (28 and 20 pins). Available on STM32F04x devices only."]
+    #[inline]
+    pub fn pa11_pa12_rmp(&mut self) -> _PA11_PA12_RMPW {
+        _PA11_PA12_RMPW { w: self }
     }
     #[doc = "Bit 8 - ADC DMA remapping bit"]
     #[inline]
