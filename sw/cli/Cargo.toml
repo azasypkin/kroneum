@@ -1,0 +1,8 @@
+[package]
+name = "kroneum-cli"
+version = "0.1.0"
+authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+libusb = "0.3"
