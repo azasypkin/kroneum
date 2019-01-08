@@ -293,11 +293,6 @@ impl From<(u16, u16, u16, u16)> for UsbRequestHeader {
     }
 }
 
-enum Endpoint<'a> {
-    Endpoint0(&'a stm32f0x2::usb::EP0R),
-    Endpoint1(&'a stm32f0x2::usb::EP1R),
-}
-
 #[derive(Copy, Clone)]
 enum EndpointType {
     Control = 0b0,
@@ -723,14 +718,13 @@ impl<'a> USB<'a> {
             UsbRequestRecipient::Device => self.handle_device_request(header),
             UsbRequestRecipient::Interface => self.handle_interface_request(header),
             UsbRequestRecipient::Endpoint => self.handle_endpoint_request(header),
-            _ => self.set_rx_endpoint_status(&Endpoint::Endpoint0(endpoint), EndpointStatus::Stall),
+            _ => self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Stall),
         }
     }
 
     fn handle_control_data_out_transfer(&self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        let endpoint = &self.peripherals.USB.ep0r;
-        endpoint.modify(|_, w| unsafe {
+        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .ctr_tx()
@@ -748,14 +742,12 @@ impl<'a> USB<'a> {
         // Here we can check the amount of data and do smth with it....
 
         self.pma.set_rx_count(EndpointType::Control, 0);
-
-        self.set_rx_endpoint_status(&Endpoint::Endpoint0(endpoint), EndpointStatus::Valid);
+        self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Valid);
     }
 
     fn handle_control_in_transfer(&mut self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        let endpoint = &self.peripherals.USB.ep0r;
-        endpoint.modify(|_, w| unsafe {
+        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_tx()
                 .clear_bit()
                 .ctr_rx()
@@ -775,7 +767,7 @@ impl<'a> USB<'a> {
 
             // Prepare for premature end of transfer.
             self.pma.set_rx_count(EndpointType::Control, 0);
-            self.set_rx_endpoint_status(&Endpoint::Endpoint0(&endpoint), EndpointStatus::Valid);
+            self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Valid);
         }
 
         if self.state.address > 0 {
@@ -970,10 +962,7 @@ impl<'a> USB<'a> {
                 self.update_control_endpoint_state(ControlEndpointState::DataOut);
                 self.pma
                     .set_rx_count(EndpointType::Control, request_header.length);
-                self.set_rx_endpoint_status(
-                    &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-                    EndpointStatus::Valid,
-                );
+                self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Valid);
                 self.send_control_zero_length_packet();
             }
             _ => self.control_endpoint_error(),
@@ -1076,8 +1065,7 @@ impl<'a> USB<'a> {
 
     fn handle_device_out_transfer(&self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        let endpoint = &self.peripherals.USB.ep1r;
-        endpoint.modify(|_, w| unsafe {
+        self.peripherals.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .dtog_tx()
@@ -1093,8 +1081,7 @@ impl<'a> USB<'a> {
         // Here we can check the amount of data and do smth with it....
 
         self.pma.set_rx_count(EndpointType::Device, 0);
-
-        self.set_rx_endpoint_status(&Endpoint::Endpoint1(endpoint), EndpointStatus::Valid);
+        self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);
     }
 
     fn handle_device_in_transfer(&self) {
@@ -1119,15 +1106,15 @@ impl<'a> USB<'a> {
             self.control_endpoint_error();
         } else {
             let endpoint = match endpoint_index {
-                0 => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-                1 => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
-                _ => panic!("AAA"),
+                0 => EndpointType::Control,
+                1 => EndpointType::Device,
+                _ => panic!("Unknown endpoint"),
             };
 
             if endpoint_address & 0x80 == 0x80 {
-                self.set_tx_endpoint_status(&endpoint, EndpointStatus::Stall);
+                self.set_tx_endpoint_status(endpoint, EndpointStatus::Stall);
             } else {
-                self.set_rx_endpoint_status(&endpoint, EndpointStatus::Stall);
+                self.set_rx_endpoint_status(endpoint, EndpointStatus::Stall);
             }
         }
     }
@@ -1135,15 +1122,15 @@ impl<'a> USB<'a> {
     fn unstall_endpoint(&self, endpoint_address: u8) {
         let endpoint_index = endpoint_address & 0x7f;
         let endpoint = match endpoint_index {
-            0 => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-            1 => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
-            _ => panic!("BBBB"),
+            0 => EndpointType::Control,
+            1 => EndpointType::Device,
+            _ => panic!("Unknown endpoint"),
         };
 
         if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {
-            self.set_tx_endpoint_status(&endpoint, EndpointStatus::Stall);
+            self.set_tx_endpoint_status(endpoint, EndpointStatus::Stall);
         } else if endpoint_address & 0x80 == 0x0 {
-            self.set_rx_endpoint_status(&endpoint, EndpointStatus::Stall);
+            self.set_rx_endpoint_status(endpoint, EndpointStatus::Stall);
         }
     }
 
@@ -1183,13 +1170,8 @@ impl<'a> USB<'a> {
             .map_or(0, |d| d.len() as u16);
 
         // Now that the PMA memory is prepared, set the length and tell the peripheral to send it.
-        let endpoint = match endpoint_type {
-            EndpointType::Control => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
-            EndpointType::Device => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
-        };
-
         self.pma.set_tx_count(endpoint_type, length);
-        self.set_tx_endpoint_status(&endpoint, EndpointStatus::Valid);
+        self.set_tx_endpoint_status(endpoint_type, EndpointStatus::Valid);
     }
 
     fn suspend(&mut self) {
@@ -1356,11 +1338,11 @@ impl<'a> USB<'a> {
         return current_bits ^ status as u8;
     }
 
-    fn set_rx_endpoint_status(&self, endpoint: &Endpoint, status: EndpointStatus) {
+    fn set_rx_endpoint_status(&self, endpoint: EndpointType, status: EndpointStatus) {
         // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
         match endpoint {
-            Endpoint::Endpoint0(e) => {
-                e.modify(|r, w| unsafe {
+            EndpointType::Control => {
+                self.peripherals.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_rx()
                         .bits(self.get_status_bits(r.stat_rx().bits(), status))
                         .ctr_tx()
@@ -1375,9 +1357,13 @@ impl<'a> USB<'a> {
                         .bits(0b00)
                 });
             }
-            Endpoint::Endpoint1(e) => e.modify(|r, w| unsafe {
+            EndpointType::Device => self.peripherals.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_rx()
                     .bits(self.get_status_bits(r.stat_rx().bits(), status))
+                    .ctr_tx()
+                    .set_bit()
+                    .ctr_rx()
+                    .set_bit()
                     .dtog_tx()
                     .clear_bit()
                     .dtog_rx()
@@ -1388,11 +1374,11 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn set_tx_endpoint_status(&self, endpoint: &Endpoint, status: EndpointStatus) {
+    fn set_tx_endpoint_status(&self, endpoint: EndpointType, status: EndpointStatus) {
         // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
         match endpoint {
-            Endpoint::Endpoint0(e) => {
-                e.modify(|r, w| unsafe {
+            EndpointType::Control => {
+                self.peripherals.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_tx()
                         .bits(self.get_status_bits(r.stat_tx().bits(), status))
                         .ctr_tx()
@@ -1407,7 +1393,7 @@ impl<'a> USB<'a> {
                         .bits(0b00)
                 });
             }
-            Endpoint::Endpoint1(e) => e.modify(|r, w| unsafe {
+            EndpointType::Device => self.peripherals.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_tx()
                     .bits(self.get_status_bits(r.stat_tx().bits(), status))
                     .dtog_tx()
