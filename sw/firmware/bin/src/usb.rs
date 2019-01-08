@@ -434,10 +434,6 @@ impl<'a> USB<'a> {
         self.set_interrupt_mask();
 
         self.pma.init();
-        /*self.set_tx_addr(CONTROL_IN_PMA_ADDRESS);
-        self.set_tx_count(0);
-        self.set_rx_addr(CONTROL_OUT_PMA_ADDRESS);
-        self.set_rx_count(0);*/
 
         self.peripherals.USB.bcdr.modify(|_, w| w.dppu().set_bit());
     }
@@ -489,28 +485,6 @@ impl<'a> USB<'a> {
 
         // Correct endpoint transfer
         if self.peripherals.USB.istr.read().ctr().bit_is_set() {
-            /*let istr = self.peripherals.USB.istr.read().bits();
-            let cntr = self.peripherals.USB.cntr.read().bits();
-            let base_address = CONTROL_OUT_PMA_ADDRESS as usize;
-            let setup_packet = [
-                self.pma.get_u16(base_address),
-                self.pma.get_u16(base_address + 2),
-                self.pma.get_u16(base_address + 4),
-                self.pma.get_u16(base_address + 6),
-            ];
-
-            let btable = [
-                self.pma.get_u16(0),
-                self.pma.get_u16(2),
-                self.pma.get_u16(4),
-                self.pma.get_u16(6),
-            ];
-
-            if setup_packet.iter().any(|&x| x > 0) && btable.iter().any(|&x| x > 0) && istr > 0 && cntr > 0 {
-                self.blue_on();
-            }
-
-            asm::bkpt();*/
             self.correct_transfer();
         }
     }
@@ -551,14 +525,13 @@ impl<'a> USB<'a> {
                         self.handle_control_in_transfer();
                     }
                 }
-                /* 1 => {
-                    let ep1 = self.peripherals.USB.ep1r.read();
-                    if is_out && ep1.ctr_rx().bit_is_set() {
+                1 => {
+                    if is_out && self.peripherals.USB.ep1r.read().ctr_rx().bit_is_set() {
                         self.handle_device_out_transfer();
-                    } else if !is_out && ep1.ctr_tx().bit_is_set() {
+                    } else if !is_out && self.peripherals.USB.ep1r.read().ctr_tx().bit_is_set() {
                         self.handle_device_in_transfer();
                     }
-                }*/
+                }
                 _ => panic!("Unknown endpoint"),
             }
         }
@@ -573,115 +546,16 @@ impl<'a> USB<'a> {
     }
 
     fn handle_control_setup_out_transfer(&mut self) {
-        /*  let req: u16 = self.pma.get_u16(base_address);*/
-        /*  let val = self.pma.get_u16(base_address + 2);
-        let index = self.pma.get_u16(base_address + 4);
-        let len = self.pma.get_u16(base_address + 6);*/
-
-        /*  let comparator: u16 = 0x0001;
-        let mask: u16 = 0x00FF;
-        let full: u16 = 0x0001;*/
-        /* if req != 0x0000 {
-            self.blue_on();
-        } else {
-            self.red_on();
-        }*/
-
-        /*let count_mask: u16 = 0xfc00;
-        let count_tx: u16 = self.pma.get_u16(2);*/
-        //let count_rx: u16 = self.pma.get_u16(6) & 0x03ff;
-        /*  let comp: u16 = 0x8400;
-        let ref_count: u16 = 0x0000;*/
-        /*if count_rx != 0x0000 {
-            self.green_on();
-        }*/
-
-        /*let req = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize);
-        let val = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize + 2);
-        let index = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize + 4);
-        let len = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize + 6);
-
-        if req != 0 || val != 0 || index != 0 || len != 0 {
-            self.blue_on();
-        } else {
-            self.red_on();
-        }0x1f*/
-
-        /*  let tx_add = self.pma.get_u16(0);
-        let raw_tx_add = self.read(0x40006000);
-
-        let tx_count = self.pma.get_u16(2);
-        let raw_tx_count = self.read(0x40006000 + 4);
-
-        let rx_add = self.pma.get_u16(4);
-        let raw_rx_add = self.read(0x40006000 + 8);
-
-        let rx_count = self.pma.get_u16(6);
-        let raw_rx_count = self.read(0x40006000 + 12);*/
-
-        /* let base_add_1 = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize);
-        let base_add_2 = self.pma.get_u16(CONTROL_OUT_PMA_ADDRESS as usize);*/
-
-        /* let arr = [
-            self.pma.get_u16(0),
-            self.pma.get_u16(2),
-            self.pma.get_u16(4),
-            self.pma.get_u16(6),
-            self.pma.get_u16(CONTROL_OUT_PMA_ADDRESS as usize),
-            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 2) as usize),
-            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 4) as usize),
-            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 6) as usize),
-        ];
-
-        let arr2 = [
-            self.pma.get_u16_old(0 / 2),
-            self.pma.get_u16_old(2 / 2),
-            self.pma.get_u16_old(4 / 2),
-            self.pma.get_u16_old(6 / 2),
-            self.pma.get_u16_old((CONTROL_OUT_PMA_ADDRESS / 2) as usize),
-            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 2) / 2) as usize),
-            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 4) / 2) as usize),
-            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 6) / 2) as usize),
-        ];
-
-        self.blue_on();
-        asm::bkpt();
-        if arr.iter().all(|&x| x > 0) && arr2.iter().all(|&x| x > 0) {
-            self.green_on();
-        }*/
-
-        /*asm::bkpt();
-
-        if setup_packet.iter().any(|&x| x > 0) && btable.iter().any(|&x| x > 0) {
-            self.blue_on();
-        }*/
-
-        /* if setup_packet[1] > 0 && setup_packet.iter().any(|&x| x == 0x0680 || x == 0x8060) {
-            asm::bkpt();
-        }*/
-
-        let btable = [
-            self.pma.get_tx_addr(EndpointType::Control),
-            self.pma.get_tx_count(EndpointType::Control),
-            self.pma.get_rx_addr(EndpointType::Control),
-            self.pma.get_rx_count(EndpointType::Control),
-        ];
+        let endpoint_type = EndpointType::Control;
 
         let setup_packet = [
-            self.pma.read(EndpointType::Control, 0),
-            self.pma.read(EndpointType::Control, 2),
-            self.pma.read(EndpointType::Control, 4),
-            self.pma.read(EndpointType::Control, 6),
+            self.pma.read(endpoint_type, 0),
+            self.pma.read(endpoint_type, 2),
+            self.pma.read(endpoint_type, 4),
+            self.pma.read(endpoint_type, 6),
         ];
 
-        /*   let c_setup_packet = [
-            self.read(0x40006000),
-            self.read(0x40006002),
-            self.read(0x40006004),
-            self.read(0x40006006)
-        ];*/
-
-        let setup_packet_length = btable[3];
+        let setup_packet_length = self.pma.get_rx_count(endpoint_type);
 
         let header = UsbRequestHeader::from((
             setup_packet[0],
@@ -690,15 +564,8 @@ impl<'a> USB<'a> {
             setup_packet[3],
         ));
 
-        /* asm::bkpt();
-
-        if setup_packet.iter().any(|&x| x > 0) && btable.iter().any(|&x| x > 0) && c_setup_packet.iter().any(|&x| x > 0) {
-            self.blue_on();
-        }*/
-
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        let endpoint = &self.peripherals.USB.ep0r;
-        endpoint.modify(|_, w| unsafe {
+        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .ctr_tx()
@@ -718,7 +585,7 @@ impl<'a> USB<'a> {
             UsbRequestRecipient::Device => self.handle_device_request(header),
             UsbRequestRecipient::Interface => self.handle_interface_request(header),
             UsbRequestRecipient::Endpoint => self.handle_endpoint_request(header),
-            _ => self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Stall),
+            _ => self.set_rx_endpoint_status(endpoint_type, EndpointStatus::Stall),
         }
     }
 
@@ -1216,8 +1083,6 @@ impl<'a> USB<'a> {
                 .set_bit()*/
                 .errm()
                 .set_bit()
-                /*.pmaovrm()
-                .set_bit()*/
                 .resetm()
                 .set_bit()
         });
@@ -1266,71 +1131,37 @@ impl<'a> USB<'a> {
                 .bits(self.get_status_bits(0, EndpointStatus::Nak))
                 .stat_rx()
                 .bits(self.get_status_bits(0, EndpointStatus::Valid))
-            // If DTOG_RX is 1 then we need to write 1 to toggle it to zero.
-            /* .dtog_rx()
-            .bit(r.dtog_rx().bit_is_set())
-            .dtog_tx()
-            .bit(r.dtog_tx().bit_is_set())*/
         });
     }
 
     fn open_device_endpoints(&self) {
         self.peripherals.USB.ep1r.modify(|r, w| unsafe {
             w.ep_type()
-                .bits(EndpointType::Device as u8)
+                .bits(0b11)
                 .ea()
                 .bits(0x1)
                 .stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
                 .stat_rx()
                 .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
-                // If DTOG_RX is 1 then we need to write 1 to toggle it to zero.
-                .dtog_rx()
-                .bit(r.dtog_rx().bit_is_set())
-                .dtog_tx()
-                .bit(r.dtog_tx().bit_is_set())
         });
     }
 
     fn close_control_endpoints(&self) {
         self.peripherals.USB.ep0r.modify(|r, w| unsafe {
-            let mut bits = w
-                .stat_tx()
+            w.stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
-                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled));
-
-            // If DTOG_RX is 1 then we need to write 1 to toggle it to zero.
-            if r.dtog_rx().bit_is_set() {
-                bits = bits.dtog_rx().set_bit();
-            }
-
-            if r.dtog_tx().bit_is_set() {
-                bits.dtog_tx().set_bit()
-            } else {
-                bits
-            }
+                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
         });
     }
 
     fn close_device_endpoints(&self) {
         self.peripherals.USB.ep1r.modify(|r, w| unsafe {
-            let mut bits = w
-                .stat_tx()
+            w.stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
-                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled));
-
-            // If DTOG_RX is 1 then we need to write 1 to toggle it to zero.
-            if r.dtog_rx().bit_is_set() {
-                bits = bits.dtog_rx().set_bit();
-            }
-
-            if r.dtog_tx().bit_is_set() {
-                bits.dtog_tx().set_bit()
-            } else {
-                bits
-            }
+                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
         });
     }
 
@@ -1396,6 +1227,10 @@ impl<'a> USB<'a> {
             EndpointType::Device => self.peripherals.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_tx()
                     .bits(self.get_status_bits(r.stat_tx().bits(), status))
+                    .ctr_tx()
+                    .set_bit()
+                    .ctr_rx()
+                    .set_bit()
                     .dtog_tx()
                     .clear_bit()
                     .dtog_rx()
