@@ -33,7 +33,7 @@ $ cargo build --target=thumbv6m-none-eabi
 $ cargo build --target=thumbv6m-none-eabi --release
 ```
 2. Run `openocd -f openocd.cfg`
-3. In another terminal run `arm-none-eabi-gdb target/thumbv6m-none-eabi/release/kroneum-fw`
+3. In another terminal run `arm-none-eabi-gdb  -x openocd.gdb target/thumbv6m-none-eabi/release/kroneum-bin`
 
 # Firmware Upload via USB DFU
 
@@ -69,11 +69,13 @@ $ dfu-util -U fw-from-device.bin -a 0 -d 0483:df11
 
 ## Notes
 
-SVD file can be downloaded from http://www.st.com/en/microcontrollers/stm32f051r8.html. Make sure that SVD
+1. Steps 1-2 above can be replaces with just `$ ./scripts/flash.sh`.
+
+2. SVD file can be downloaded from http://www.st.com/en/microcontrollers/stm32f051r8.html. Make sure that SVD
 does not contain any `bitWidth` that equals to `0` and generate Rust lib with `svd2rust`.
 
-If binary is too large GDB may fail so try to use `--release` flag with `cargo build`.
+3. If binary is too large GDB may fail so try to use `--release` flag with `cargo build`.
 
-To reload program on the MCU use `monitor reset halt`
+4. To reload program on the MCU use `monitor reset halt`
 
-RTC & Low Power modes: https://github.com/mattico/stm32f0-Discovery_Tools/blob/master/ST_Example_Projects/Projects/Peripheral_Examples/PWR_CurrentConsumption/stm32f0xx_lp_modes.c
+5. RTC & Low Power modes: https://github.com/mattico/stm32f0-Discovery_Tools/blob/master/ST_Example_Projects/Projects/Peripheral_Examples/PWR_CurrentConsumption/stm32f0xx_lp_modes.c
