@@ -5,29 +5,21 @@
 
 extern crate panic_semihosting;
 
-// mod beeper;
-// mod button;
 mod config;
-// mod rtc;
-// mod systick;
 mod usb;
 
 use core::cell::RefCell;
 
-use core::ptr::read_volatile;
+// use core::ptr::read_volatile;
 use cortex_m::{
-    asm,
+    // asm,
     interrupt::{free, Mutex},
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
-// use cortex_m_semihosting::hprintln;
-
-// use beeper::Beeper;
-// use button::Button;
 use usb::{
-    pma::{PacketMemoryArea, PacketMemoryArea1},
+    pma::{PacketMemoryArea},
     USB,
 };
 
@@ -35,13 +27,23 @@ struct AppState {
     device_peripherals: Peripherals,
     core_peripherals: CorePeripherals,
     usb: usb::UsbState,
-    pma: &'static mut PacketMemoryArea,
-    reset_count: u8,
-    ctr_count: u16,
-    debug_displayed: bool,
+    pma: PacketMemoryArea,
 }
 
 static STATE: Mutex<RefCell<Option<AppState>>> = Mutex::new(RefCell::new(None));
+
+fn interrupt_free<F>(f: F) -> ()
+    where
+        F: FnOnce(&mut AppState),
+{
+    free(|cs| {
+        if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {
+            f(s);
+        } else {
+            panic!("Can not borrow peripherals!");
+        }
+    });
+}
 
 fn system_init(peripherals: &Peripherals) {
     // Enable HSI48.
@@ -118,81 +120,17 @@ fn system_init(peripherals: &Peripherals) {
         .afrh
         .modify(|_, w| unsafe { w.afrh11().bits(af2_usb).afrh12().bits(af2_usb) });
 }
-/*
-fn toggle_leds(p: &Peripherals, on: bool) {
-    p.GPIOA.bsrr.write(|w| {
-        if on {
-            w.bs2().set_bit().bs3().set_bit().bs4().set_bit()
-        } else {
-            w.br2().set_bit().br3().set_bit().br4().set_bit()
-        }
-    });
-}*/
-
-fn blue_on(p: &Peripherals) {
-    p.GPIOA.bsrr.write(|w| w.bs2().set_bit());
-}
-
-pub fn red_on(p: &Peripherals) {
-    p.GPIOA.bsrr.write(|w| w.bs4().set_bit());
-}
-
-pub fn green_on(p: &Peripherals) {
-    p.GPIOA.bsrr.write(|w| w.bs3().set_bit());
-}
-
-pub fn has_address() -> bool {
-    const A: *mut u32 = (0x4000_6000) as *mut u32;
-    const B: *mut u32 = (0x4000_6000 + 0x8) as *mut u32;
-    let a = unsafe { read_volatile(A) };
-    let b = unsafe { read_volatile(B) };
-
-    (a >> 16) as u16 == 0x60 && (b >> 16) as u16 == 0x20
-}
-
-/*pub fn toggle_number(p: &Peripherals, num: u8) {
-    toggle_leds(p, false);
-
-    match num {
-        0 => {},
-        1 => red_on(p),
-        2 => green_on(p),
-        3 => {
-            green_on(p);
-            red_on(p);
-        },
-        4 => blue_on(p),
-        5 => {
-            blue_on(p);
-            red_on(p);
-        }
-        6 => {
-            blue_on(p);
-            green_on(p);
-        }
-        _ => {
-            red_on(p);
-            green_on(p);
-            blue_on(p);
-        }
-    }
-}*/
 
 // Read about interrupt setup sequence at:
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
 #[entry]
 fn main() -> ! {
     free(|cs| {
-        let pma = unsafe { &mut *PacketMemoryArea1.get() };
-
         *STATE.borrow(cs).borrow_mut() = Some(AppState {
             device_peripherals: Peripherals::take().unwrap(),
             core_peripherals: cortex_m::Peripherals::take().unwrap(),
             usb: usb::UsbState::default(),
-            pma,
-            reset_count: 0,
-            ctr_count: 0,
-            debug_displayed: false,
+            pma: PacketMemoryArea {},
         });
     });
 
@@ -211,130 +149,27 @@ fn main() -> ! {
     loop {}
 }
 
-/*
-#[interrupt]
-fn EXTI0_1() {
-    interrupt_free(|state| {
-        //toggle_leds(&state.device_peripherals, false);
-
-        USB::acquire(
-            &mut state.core_peripherals,
-            &state.device_peripherals,
-            &mut state.usb,
-            state.pma,
-            |mut usb| {
-                usb.stop();
-            },
-        );
-    });
-}
-*/
-
 #[interrupt]
 fn USB() {
     interrupt_free(|state| {
-        /* let istr = state.device_peripherals.USB.istr.read();
-        let is_reset = istr.reset().bit_is_set();
-        let is_ctr = istr.ctr().bit_is_set();
-        let is_ovr = istr.pmaovr().bit_is_set();
-        let is_err = istr.err().bit_is_set();*/
-
         USB::acquire(
             &mut state.core_peripherals,
             &state.device_peripherals,
             &mut state.usb,
-            state.pma,
+            &state.pma,
             |mut usb| {
                 usb.interrupt();
             },
         );
-
-        //if is_ctr {
-        // toggle_number(&state.device_peripherals, state.device_peripherals.USB.ep0r.read().stat_rx().bits());
-        /*if state.device_peripherals.USB.ep0r.read().stat_rx().bits() == 0b11 {
-            blue_on(&state.device_peripherals);
-        } else {
-            green_on(&state.device_peripherals);
-        };*/
-        //}
-
-        /*
-        if !is_reset {
-            //state.reset_count = state.reset_count + 1;
-            toggle_number(&state.device_peripherals, 5);
-        }*/
-
-        /* if is_ctr {
-            state.ctr_count = state.ctr_count + 1;
-            toggle_number(&state.device_peripherals, state.ctr_count as u8);
-            if state.err_count % 300 == 0 {
-                toggle_number(&state.device_peripherals, (state.err_count / 1000) as u8);
-            }
-        }*/
-
-        /*if is_reset && !has_address() {
-            blue_on(&state.device_peripherals);
-        }
-
-        if !is_reset && state.reset_count > 0 && !has_address() && !state.debug_displayed {
-            green_on(&state.device_peripherals);
-
-            if is_ctr {
-                red_on(&state.device_peripherals);
-            }
-        }*/
-
-        /*  if is_reset {
-            toggle_number(&state.device_peripherals, state.esof_count);
-        }*/
-
-        /*if is_reset {
-            const A: *mut u32 = (0x4000_6000) as *mut u32;
-            const B: *mut u32 = (0x4000_6000 + 0x8) as *mut u32;
-            let a = unsafe { read_volatile(A) };
-            let b = unsafe { read_volatile(B) };
-
-            if (a >> 16) as u16 == 0x50 && (b >> 16) as u16 == 0x10 {
-                blue_on(&state.device_peripherals);
-            }
-
-            state.reset_count = state.reset_count + 1;
-        } else if state.reset_count {
-            const A: *mut u32 = (0x4000_6000) as *mut u32;
-            const B: *mut u32 = (0x4000_6000 + 0x8) as *mut u32;
-            let a = unsafe { read_volatile(A) };
-            let b = unsafe { read_volatile(B) };
-
-            if (a >> 16) as u16 == 0x50 && (b >> 16) as u16 == 0x10 {
-                green_on(&state.device_peripherals);
-            }
-        }*/
     });
 }
 
 #[exception]
 fn DefaultHandler(irqn: i16) {
-    // interrupt_free(|state| toggle_leds(&state.device_peripherals, false));
-
     panic!("unhandled exception (IRQn={})", irqn);
 }
 
 #[exception]
 fn HardFault(_ef: &ExceptionFrame) -> ! {
-    // interrupt_free(|state| toggle_leds(&state.device_peripherals, false));
-
     loop {}
-}
-
-fn interrupt_free<F>(f: F) -> ()
-where
-    F: FnOnce(&mut AppState),
-{
-    free(|cs| {
-        if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {
-            f(s);
-        } else {
-            panic!("Can not borrow peripherals!");
-        }
-    });
 }

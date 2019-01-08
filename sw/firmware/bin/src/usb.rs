@@ -5,7 +5,6 @@ use cortex_m::{asm, Peripherals as CorePeripherals};
 use stm32f0x2::{Interrupt, Peripherals};
 
 use pma::PacketMemoryArea;
-use crate::config::BTABLE_ADDRESS;
 
 pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
     0x04, 0x03, //
@@ -301,10 +300,8 @@ enum Endpoint<'a> {
 
 #[derive(Copy, Clone)]
 enum EndpointType {
-    Bulk = 0b0,
-    Control = 0b01,
-    Iso = 0b10,
-    Interrupt = 0b11,
+    Control = 0b0,
+    Device = 0b1,
 }
 
 #[derive(Copy, Clone)]
@@ -383,29 +380,17 @@ impl Default for UsbState {
 pub struct USB<'a> {
     core_peripherals: &'a mut CorePeripherals,
     peripherals: &'a Peripherals,
-    /*pma: PacketMemoryArea,*/
-    pma: &'a mut PacketMemoryArea,
+    pma: &'a PacketMemoryArea,
     state: &'a mut UsbState,
 }
-
-const CONTROL_OUT_PMA_ADDRESS: u16 = 0x40;
-const CONTROL_IN_PMA_ADDRESS: u16 = 0x80;
-const DEVICE_IN_PMA_ADDRESS: u16 = 0xA0;
-const DEVICE_OUT_PMA_ADDRESS: u16 = 0xE0;
-
-static mut USB_INTERRUPT_COUNTER: u8 = 0;
 
 impl<'a> USB<'a> {
     pub fn new(
         core_peripherals: &'a mut CorePeripherals,
         peripherals: &'a Peripherals,
         state: &'a mut UsbState,
-        pma: &'a mut PacketMemoryArea,
+        pma: &'a PacketMemoryArea,
     ) -> USB<'a> {
-        /*let pma = unsafe { &mut *PacketMemoryArea1.get() };
-        pma.clear();*/
-        /* let pma = PacketMemoryArea {};*/
-
         USB {
             core_peripherals,
             peripherals,
@@ -418,7 +403,7 @@ impl<'a> USB<'a> {
         core_peripherals: &'b mut CorePeripherals,
         peripherals: &'b Peripherals,
         state: &'b mut UsbState,
-        pma: &'b mut PacketMemoryArea,
+        pma: &'b PacketMemoryArea,
         f: F,
     ) -> ()
     where
@@ -453,13 +438,11 @@ impl<'a> USB<'a> {
 
         self.set_interrupt_mask();
 
-        self.peripherals.USB.btable.write(|w| unsafe { w.btable().bits(BTABLE_ADDRESS) });
-
-        self.pma.clear();
-        self.set_tx_addr(CONTROL_IN_PMA_ADDRESS);
+        self.pma.init();
+        /*self.set_tx_addr(CONTROL_IN_PMA_ADDRESS);
         self.set_tx_count(0);
         self.set_rx_addr(CONTROL_OUT_PMA_ADDRESS);
-        self.set_rx_count(0);
+        self.set_rx_count(0);*/
 
         self.peripherals.USB.bcdr.modify(|_, w| w.dppu().set_bit());
     }
@@ -545,38 +528,6 @@ impl<'a> USB<'a> {
 
         self.update_address(0);
         self.open_control_endpoints();
-    }
-
-    fn get_tx_addr(&self) -> u16 {
-        return self.pma.get_u16(BTABLE_ADDRESS as usize);
-    }
-
-    fn set_tx_addr(&self, address: u16) {
-        return self.pma.set_u16(BTABLE_ADDRESS as usize, address);
-    }
-
-    fn get_tx_count(&self) -> u16 {
-        return self.pma.get_u16((BTABLE_ADDRESS + 2) as usize);
-    }
-
-    fn set_tx_count(&self, count: u16) {
-        return self.pma.set_u16((BTABLE_ADDRESS + 2) as usize, count);
-    }
-
-    fn get_rx_addr(&self) -> u16 {
-        return self.pma.get_u16((BTABLE_ADDRESS + 4) as usize);
-    }
-
-    fn set_rx_addr(&self, address: u16) {
-        return self.pma.set_u16((BTABLE_ADDRESS + 4) as usize, address);
-    }
-
-    fn get_rx_count(&self) -> u16 {
-        return self.pma.get_u16((BTABLE_ADDRESS + 6) as usize) & 0x3ff;
-    }
-
-    fn set_rx_count(&self, count: u16) {
-        return self.pma.set_u16((BTABLE_ADDRESS + 6) as usize, 0x8400 | count);
     }
 
     #[no_mangle]
@@ -676,38 +627,33 @@ impl<'a> USB<'a> {
         /* let base_add_1 = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize);
         let base_add_2 = self.pma.get_u16(CONTROL_OUT_PMA_ADDRESS as usize);*/
 
-        /* let arr = [
+       /* let arr = [
             self.pma.get_u16(0),
-            // self.read(0x40006000),
             self.pma.get_u16(2),
-            // self.read(0x40006000 + 4),
             self.pma.get_u16(4),
-            // self.read(0x40006000 + 8),
             self.pma.get_u16(6),
-            // self.pma.get_u16(6) & 0x3ff,
-            self.pma.get_u16(8),
-            // self.pma.get_u16(10),
-            // self.pma.get_u16(12),
-            // self.read(0x40006000 + 12),
             self.pma.get_u16(CONTROL_OUT_PMA_ADDRESS as usize),
-            // self.read(0x40006080),
-            self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize),
-            // self.read(0x40006100),
+            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 2) as usize),
+            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 4) as usize),
+            self.pma.get_u16((CONTROL_OUT_PMA_ADDRESS + 6) as usize),
         ];
 
-        let addr = [
-            self.read_u32(0x40005C50),
-            self.read_u32(0x40005C00)
+        let arr2 = [
+            self.pma.get_u16_old(0 / 2),
+            self.pma.get_u16_old(2 / 2),
+            self.pma.get_u16_old(4 / 2),
+            self.pma.get_u16_old(6 / 2),
+            self.pma.get_u16_old((CONTROL_OUT_PMA_ADDRESS / 2) as usize),
+            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 2) / 2) as usize),
+            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 4) / 2) as usize),
+            self.pma.get_u16_old(((CONTROL_OUT_PMA_ADDRESS + 6) / 2) as usize),
         ];
 
         self.blue_on();
-        //asm::bkpt();
-        if arr.iter().all(|&x| x > 0) && addr.iter().all(|&x| x > 0) {
+        asm::bkpt();
+        if arr.iter().all(|&x| x > 0) && arr2.iter().all(|&x| x > 0) {
             self.green_on();
-        } else if arr.iter().any(|&x|x == 0x0680 || x == 0x8006) {
-            self.red_on();
-        }
-        */
+        }*/
 
         /*asm::bkpt();
 
@@ -720,26 +666,25 @@ impl<'a> USB<'a> {
         }*/
 
         let btable = [
-            self.get_tx_addr(),
-            self.get_tx_count(),
-            self.get_rx_addr(),
-            self.get_rx_count(),
+            self.pma.get_tx_addr(EndpointType::Control),
+            self.pma.get_tx_count(EndpointType::Control),
+            self.pma.get_rx_addr(EndpointType::Control),
+            self.pma.get_rx_count(EndpointType::Control),
         ];
 
-        let base_address = CONTROL_OUT_PMA_ADDRESS as usize;
         let setup_packet = [
-            self.pma.get_u16(base_address),
-            self.pma.get_u16(base_address + 2),
-            self.pma.get_u16(base_address + 4),
-            self.pma.get_u16(base_address + 6),
+            self.pma.read(EndpointType::Control, 0),
+            self.pma.read(EndpointType::Control, 2),
+            self.pma.read(EndpointType::Control, 4),
+            self.pma.read(EndpointType::Control, 6),
         ];
 
-        let c_setup_packet = [
+     /*   let c_setup_packet = [
             self.read(0x40006000),
             self.read(0x40006002),
             self.read(0x40006004),
             self.read(0x40006006)
-        ];
+        ];*/
 
         let setup_packet_length = btable[3];
 
@@ -858,10 +803,7 @@ impl<'a> USB<'a> {
 
     fn handle_get_descriptor(&mut self, request_header: UsbRequestHeader) {
         let data_to_send: Option<&[u8]> = match (&request_header.value >> 8) as u16 {
-            1 => {
-                self.green_on();
-                Some(&DEV_DESC)
-            },
+            1 => Some(&DEV_DESC),
             2 => Some(&CONF_DESC),
             3 => self.get_descriptor_string(&request_header),
             _ => None,
@@ -1225,29 +1167,29 @@ impl<'a> USB<'a> {
 
     fn send_control_data(&mut self, data: Option<&[u8]>) {
         self.update_control_endpoint_state(ControlEndpointState::DataIn);
-        self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, data);
+        self.send_data(EndpointType::Control, data);
     }
 
     fn send_control_zero_length_packet(&mut self) {
         self.update_control_endpoint_state(ControlEndpointState::StatusIn);
-        self.send_data(EndpointType::Control, CONTROL_IN_PMA_ADDRESS, None);
+        self.send_data(EndpointType::Control, None);
     }
 
-    fn send_data(&self, endpoint_type: EndpointType, pma_address: u16, data: Option<&[u8]>) {
+    fn send_data(&self, endpoint_type: EndpointType, data: Option<&[u8]>) {
         let length = data
             .and_then(|d| {
-                self.pma.write_buffer_u8(pma_address as usize, &d);
+                self.pma.write(endpoint_type, &d);
                 Some(d)
             })
             .map_or(0, |d| d.len() as u16);
 
         // Now that the PMA memory is prepared, set the length and tell the peripheral to send it.
-        let (tx_count_offset, endpoint) = match endpoint_type {
-            EndpointType::Control => (2, Endpoint::Endpoint0(&self.peripherals.USB.ep0r)),
-            _ => (10, Endpoint::Endpoint1(&self.peripherals.USB.ep1r)),
+        let endpoint = match endpoint_type {
+            EndpointType::Control => Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
+            EndpointType::Device => Endpoint::Endpoint1(&self.peripherals.USB.ep1r),
         };
 
-        self.pma.set_u16(tx_count_offset, length);
+        self.pma.set_tx_count(endpoint_type, length);
         self.set_tx_endpoint_status(&endpoint, EndpointStatus::Valid);
     }
 
@@ -1350,17 +1292,9 @@ impl<'a> USB<'a> {
     }
 
     fn open_device_endpoints(&self) {
-        self.pma.set_u16(8, DEVICE_IN_PMA_ADDRESS);
-        self.pma.set_u16(10, 0);
-        self.pma.set_u16(12, DEVICE_OUT_PMA_ADDRESS);
-        self.pma.set_u16(
-            14,
-            0x8400 as u16, /* 32 byte size, 1 block = 64 bytes */
-        );
-
         self.peripherals.USB.ep1r.modify(|r, w| unsafe {
             w.ep_type()
-                .bits(EndpointType::Interrupt as u8)
+                .bits(EndpointType::Device as u8)
                 .ea()
                 .bits(0x1)
                 .stat_tx()
