@@ -1,5 +1,5 @@
-use core::ops::Deref;
 use super::EndpointType;
+use core::ops::Deref;
 
 const BTABLE_ADDRESS: usize = 0x4000_6000;
 const CONTROL_OUT_PMA_ADDRESS: u16 = 0x10;
@@ -69,28 +69,28 @@ impl PacketMemoryAreaAccessor {
         assert_eq!((offset & 0x01), 0);
         match endpoint {
             EndpointType::Control => self.get_u16((CONTROL_OUT_PMA_ADDRESS + offset) as usize),
-            EndpointType::Device => self.get_u16((DEVICE_OUT_PMA_ADDRESS + offset) as usize)
+            EndpointType::Device => self.get_u16((DEVICE_OUT_PMA_ADDRESS + offset) as usize),
         }
     }
 
     pub fn write(&self, endpoint: EndpointType, buf: &[u8]) {
         match endpoint {
             EndpointType::Control => self.write_buffer_u8(CONTROL_IN_PMA_ADDRESS as usize, buf),
-            EndpointType::Device => self.write_buffer_u8(DEVICE_OUT_PMA_ADDRESS as usize, buf)
+            EndpointType::Device => self.write_buffer_u8(DEVICE_OUT_PMA_ADDRESS as usize, buf),
         }
     }
 
-    pub fn get_u16(&self, offset: usize) -> u16 {
+    fn get_u16(&self, offset: usize) -> u16 {
         assert_eq!((offset & 0x01), 0);
         self.cells[offset >> 1].get()
     }
 
-    pub fn set_u16(&self, offset: usize, val: u16) {
+    fn set_u16(&self, offset: usize, val: u16) {
         assert_eq!((offset & 0x01), 0);
         self.cells[offset >> 1].set(val);
     }
 
-    pub fn write_buffer_u8(&self, base_offset: usize, buf: &[u8]) {
+    fn write_buffer_u8(&self, base_offset: usize, buf: &[u8]) {
         let mut last_value: u16 = 0;
         let mut last_offset: usize = 0;
 
@@ -109,10 +109,6 @@ impl PacketMemoryAreaAccessor {
         if last_offset & 1 == 0 {
             self.set_u16(base_offset + last_offset, last_value);
         }
-    }
-
-    fn get_address(&self, offset: usize) -> *mut u16 {
-        (BTABLE_ADDRESS + offset) as *mut u16
     }
 }
 

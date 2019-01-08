@@ -9,19 +9,13 @@ mod config;
 mod usb;
 
 use core::cell::RefCell;
-
-// use core::ptr::read_volatile;
 use cortex_m::{
-    // asm,
     interrupt::{free, Mutex},
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
-use usb::{
-    pma::{PacketMemoryArea},
-    USB,
-};
+use usb::{pma::PacketMemoryArea, USB};
 
 struct AppState {
     device_peripherals: Peripherals,
@@ -33,8 +27,8 @@ struct AppState {
 static STATE: Mutex<RefCell<Option<AppState>>> = Mutex::new(RefCell::new(None));
 
 fn interrupt_free<F>(f: F) -> ()
-    where
-        F: FnOnce(&mut AppState),
+where
+    F: FnOnce(&mut AppState),
 {
     free(|cs| {
         if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {

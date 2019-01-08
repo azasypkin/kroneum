@@ -627,7 +627,7 @@ impl<'a> USB<'a> {
         /* let base_add_1 = self.pma.get_u16(CONTROL_IN_PMA_ADDRESS as usize);
         let base_add_2 = self.pma.get_u16(CONTROL_OUT_PMA_ADDRESS as usize);*/
 
-       /* let arr = [
+        /* let arr = [
             self.pma.get_u16(0),
             self.pma.get_u16(2),
             self.pma.get_u16(4),
@@ -661,7 +661,7 @@ impl<'a> USB<'a> {
             self.blue_on();
         }*/
 
-       /* if setup_packet[1] > 0 && setup_packet.iter().any(|&x| x == 0x0680 || x == 0x8060) {
+        /* if setup_packet[1] > 0 && setup_packet.iter().any(|&x| x == 0x0680 || x == 0x8060) {
             asm::bkpt();
         }*/
 
@@ -679,7 +679,7 @@ impl<'a> USB<'a> {
             self.pma.read(EndpointType::Control, 6),
         ];
 
-     /*   let c_setup_packet = [
+        /*   let c_setup_packet = [
             self.read(0x40006000),
             self.read(0x40006002),
             self.read(0x40006004),
@@ -695,7 +695,7 @@ impl<'a> USB<'a> {
             setup_packet[3],
         ));
 
-       /* asm::bkpt();
+        /* asm::bkpt();
 
         if setup_packet.iter().any(|&x| x > 0) && btable.iter().any(|&x| x > 0) && c_setup_packet.iter().any(|&x| x > 0) {
             self.blue_on();
@@ -747,8 +747,7 @@ impl<'a> USB<'a> {
 
         // Here we can check the amount of data and do smth with it....
 
-        /* 32 byte size, 1 block = 64 bytes */
-        self.pma.set_u16(6, 0x8400 as u16);
+        self.pma.set_rx_count(EndpointType::Control, 0);
 
         self.set_rx_endpoint_status(&Endpoint::Endpoint0(endpoint), EndpointStatus::Valid);
     }
@@ -775,7 +774,7 @@ impl<'a> USB<'a> {
             self.update_control_endpoint_state(ControlEndpointState::DataOut);
 
             // Prepare for premature end of transfer.
-            self.pma.set_u16(6, 8400);
+            self.pma.set_rx_count(EndpointType::Control, 0);
             self.set_rx_endpoint_status(&Endpoint::Endpoint0(&endpoint), EndpointStatus::Valid);
         }
 
@@ -969,7 +968,8 @@ impl<'a> USB<'a> {
             // CUSTOM_HID_REQ_SET_REPORT
             UsbRequest::SetConfiguration => {
                 self.update_control_endpoint_state(ControlEndpointState::DataOut);
-                self.pma.set_u16(6, request_header.length);
+                self.pma
+                    .set_rx_count(EndpointType::Control, request_header.length);
                 self.set_rx_endpoint_status(
                     &Endpoint::Endpoint0(&self.peripherals.USB.ep0r),
                     EndpointStatus::Valid,
@@ -1092,8 +1092,7 @@ impl<'a> USB<'a> {
 
         // Here we can check the amount of data and do smth with it....
 
-        self.pma
-            .set_u16(14, 0x8000 | (1 << 10) /* 32 byte size, 1 block */);
+        self.pma.set_rx_count(EndpointType::Device, 0);
 
         self.set_rx_endpoint_status(&Endpoint::Endpoint1(endpoint), EndpointStatus::Valid);
     }
@@ -1277,8 +1276,10 @@ impl<'a> USB<'a> {
         self.peripherals.USB.ep0r.write(|w| unsafe {
             w.ep_type()
                 .bits(0b01)
-                .ctr_rx().set_bit()
-                .ctr_tx().set_bit()
+                .ctr_rx()
+                .set_bit()
+                .ctr_tx()
+                .set_bit()
                 .stat_tx()
                 .bits(self.get_status_bits(0, EndpointStatus::Nak))
                 .stat_rx()

@@ -10,7 +10,6 @@ license = "MIT"
 repository = "https://github.com/azasypkin/kroneum"
 
 [dependencies]
-bare-metal = "0.2.4"
 cortex-m = "0.5.8"
 cortex-m-rt = "0.6.7"
 cortex-m-semihosting = "0.3.2"
@@ -25,4 +24,4 @@ test = false
 bench = false
 
 [features]
-default = ["stm32f0x2", "stm32f0x2/rt", "bare-metal/const-fn"]
+default = ["stm32f0x2", "stm32f0x2/rt"]
