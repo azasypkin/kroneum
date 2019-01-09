@@ -1,17 +1,16 @@
+mod descriptors;
 pub mod pma;
 mod setup_packet;
-mod descriptors;
 
 use cortex_m::Peripherals as CorePeripherals;
 use stm32f0x2::{Interrupt, Peripherals};
 
+use descriptors::*;
 use pma::PacketMemoryArea;
 use setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
-use descriptors::*;
-
 
 #[derive(Copy, Clone)]
-enum EndpointType {
+pub enum EndpointType {
     Control = 0b0,
     Device = 0b1,
 }
@@ -185,14 +184,6 @@ impl<'a> USB<'a> {
                 .istr
                 .write(|w| unsafe { w.bits(0xDFFF) });
         }
-
-        /*if istr.susp().bit_is_set() {
-            self.suspend();
-        }
-
-        if istr.wkup().bit_is_set() {
-            self.wake_up();
-        }*/
 
         // Clear SUSP, SOF and ESOF
         self.peripherals
@@ -740,51 +731,11 @@ impl<'a> USB<'a> {
         self.set_tx_endpoint_status(endpoint_type, EndpointStatus::Valid);
     }
 
-    fn suspend(&mut self) {
-        self.peripherals
-            .USB
-            .istr
-            .modify(|_, w| w.susp().clear_bit());
-
-        // suspend and low power mode
-        self.peripherals
-            .USB
-            .cntr
-            .modify(|_, w| w.fsusp().set_bit().lpmode().set_bit());
-
-        self.update_device_state(DeviceState::Suspended);
-    }
-
-    fn wake_up(&mut self) {
-        // Come out of low power mode.
-        self.peripherals
-            .USB
-            .cntr
-            .modify(|_, w| w.lpmode().clear_bit());
-        self.set_interrupt_mask();
-
-        // clear interrupt flag
-        self.peripherals
-            .USB
-            .istr
-            .modify(|_, w| w.wkup().clear_bit());
-
-        self.update_device_state(DeviceState::WokenUp);
-    }
-
     fn set_interrupt_mask(&self) {
-        self.peripherals.USB.cntr.modify(|_, w| {
-            w.ctrm()
-                .set_bit()
-                /*.wkupm()
-                .set_bit()
-                .suspm()
-                .set_bit()*/
-                .errm()
-                .set_bit()
-                .resetm()
-                .set_bit()
-        });
+        self.peripherals
+            .USB
+            .cntr
+            .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
     }
 
     fn update_device_state(&mut self, device_state: DeviceState) {

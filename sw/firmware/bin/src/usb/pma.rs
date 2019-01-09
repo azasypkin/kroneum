@@ -32,10 +32,6 @@ impl PacketMemoryAreaAccessor {
         self.set_rx_count(EndpointType::Device, 0);
     }
 
-    pub fn get_tx_addr(&self, endpoint: EndpointType) -> u16 {
-        return self.get_u16((endpoint as usize) * 8);
-    }
-
     pub fn set_tx_addr(&self, endpoint: EndpointType, address: u16) {
         return self.set_u16((endpoint as usize) * 8, address);
     }
@@ -46,10 +42,6 @@ impl PacketMemoryAreaAccessor {
 
     pub fn set_tx_count(&self, endpoint: EndpointType, count: u16) {
         return self.set_u16((endpoint as usize) * 8 + 2, count);
-    }
-
-    pub fn get_rx_addr(&self, endpoint: EndpointType) -> u16 {
-        return self.get_u16((endpoint as usize) * 8 + 4);
     }
 
     pub fn set_rx_addr(&self, endpoint: EndpointType, address: u16) {
