@@ -5,7 +5,7 @@ pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
 
 // To get unicode code in JS web console use e.g. `0x${'K'.charCodeAt(0).toString(16)}`
 pub const MANUFACTURER_STR: [u8; 24] = [
-    0x26, 0x03, //
+    0x18, 0x03, // 24 (length)
     0x4b, 0x00, // K
     0x72, 0x00, // r
     0x6f, 0x00, // o
@@ -20,7 +20,7 @@ pub const MANUFACTURER_STR: [u8; 24] = [
 ];
 
 pub const PRODUCT_STR: [u8; 16] = [
-    0x1c, 0x03, //
+    0x10, 0x03, // 16 (length)
     0x4b, 0x00, // K
     0x72, 0x00, // r
     0x6f, 0x00, // o
@@ -31,7 +31,7 @@ pub const PRODUCT_STR: [u8; 16] = [
 ];
 
 pub const SERIAL_NUMBER_STR: [u8; 12] = [
-    0x0e, 0x03, //
+    0x0c, 0x03, // 12 (length)
     0x31, 0x00, // 1
     0x2e, 0x00, // .
     0x30, 0x00, // 0
@@ -40,7 +40,7 @@ pub const SERIAL_NUMBER_STR: [u8; 12] = [
 ];
 
 pub const CONF_STR: [u8; 26] = [
-    0x28, 0x03, //
+    0x1a, 0x03, // 26 (length)
     0x4b, 0x00, // K
     0x72, 0x00, // r
     0x6f, 0x00, // o
@@ -56,7 +56,7 @@ pub const CONF_STR: [u8; 26] = [
 ];
 
 pub const INTERFACE_STR: [u8; 22] = [
-    0x20, 0x03, //
+    0x16, 0x03, // 22 (length)
     0x4b, 0x00, // K
     0x72, 0x00, // r
     0x6f, 0x00, // o
