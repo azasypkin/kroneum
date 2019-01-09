@@ -1,297 +1,14 @@
 pub mod pma;
+mod setup_packet;
+mod descriptors;
 
-use core::ptr::read_volatile;
-use cortex_m::{asm, Peripherals as CorePeripherals};
+use cortex_m::Peripherals as CorePeripherals;
 use stm32f0x2::{Interrupt, Peripherals};
 
 use pma::PacketMemoryArea;
+use setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
+use descriptors::*;
 
-pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
-    0x04, 0x03, //
-    0x09, 0x04, // English - US
-];
-
-pub const MANUFACTURER_STR: [u8; 38] = [
-    0x26, 0x03, //
-    0x52, 0x00, // R
-    0x75, 0x00, // u
-    0x73, 0x00, // s
-    0x74, 0x00, // t
-    0x79, 0x00, // y
-    0x20, 0x00, //
-    0x4d, 0x00, // M
-    0x61, 0x00, // a
-    0x6e, 0x00, // n
-    0x75, 0x00, // u
-    0x66, 0x00, // f
-    0x61, 0x00, // a
-    0x63, 0x00, // c
-    0x74, 0x00, // t
-    0x75, 0x00, // u
-    0x72, 0x00, // r
-    0x65, 0x00, // e
-    0x72, 0x00, // r
-];
-
-pub const PRODUCT_STR: [u8; 28] = [
-    0x1c, 0x03, //
-    0x52, 0x00, // R
-    0x75, 0x00, // u
-    0x73, 0x00, // s
-    0x74, 0x00, // t
-    0x79, 0x00, // y
-    0x20, 0x00, //
-    0x50, 0x00, // P
-    0x72, 0x00, // r
-    0x6f, 0x00, // o
-    0x64, 0x00, // d
-    0x75, 0x00, // u
-    0x63, 0x00, // c
-    0x74, 0x00, // t
-];
-
-pub const SERIAL_NUMBER_STR: [u8; 14] = [
-    0x0e, 0x03, //
-    0x31, 0x00, // 1
-    0x32, 0x00, // 2
-    0x33, 0x00, // 3
-    0x41, 0x00, // A
-    0x42, 0x00, // B
-    0x43, 0x00, // C
-];
-
-pub const CONF_STR: [u8; 40] = [
-    0x28, 0x03, //
-    0x52, 0x00, // R
-    0x75, 0x00, // u
-    0x73, 0x00, // s
-    0x74, 0x00, // t
-    0x79, 0x00, // y
-    0x20, 0x00, //
-    0x43, 0x00, // C
-    0x6f, 0x00, // o
-    0x6e, 0x00, // n
-    0x66, 0x00, // f
-    0x69, 0x00, // i
-    0x67, 0x00, // g
-    0x75, 0x00, // u
-    0x72, 0x00, // r
-    0x61, 0x00, // a
-    0x74, 0x00, // t
-    0x69, 0x00, // i
-    0x6f, 0x00, // o
-    0x6e, 0x00, // n
-];
-
-pub const INTERFACE_STR: [u8; 32] = [
-    0x20, 0x03, //
-    0x52, 0x00, // R
-    0x75, 0x00, // u
-    0x73, 0x00, // s
-    0x74, 0x00, // t
-    0x79, 0x00, // y
-    0x20, 0x00, //
-    0x49, 0x00, // I
-    0x6e, 0x00, // n
-    0x74, 0x00, // t
-    0x65, 0x00, // e
-    0x72, 0x00, // r
-    0x66, 0x00, // f
-    0x61, 0x00, // a
-    0x63, 0x00, // c
-    0x65, 0x00, // e
-];
-
-pub const DEV_DESC: [u8; 18] = [
-    0x12, // bLength
-    0x01, // bDescriptorType (Device)
-    0x00, 0x02, // bcdUSB 2.00
-    0x00, // bDeviceClass (Use class information in the Interface Descriptors)
-    0x00, // bDeviceSubClass
-    0x00, // bDeviceProtocol
-    0x40, // bMaxPacketSize0 64
-    0xFF, 0xFF, // idVendor 0xFFFF
-    0xFF, 0xFF, // idProduct 0xFFFF
-    0x01, 0x00, // bcdDevice 0.01
-    0x01, // iManufacturer (String Index)
-    0x02, // iProduct (String Index)
-    0x03, // iSerialNumber (String Index)
-    0x01, // bNumConfigurations 1
-];
-
-pub const CONF_DESC: [u8; 41] = [
-    0x09, // bLength
-    0x02, // bDescriptorType (Configuration)
-    0x29, 0x00, // wTotalLength
-    0x01, // bNumInterfaces
-    0x01, // bConfigurationValue
-    0x04, // iConfiguration (String Index)
-    0x80, // bmAttributes
-    0xFA, // bMaxPower 500mA
-    0x09, // bLength
-    0x04, // bDescriptorType (Interface)
-    0x00, // bInterfaceNumber 0
-    0x00, // bAlternateSetting
-    0x02, // bNumEndpoints 2
-    0x03, // bInterfaceClass
-    0x00, // bInterfaceSubClass 1=BOOT, 0=no boot
-    0x00, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
-    0x00, // iInterface (String Index)
-    // HID descriptor
-    0x09, // bLength
-    0x21, // bDescriptorType (HID)
-    0x11, 0x01, // bcdHID 1.11
-    0x00, // bCountryCode
-    0x01, // bNumDescriptors
-    0x22, // bDescriptorType[0] (HID)
-    0x20, 0x00, // wDescriptorLength[0] 32
-    // IN endpoint descriptor
-    0x07, // bLength
-    0x05, // bDescriptorType (Endpoint)
-    0x81, // bEndpointAddress (IN/D2H)
-    0x03, // bmAttributes (Interrupt)
-    0x40, 0x00, // wMaxPacketSize 64
-    0x20, // bInterval 1 (unit depends on device speed)
-    // OUT endpoint descriptor
-    0x07, // bLength
-    0x05, // bDescriptorType (Endpoint)
-    0x01, // bEndpointAddress (OUT/H2D)
-    0x03, // bmAttributes (Interrupt)
-    0x40, 0x00, // wMaxPacketSize 64
-    0x20, // bInterval 1 (unit depends on device speed)
-];
-
-// The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
-pub const HID_DESC: [u8; 9] = [
-    0x09, // bLength: CUSTOM_HID Descriptor size
-    0x21, // bDescriptorType (HID)
-    0x11, 0x01, // bcdHID 1.11
-    0x00, // bCountryCode
-    0x01, // bNumDescriptors
-    0x22, // bDescriptorType[0] (HID)
-    0x20, 0x00, // wDescriptorLength[0] 32
-];
-
-pub const REPORT_DESC: [u8; 32] = [
-    0x05, 0x01, // USAGE_PAGE (Generic Desktop)
-    0x09, 0x00, // USAGE (Undefined)
-    0xa1, 0x01, // COLLECTION (Application)
-    0x15, 0x00, //   LOGICAL_MINIMUM (0)
-    0x26, 0xff, 0x00, //   LOGICAL_MAXIMUM (255)
-    // IN report
-    0x85, 0x01, //   REPORT_ID (1)
-    0x75, 0x08, //   REPORT_SIZE (8)
-    0x95, 0x3f, // REPORT_COUNT (this is the byte length)
-    0x09, 0x00, //   USAGE (Undefined)
-    0x81, 0x82, //   INPUT (Data,Var,Abs,Vol)
-    // OUT report
-    0x85, 0x02, //   REPORT_ID (2)
-    0x75, 0x08, //   REPORT_SIZE (8)
-    0x95, 0x3f, // REPORT_COUNT (this is the byte length)
-    0x09, 0x00, //   USAGE (Undefined)
-    0x91, 0x82, //   OUTPUT (Data,Var,Abs,Vol)
-    0xc0, // END_COLLECTION
-];
-
-pub enum UsbRequestDirection {
-    HostToDevice,
-    DeviceToHost,
-}
-
-pub enum UsbRequestKind {
-    Standard,
-    Class,
-    Vendor,
-    Reserved,
-}
-
-pub enum UsbRequestRecipient {
-    Device,
-    Interface,
-    Endpoint,
-    Other,
-    Reserved,
-}
-
-#[repr(u8)]
-#[non_exhaustive]
-#[derive(Debug, Copy, Clone)]
-pub enum UsbRequest {
-    GetStatus = 0x00,
-    ClearFeature = 0x01,
-    Two = 0x02,
-    SetFeature = 0x03,
-    SetAddress = 0x05,
-    GetDescriptor = 0x06,
-    SetDescriptor = 0x07,
-    GetConfiguration = 0x08,
-    SetConfiguration = 0x09,
-    GetInterface = 0x0A,
-    SetInterface = 0x0B,
-    SynchFrame = 0x0C,
-}
-
-struct UsbRequestHeader {
-    request: UsbRequest,
-    dir: UsbRequestDirection,
-    kind: UsbRequestKind,
-    recipient: UsbRequestRecipient,
-    value: u16,
-    index: u16,
-    length: u16,
-}
-
-impl From<(u16, u16, u16, u16)> for UsbRequestHeader {
-    #[inline]
-    fn from((request_header, value, index, data_length): (u16, u16, u16, u16)) -> Self {
-        let request_type = (request_header & 0x00ff) as u8;
-        let request = ((request_header & 0xff00) >> 8) as u8;
-
-        UsbRequestHeader {
-            request: match request {
-                0x00 => UsbRequest::GetStatus,
-                0x01 => UsbRequest::ClearFeature,
-                0x02 => UsbRequest::Two,
-                0x03 => UsbRequest::SetFeature,
-                0x05 => UsbRequest::SetAddress,
-                0x06 => UsbRequest::GetDescriptor,
-                0x07 => UsbRequest::SetDescriptor,
-                0x08 => UsbRequest::GetConfiguration,
-                0x09 => UsbRequest::SetConfiguration,
-                0x0A => UsbRequest::GetInterface,
-                0x0B => UsbRequest::SetInterface,
-                0x0C => UsbRequest::SynchFrame,
-                _ => panic!("Unreachable"),
-            },
-            // Bit 7
-            dir: match request_type & 0x80 {
-                0x00 => UsbRequestDirection::HostToDevice,
-                0x80 => UsbRequestDirection::DeviceToHost,
-                _ => panic!("Unreachable"),
-            },
-            // Bits 6:5
-            kind: match request_type & 0x60 {
-                0x00 => UsbRequestKind::Standard,
-                0x20 => UsbRequestKind::Class,
-                0x40 => UsbRequestKind::Vendor,
-                0x60 => UsbRequestKind::Reserved,
-                _ => panic!("Unreachable"),
-            },
-            // Bits 4:0
-            recipient: match request_type & 0x1f {
-                0x00 => UsbRequestRecipient::Device,
-                0x01 => UsbRequestRecipient::Interface,
-                0x02 => UsbRequestRecipient::Endpoint,
-                0x03 => UsbRequestRecipient::Other,
-                0x04...0x1f => UsbRequestRecipient::Reserved,
-                _ => panic!("Unreachable"),
-            },
-            value,
-            index,
-            length: data_length,
-        }
-    }
-}
 
 #[derive(Copy, Clone)]
 enum EndpointType {
@@ -499,16 +216,6 @@ impl<'a> USB<'a> {
         self.open_control_endpoints();
     }
 
-    #[no_mangle]
-    fn read(&self, address: u32) -> u16 {
-        return unsafe { read_volatile(address as *mut u16) };
-    }
-
-    #[no_mangle]
-    fn read_u32(&self, address: u32) -> u32 {
-        return unsafe { read_volatile(address as *mut u32) };
-    }
-
     fn correct_transfer(&mut self) {
         // USB_ISTR_CTR is read only and will be automatically cleared by
         // hardware when we've processed all endpoint results.
@@ -548,20 +255,12 @@ impl<'a> USB<'a> {
     fn handle_control_setup_out_transfer(&mut self) {
         let endpoint_type = EndpointType::Control;
 
-        let setup_packet = [
+        let setup_packet_length = self.pma.get_rx_count(endpoint_type);
+        let setup_packet = SetupPacket::from((
             self.pma.read(endpoint_type, 0),
             self.pma.read(endpoint_type, 2),
             self.pma.read(endpoint_type, 4),
             self.pma.read(endpoint_type, 6),
-        ];
-
-        let setup_packet_length = self.pma.get_rx_count(endpoint_type);
-
-        let header = UsbRequestHeader::from((
-            setup_packet[0],
-            setup_packet[1],
-            setup_packet[2],
-            setup_packet[3],
         ));
 
         // Clear the 'correct transfer for reception' bit for this endpoint.
@@ -581,10 +280,10 @@ impl<'a> USB<'a> {
         });
         self.update_control_endpoint_state(ControlEndpointState::Setup(setup_packet_length));
 
-        match header.recipient {
-            UsbRequestRecipient::Device => self.handle_device_request(header),
-            UsbRequestRecipient::Interface => self.handle_interface_request(header),
-            UsbRequestRecipient::Endpoint => self.handle_endpoint_request(header),
+        match setup_packet.recipient {
+            RequestRecipient::Device => self.handle_device_request(setup_packet),
+            RequestRecipient::Interface => self.handle_interface_request(setup_packet),
+            RequestRecipient::Endpoint => self.handle_endpoint_request(setup_packet),
             _ => self.set_rx_endpoint_status(endpoint_type, EndpointStatus::Stall),
         }
     }
@@ -646,20 +345,20 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_device_request(&mut self, request_header: UsbRequestHeader) {
+    fn handle_device_request(&mut self, request_header: SetupPacket) {
         match request_header.request {
-            UsbRequest::GetDescriptor => self.handle_get_descriptor(request_header),
-            UsbRequest::SetAddress => self.handle_set_address(request_header),
-            UsbRequest::SetConfiguration => self.handle_set_configuration(request_header),
-            UsbRequest::GetConfiguration => self.handle_get_configuration(request_header),
-            UsbRequest::GetStatus => self.handle_get_status(),
-            UsbRequest::SetFeature => self.handle_set_feature(request_header),
-            UsbRequest::ClearFeature => self.handle_clear_feature(request_header),
+            Request::GetDescriptor => self.handle_get_descriptor(request_header),
+            Request::SetAddress => self.handle_set_address(request_header),
+            Request::SetConfiguration => self.handle_set_configuration(request_header),
+            Request::GetConfiguration => self.handle_get_configuration(request_header),
+            Request::GetStatus => self.handle_get_status(),
+            Request::SetFeature => self.handle_set_feature(request_header),
+            Request::ClearFeature => self.handle_clear_feature(request_header),
             _ => self.control_endpoint_error(),
         }
     }
 
-    fn handle_get_descriptor(&mut self, request_header: UsbRequestHeader) {
+    fn handle_get_descriptor(&mut self, request_header: SetupPacket) {
         let data_to_send: Option<&[u8]> = match (&request_header.value >> 8) as u16 {
             1 => Some(&DEV_DESC),
             2 => Some(&CONF_DESC),
@@ -683,7 +382,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn get_descriptor_string(&self, request_header: &UsbRequestHeader) -> Option<&'static [u8]> {
+    fn get_descriptor_string(&self, request_header: &SetupPacket) -> Option<&'static [u8]> {
         match request_header.value & 0xff {
             0x00 => Some(&LANG_ID_DESCRIPTOR),
             0x01 => Some(&MANUFACTURER_STR),
@@ -695,7 +394,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_set_address(&mut self, request_header: UsbRequestHeader) {
+    fn handle_set_address(&mut self, request_header: SetupPacket) {
         if request_header.index == 0 && request_header.length == 0 {
             if let DeviceState::Configured = self.state.device_state {
                 self.control_endpoint_error();
@@ -714,7 +413,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_set_configuration(&mut self, request_header: UsbRequestHeader) {
+    fn handle_set_configuration(&mut self, request_header: SetupPacket) {
         let configuration_index = request_header.value as u8;
 
         self.state.configuration_index = configuration_index;
@@ -746,7 +445,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_get_configuration(&mut self, request_header: UsbRequestHeader) {
+    fn handle_get_configuration(&mut self, request_header: SetupPacket) {
         if request_header.length != 1 {
             self.control_endpoint_error();
         } else {
@@ -772,14 +471,14 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_set_feature(&mut self, request_header: UsbRequestHeader) {
+    fn handle_set_feature(&mut self, request_header: SetupPacket) {
         if request_header.value == 1 {
             // ACK
             self.send_control_zero_length_packet();
         }
     }
 
-    fn handle_clear_feature(&mut self, request_header: UsbRequestHeader) {
+    fn handle_clear_feature(&mut self, request_header: SetupPacket) {
         match self.state.device_state {
             DeviceState::Addressed | DeviceState::Configured => {
                 if request_header.value == 1 {
@@ -791,7 +490,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_interface_request(&mut self, request_header: UsbRequestHeader) {
+    fn handle_interface_request(&mut self, request_header: SetupPacket) {
         match self.state.device_state {
             DeviceState::Configured if (request_header.index & 0xff) <= 1 => {
                 self.handle_setup(request_header);
@@ -800,32 +499,32 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_setup(&mut self, request_header: UsbRequestHeader) {
+    fn handle_setup(&mut self, request_header: SetupPacket) {
         match request_header.kind {
-            UsbRequestKind::Class => self.handle_class_setup(request_header),
-            UsbRequestKind::Standard => self.handle_standard_setup(request_header),
+            RequestKind::Class => self.handle_class_setup(request_header),
+            RequestKind::Standard => self.handle_standard_setup(request_header),
             _ => {}
         }
     }
 
-    fn handle_class_setup(&mut self, request_header: UsbRequestHeader) {
+    fn handle_class_setup(&mut self, request_header: SetupPacket) {
         match request_header.request {
             // CUSTOM_HID_REQ_SET_PROTOCOL
-            UsbRequest::SetInterface => {
+            Request::SetInterface => {
                 self.state.protocol = request_header.value as u8;
                 self.send_control_zero_length_packet();
             }
             // CUSTOM_HID_REQ_GET_PROTOCOL
-            UsbRequest::SetFeature => self.send_control_data(Some([self.state.protocol].as_ref())),
+            Request::SetFeature => self.send_control_data(Some([self.state.protocol].as_ref())),
             // CUSTOM_HID_REQ_SET_IDLE
-            UsbRequest::GetInterface => {
+            Request::GetInterface => {
                 self.state.idle_state = (request_header.value >> 8) as u8;
                 self.send_control_zero_length_packet();
             }
             // CUSTOM_HID_REQ_GET_IDLE
-            UsbRequest::Two => self.send_control_data(Some([self.state.idle_state].as_ref())),
+            Request::Two => self.send_control_data(Some([self.state.idle_state].as_ref())),
             // CUSTOM_HID_REQ_SET_REPORT
-            UsbRequest::SetConfiguration => {
+            Request::SetConfiguration => {
                 self.update_control_endpoint_state(ControlEndpointState::DataOut);
                 self.pma
                     .set_rx_count(EndpointType::Control, request_header.length);
@@ -836,9 +535,9 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_standard_setup(&mut self, request_header: UsbRequestHeader) {
+    fn handle_standard_setup(&mut self, request_header: SetupPacket) {
         match request_header.request {
-            UsbRequest::GetDescriptor => {
+            Request::GetDescriptor => {
                 let data = match request_header.value >> 8 {
                     // USB_DESC_TYPE_HID_REPORT
                     0x22 => Some(if (request_header.length as usize) < REPORT_DESC.len() {
@@ -857,26 +556,26 @@ impl<'a> USB<'a> {
 
                 self.send_control_data(data);
             }
-            UsbRequest::SetInterface => {
+            Request::SetInterface => {
                 self.state.alt_setting = request_header.value as u8;
                 self.send_control_zero_length_packet();
             }
-            UsbRequest::GetInterface => {
+            Request::GetInterface => {
                 self.send_control_data(Some([self.state.alt_setting].as_ref()))
             }
             _ => self.control_endpoint_error(),
         }
     }
 
-    fn handle_endpoint_request(&mut self, request_header: UsbRequestHeader) {
-        if let UsbRequestKind::Class = request_header.kind {
+    fn handle_endpoint_request(&mut self, request_header: SetupPacket) {
+        if let RequestKind::Class = request_header.kind {
             self.handle_setup(request_header);
             return;
         }
 
         let endpoint_address = request_header.index as u8;
         match request_header.request {
-            UsbRequest::SetFeature => {
+            Request::SetFeature => {
                 match self.state.device_state {
                     DeviceState::Addressed => {
                         if endpoint_address & 0x7f != 0 {
@@ -895,7 +594,7 @@ impl<'a> USB<'a> {
                     _ => self.control_endpoint_error(),
                 }
             }
-            UsbRequest::ClearFeature => {
+            Request::ClearFeature => {
                 match self.state.device_state {
                     DeviceState::Addressed => {
                         if endpoint_address & 0x7f != 0 {
@@ -912,7 +611,7 @@ impl<'a> USB<'a> {
                     _ => self.control_endpoint_error(),
                 }
             }
-            UsbRequest::GetStatus => {
+            Request::GetStatus => {
                 match self.state.device_state {
                     DeviceState::Addressed => {
                         if endpoint_address & 0x7f != 0 {
