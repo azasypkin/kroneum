@@ -625,6 +625,8 @@ impl<'a> USB<'a> {
         self.peripherals.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
+                .ctr_tx()
+                .set_bit()
                 .dtog_tx()
                 .clear_bit()
                 .dtog_rx()
@@ -636,6 +638,29 @@ impl<'a> USB<'a> {
         });
 
         // Here we can check the amount of data and do smth with it....
+        let endpoint_type = EndpointType::Device;
+        let data = [
+            self.pma.get_rx_count(endpoint_type),
+            self.pma.read(endpoint_type, 0) & 0xff,
+            (self.pma.read(endpoint_type, 0) & 0xff00) >> 8,
+            self.pma.read(endpoint_type, 2) & 0xff,
+            (self.pma.read(endpoint_type, 2) & 0xff00) >> 8,
+            self.pma.read(endpoint_type, 4) & 0xff,
+            (self.pma.read(endpoint_type, 4) & 0xff00) >> 8,
+        ];
+
+        if data[0] == 6
+            && data[1] == 1
+            && data[2] == 2
+            && data[3] == 3
+            && data[4] == 4
+            && data[5] == 5
+            && data[6] == 6
+        {
+            self.blue_on();
+        } else {
+            self.red_on();
+        }
 
         self.pma.set_rx_count(EndpointType::Device, 0);
         self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);
@@ -646,6 +671,8 @@ impl<'a> USB<'a> {
         self.peripherals.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_tx()
                 .clear_bit()
+                .ctr_rx()
+                .set_bit()
                 .dtog_tx()
                 .clear_bit()
                 .dtog_rx()
@@ -790,6 +817,10 @@ impl<'a> USB<'a> {
                 .bits(0b11)
                 .ea()
                 .bits(0x1)
+                .ctr_rx()
+                .set_bit()
+                .ctr_tx()
+                .set_bit()
                 .stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
                 .stat_rx()
