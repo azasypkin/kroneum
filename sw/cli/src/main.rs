@@ -8,7 +8,7 @@ fn main() -> Result<(), String> {
     let mut context = libusb::Context::new()
         .or_else(|err| Err(format!("Failed to create context: {:?}", err)))?;
 
-    context.set_log_level(libusb::LogLevel::Debug);
+    context.set_log_level(libusb::LogLevel::Info);
 
     let devices = context
         .devices()
@@ -85,13 +85,21 @@ fn main() -> Result<(), String> {
 
     println!("Device manufacturer: {}", manufacturer);
 
-    //device_handle.write_interrupt(81, [1, 2, 3].as_ref(), Duration::from_secs(5)).unwrap();
+    device_handle
+        .write_interrupt(1, [1, 2, 3, 4, 5, 6].as_ref(), Duration::from_secs(5))
+        .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))?;
+
+    device_handle
+        .release_interface(INTERFACE)
+        .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))?;
 
     if detached_kernel_driver {
         device_handle
             .attach_kernel_driver(INTERFACE)
-            .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))?
+            .or_else(|err| Err(format!("Failed to attach kernel driver: {:?}", err)))?
     }
+
+    println!("Successfully completed \u{1f389}");
 
     Ok(())
 }
