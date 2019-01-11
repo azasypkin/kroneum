@@ -73,7 +73,7 @@ fn main() -> Result<(), String> {
         .and_then(|languages| {
             languages
                 .first()
-                .ok_or_else(|| format!("No languages were returned from device."))
+                .ok_or_else(|| "No languages were returned from device.".to_string())
                 .map(|lang| *lang)
         })?;
 
