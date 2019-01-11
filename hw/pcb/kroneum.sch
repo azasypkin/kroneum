@@ -406,11 +406,11 @@ Wire Wire Line
 	6300 4450 6550 4450
 Text GLabel 5600 4550 0    50   Input ~ 0
 BOOT0
-Text GLabel 3700 3600 3    50   Input ~ 0
+Text GLabel 4300 3600 3    50   Input ~ 0
 Ctrl_One
 Text GLabel 3800 3600 3    50   Input ~ 0
 Ctrl_Ten
-NoConn ~ 4300 3600
+NoConn ~ 3700 3600
 NoConn ~ 4200 3600
 NoConn ~ 4100 3600
 NoConn ~ 4000 3600
