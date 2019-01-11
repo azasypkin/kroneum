@@ -1,6 +1,5 @@
 use crate::config;
-use cortex_m::peripheral::syst::SystClkSource;
-use cortex_m::peripheral::SYST;
+use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
 pub struct SysTick {}
 

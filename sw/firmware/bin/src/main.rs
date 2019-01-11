@@ -5,7 +5,9 @@
 
 extern crate panic_semihosting;
 
+mod button;
 mod config;
+mod systick;
 mod usb;
 
 use core::cell::RefCell;
@@ -15,7 +17,10 @@ use cortex_m::{
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
+
+use button::Button;
 use usb::{pma::PacketMemoryArea, USB};
+use systick::SysTick;
 
 struct AppState {
     device_peripherals: Peripherals,
@@ -39,7 +44,9 @@ where
     });
 }
 
+/// Initialize the system, configure clock, GPIOs and interrupts.
 fn system_init(peripherals: &Peripherals) {
+    // -------USB------------
     // Enable HSI48.
     peripherals.RCC.cr2.modify(|_, w| w.hsi48on().set_bit());
     while peripherals.RCC.cr2.read().hsi48rdy().bit_is_clear() {}
@@ -79,16 +86,33 @@ fn system_init(peripherals: &Peripherals) {
         .syscfg_cfgr1
         .modify(|_, w| unsafe { w.pa11_pa12_rmp().set_bit().mem_mode().bits(0) });
 
-    // ---------------------------
+    // -----------Buttons----------------
+
+    // Enable EXTI0 interrupt line for PA0.
+    peripherals
+        .SYSCFG_COMP
+        .syscfg_exticr1
+        .modify(|_, w| unsafe { w.exti0().bits(0) });
+
+    // Configure PA0 to trigger an interrupt event on the EXTI0 line on a rising edge.
+    peripherals.EXTI.rtsr.modify(|_, w| w.tr0().set_bit());
+
+    // Unmask the external interrupt line EXTI0 by setting the bit corresponding to the
+    // EXTI0 "bit 0" in the EXT_IMR register.
+    peripherals.EXTI.imr.modify(|_, w| w.mr0().set_bit());
+
+    // ---------GPIO------------------
 
     // Enable clock for GPIO Port A.
     peripherals.RCC.ahbenr.modify(|_, w| w.iopaen().set_bit());
 
-    // Switch PA11 and PA12 to alternate function mode, PA2, PA3 and PA4 to output.
+    // Switch PA0, PA11 and PA12 to alternate function mode, PA2, PA3 and PA4 to output.
     let moder_af = 0b10;
     let moder_out = 0b01;
     peripherals.GPIOA.moder.modify(|_, w| unsafe {
-        w.moder2()
+        w.moder0()
+            .bits(moder_af)
+            .moder2()
             .bits(moder_out)
             .moder3()
             .bits(moder_out)
@@ -100,12 +124,25 @@ fn system_init(peripherals: &Peripherals) {
             .bits(moder_af)
     });
 
+    // Enable pull-down for PA0.
+    peripherals
+        .GPIOA
+        .pupdr
+        .modify(|_, w| unsafe { w.pupdr0().bits(0b10) });
+
     // Set "high" output speed for PA11 and PA12.
     let speed_high = 0b11;
     peripherals
         .GPIOA
         .ospeedr
         .modify(|_, w| unsafe { w.ospeedr11().bits(speed_high).ospeedr12().bits(speed_high) });
+
+    // Set alternative function #2 (WKUP1) for PA0.
+    let af2_wkup = 0b0010;
+    peripherals
+        .GPIOA
+        .afrl
+        .modify(|_, w| unsafe { w.afrl0().bits(af2_wkup) });
 
     // Set alternative function #2 (USB) for PA11 and PA12.
     let af2_usb = 0b0010;
@@ -131,6 +168,12 @@ fn main() -> ! {
     interrupt_free(|state| {
         system_init(&state.device_peripherals);
 
+        Button::acquire(
+            &mut state.core_peripherals,
+            &state.device_peripherals,
+            |mut button| button.start(),
+        );
+
         USB::acquire(
             &mut state.core_peripherals,
             &state.device_peripherals,
@@ -141,6 +184,23 @@ fn main() -> ! {
     });
 
     loop {}
+}
+
+#[interrupt]
+fn EXTI0_1() {
+    interrupt_free(|state| {
+        state.device_peripherals.GPIOA.bsrr.write(|w| w.bs2().set_bit());
+        SysTick::delay_ms(&mut state.core_peripherals.SYST, 300);
+        state.device_peripherals.GPIOA.bsrr.write(|w| w.br2().set_bit());
+
+        Button::acquire(
+            &mut state.core_peripherals,
+            &state.device_peripherals,
+            |button| {
+                button.clear_pending_interrupt();
+            },
+        );
+    });
 }
 
 #[interrupt]
