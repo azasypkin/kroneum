@@ -5,6 +5,7 @@
 
 extern crate panic_semihosting;
 
+mod beeper;
 mod button;
 mod config;
 mod led;
@@ -19,6 +20,7 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
 
+use beeper::Beeper;
 use button::Button;
 use led::{LEDColor, LED};
 use usb::{DeviceStatus, UsbState, USB};
@@ -113,7 +115,8 @@ fn system_init(p: &AppPeripherals) {
     // Enable clock for GPIO Port A.
     p.device.RCC.ahbenr.modify(|_, w| w.iopaen().set_bit());
 
-    // Switch PA0, PA11 and PA12 to alternate function mode, PA2, PA3 and PA4 to output.
+    // Switch PA0 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function mode and
+    // PA2, PA3 and PA4 to output.
     let moder_af = 0b10;
     let moder_out = 0b01;
     p.device.GPIOA.moder.modify(|_, w| unsafe {
@@ -125,6 +128,8 @@ fn system_init(p: &AppPeripherals) {
             .bits(moder_out)
             .moder4()
             .bits(moder_out)
+            .moder7()
+            .bits(moder_af)
             .moder11()
             .bits(moder_af)
             .moder12()
@@ -137,19 +142,24 @@ fn system_init(p: &AppPeripherals) {
         .pupdr
         .modify(|_, w| unsafe { w.pupdr0().bits(0b10) });
 
-    // Set "high" output speed for PA11 and PA12.
+    // Set "high" output speed for PA7, PA11 and PA12.
     let speed_high = 0b11;
-    p.device
-        .GPIOA
-        .ospeedr
-        .modify(|_, w| unsafe { w.ospeedr11().bits(speed_high).ospeedr12().bits(speed_high) });
+    p.device.GPIOA.ospeedr.modify(|_, w| unsafe {
+        w.ospeedr7()
+            .bits(speed_high)
+            .ospeedr11()
+            .bits(speed_high)
+            .ospeedr12()
+            .bits(speed_high)
+    });
 
-    // Set alternative function #2 (WKUP1) for PA0.
+    // Set alternative function #2 for PA0 (WKUP1) and PA7 (TIM1_CH1N).
     let af2_wkup = 0b0010;
+    let af2_tim1 = 0b0010;
     p.device
         .GPIOA
         .afrl
-        .modify(|_, w| unsafe { w.afrl0().bits(af2_wkup) });
+        .modify(|_, w| unsafe { w.afrl0().bits(af2_wkup).afrl7().bits(af2_tim1) });
 
     // Set alternative function #2 (USB) for PA11 and PA12.
     let af2_usb = 0b0010;
@@ -185,6 +195,12 @@ fn main() -> ! {
 fn EXTI0_1() {
     interrupt_free(|state| {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
+
+        Beeper::acquire(&mut state.p, |mut beeper| {
+            beeper.start();
+            beeper.play_melody();
+            beeper.stop();
+        });
 
         if let DeviceStatus::None = state.usb.device_status {
             start_usb_clock(&state.p);
