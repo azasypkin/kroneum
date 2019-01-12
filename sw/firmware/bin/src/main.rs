@@ -21,7 +21,7 @@ use stm32f0x2::{interrupt, Peripherals};
 
 use button::Button;
 use led::{LEDColor, LED};
-use usb::{DeviceStatus, USB};
+use usb::{DeviceStatus, UsbState, USB};
 
 pub struct AppPeripherals {
     device: Peripherals,
@@ -30,7 +30,7 @@ pub struct AppPeripherals {
 
 struct AppState {
     p: AppPeripherals,
-    usb: usb::UsbState,
+    usb: UsbState,
 }
 
 static STATE: Mutex<RefCell<Option<AppState>>> = Mutex::new(RefCell::new(None));
@@ -48,20 +48,10 @@ where
     });
 }
 
-/// Initialize the system, configure clock, GPIOs and interrupts.
-fn system_init(p: &AppPeripherals) {
-    // -------USB------------
+fn start_usb_clock(p: &AppPeripherals) {
     // Enable HSI48.
     p.device.RCC.cr2.modify(|_, w| w.hsi48on().set_bit());
     while p.device.RCC.cr2.read().hsi48rdy().bit_is_clear() {}
-
-    // Use HSI48 as HCLK source.
-    let sw_as_hsi48: u8 = 0b11;
-    p.device
-        .RCC
-        .cfgr
-        .modify(|_, w| unsafe { w.sw().bits(sw_as_hsi48) });
-    while p.device.RCC.cfgr.read().sws().bits() != sw_as_hsi48 {}
 
     // Enable clock recovery system from USB SOF frames.
     p.device.RCC.apb1enr.modify(|_, w| w.crsen().set_bit());
@@ -76,7 +66,26 @@ fn system_init(p: &AppPeripherals) {
     p.device.CRS.cr.modify(|_, w| w.autotrimen().set_bit());
     // Enable Frequency error counter.
     p.device.CRS.cr.modify(|_, w| w.cen().set_bit());
+}
 
+fn stop_usb_clock(p: &AppPeripherals) {
+    // Disable Frequency error counter.
+    p.device.CRS.cr.modify(|_, w| w.cen().clear_bit());
+
+    // Reset CRS registers to their default values.
+    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().set_bit());
+    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().clear_bit());
+
+    // Disable clock recovery system from USB SOF frames.
+    p.device.RCC.apb1enr.modify(|_, w| w.crsen().clear_bit());
+
+    // Disable HSI48.
+    p.device.RCC.cr2.modify(|_, w| w.hsi48on().clear_bit());
+    while p.device.RCC.cr2.read().hsi48rdy().bit_is_set() {}
+}
+
+/// Initialize the system, configure clock, GPIOs and interrupts.
+fn system_init(p: &AppPeripherals) {
     // Remap PA9-10 to PA11-12 for USB.
     p.device.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
     p.device
@@ -160,16 +169,13 @@ fn main() -> ! {
                 core: cortex_m::Peripherals::take().unwrap(),
                 device: Peripherals::take().unwrap(),
             },
-            usb: usb::UsbState::default(),
+            usb: UsbState::default(),
         });
     });
 
     interrupt_free(|state| {
         system_init(&state.p);
-
         Button::acquire(&mut state.p, |mut button| button.start());
-
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.start());
     });
 
     loop {}
@@ -180,13 +186,13 @@ fn EXTI0_1() {
     interrupt_free(|state| {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
 
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| {
-            if let DeviceStatus::None = usb.get_status() {
-                usb.start();
-            } else {
-                usb.stop();
-            }
-        });
+        if let DeviceStatus::None = state.usb.device_status {
+            start_usb_clock(&state.p);
+            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.start());
+        } else {
+            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.stop());
+            stop_usb_clock(&state.p);
+        }
 
         Button::acquire(&mut state.p, |button| {
             button.clear_pending_interrupt();

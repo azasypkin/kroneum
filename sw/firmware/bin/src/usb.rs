@@ -54,7 +54,7 @@ enum ControlEndpointStatus {
 
 #[derive(Copy, Clone)]
 pub struct UsbState {
-    device_status: DeviceStatus,
+    pub device_status: DeviceStatus,
     suspended_device_status: Option<DeviceStatus>,
     control_endpoint_status: ControlEndpointStatus,
     setup_data_length: u16,
