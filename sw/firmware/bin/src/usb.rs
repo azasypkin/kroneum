@@ -174,10 +174,6 @@ impl<'a> USB<'a> {
         }
     }
 
-    pub fn get_status(&self) -> &DeviceStatus {
-        &self.state.device_status
-    }
-
     fn reset(&mut self) {
         self.p.device.USB.istr.write(|w| unsafe { w.bits(0xFBFF) });
 

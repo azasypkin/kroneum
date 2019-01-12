@@ -9,6 +9,7 @@ mod beeper;
 mod button;
 mod config;
 mod led;
+mod rtc;
 mod systick;
 mod usb;
 
@@ -23,6 +24,7 @@ use stm32f0x2::{interrupt, Peripherals};
 use beeper::Beeper;
 use button::Button;
 use led::{LEDColor, LED};
+use rtc::RTC;
 use usb::{DeviceStatus, UsbState, USB};
 
 pub struct AppPeripherals {
@@ -210,8 +212,42 @@ fn EXTI0_1() {
             stop_usb_clock(&state.p);
         }
 
+        RTC::acquire(&mut state.p, |mut rtc| {
+            rtc.start();
+
+            rtc.configure_time(&rtc::Time {
+                hours: 1,
+                minutes: 0,
+                seconds: 0,
+            });
+
+            rtc.configure_alarm(&rtc::Time {
+                hours: 1,
+                minutes: 0,
+                seconds: 10,
+            });
+        });
+
         Button::acquire(&mut state.p, |button| {
             button.clear_pending_interrupt();
+        });
+    });
+}
+
+#[interrupt]
+fn RTC() {
+    interrupt_free(|state| {
+        Beeper::acquire(&mut state.p, |mut beeper| {
+            beeper.start();
+            beeper.play_reset();
+            beeper.stop();
+        });
+
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.stop());
+
+        RTC::acquire(&mut state.p, |mut rtc| {
+            rtc.stop();
+            rtc.clear_pending_interrupt();
         });
     });
 }
