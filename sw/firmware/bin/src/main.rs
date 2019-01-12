@@ -47,7 +47,7 @@ where
         if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {
             f(s);
         } else {
-            panic!("Can not borrow peripherals!");
+            panic!("Can not borrow application state!");
         }
     });
 }
@@ -86,6 +86,30 @@ fn stop_usb_clock(p: &AppPeripherals) {
     // Disable HSI48.
     p.device.RCC.cr2.modify(|_, w| w.hsi48on().clear_bit());
     while p.device.RCC.cr2.read().hsi48rdy().bit_is_set() {}
+}
+
+fn setup_standby_mode(p: &mut AppPeripherals) {
+    // Select STANDBY mode.
+    p.device.PWR.cr.modify(|_, w| w.pdds().set_bit());
+
+    clear_wakeup_flag(p);
+
+    // Set SLEEPDEEP bit of Cortex-M0 System Control Register.
+    p.core.SCB.set_sleepdeep();
+}
+
+fn teardown_standby_mode(p: &mut AppPeripherals) {
+    // Disable STANDBY mode.
+    p.device.PWR.cr.modify(|_, w| w.pdds().clear_bit());
+
+    clear_wakeup_flag(p);
+
+    // Clear SLEEPDEEP bit of Cortex-M0 System Control Register.
+    p.core.SCB.clear_sleepdeep();
+}
+
+fn clear_wakeup_flag(p: &AppPeripherals) {
+    p.device.PWR.cr.modify(|_, w| w.cwuf().set_bit());
 }
 
 /// Initialize the system, configure clock, GPIOs and interrupts.
@@ -188,9 +212,12 @@ fn main() -> ! {
     interrupt_free(|state| {
         system_init(&state.p);
         Button::acquire(&mut state.p, |mut button| button.setup());
+        setup_standby_mode(&mut state.p);
     });
 
-    loop {}
+    loop {
+        cortex_m::asm::wfi();
+    }
 }
 
 #[interrupt]
@@ -231,6 +258,8 @@ fn EXTI0_1() {
         Button::acquire(&mut state.p, |button| {
             button.clear_pending_interrupt();
         });
+
+        teardown_standby_mode(&mut state.p)
     });
 }
 
@@ -249,6 +278,8 @@ fn RTC() {
             rtc.teardown();
             rtc.clear_pending_interrupt();
         });
+
+        setup_standby_mode(&mut state.p);
     });
 }
 
