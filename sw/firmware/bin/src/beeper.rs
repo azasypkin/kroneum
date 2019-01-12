@@ -15,7 +15,7 @@ impl<'a> Beeper<'a> {
         Beeper { p }
     }
 
-    pub fn start(&self) {
+    pub fn setup(&self) {
         // Enable TIM1 clock.
         self.p
             .device
@@ -88,7 +88,7 @@ impl<'a> Beeper<'a> {
         self.p.device.TIM1.cr1.modify(|_, w| w.cen().set_bit());
     }
 
-    pub fn stop(&self) {
+    pub fn teardown(&self) {
         // Disable counter.
         self.p.device.TIM1.cr1.modify(|_, w| w.cen().clear_bit());
 

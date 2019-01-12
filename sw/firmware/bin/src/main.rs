@@ -187,7 +187,7 @@ fn main() -> ! {
 
     interrupt_free(|state| {
         system_init(&state.p);
-        Button::acquire(&mut state.p, |mut button| button.start());
+        Button::acquire(&mut state.p, |mut button| button.setup());
     });
 
     loop {}
@@ -199,21 +199,21 @@ fn EXTI0_1() {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
 
         Beeper::acquire(&mut state.p, |mut beeper| {
-            beeper.start();
+            beeper.setup();
             beeper.play_melody();
-            beeper.stop();
+            beeper.teardown();
         });
 
         if let DeviceStatus::None = state.usb.device_status {
             start_usb_clock(&state.p);
-            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.start());
+            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
         } else {
-            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.stop());
+            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
             stop_usb_clock(&state.p);
         }
 
         RTC::acquire(&mut state.p, |mut rtc| {
-            rtc.start();
+            rtc.setup();
 
             rtc.configure_time(&rtc::Time {
                 hours: 1,
@@ -238,15 +238,15 @@ fn EXTI0_1() {
 fn RTC() {
     interrupt_free(|state| {
         Beeper::acquire(&mut state.p, |mut beeper| {
-            beeper.start();
+            beeper.setup();
             beeper.play_reset();
-            beeper.stop();
+            beeper.teardown();
         });
 
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.stop());
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
 
         RTC::acquire(&mut state.p, |mut rtc| {
-            rtc.stop();
+            rtc.teardown();
             rtc.clear_pending_interrupt();
         });
     });

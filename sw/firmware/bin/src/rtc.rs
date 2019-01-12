@@ -45,7 +45,7 @@ impl<'a> RTC<'a> {
         RTC { p }
     }
 
-    pub fn start(&mut self) {
+    pub fn setup(&mut self) {
         // Enable the LSI.
         self.p.device.RCC.csr.modify(|_, w| w.lsion().set_bit());
         while self.p.device.RCC.csr.read().lsirdy().bit_is_clear() {}
@@ -80,7 +80,7 @@ impl<'a> RTC<'a> {
         }
     }
 
-    pub fn stop(&mut self) {
+    pub fn teardown(&mut self) {
         self.toggle_alarm(false);
 
         // Disable the LSI.

@@ -22,7 +22,7 @@ impl<'a> Button<'a> {
         Button { p }
     }
 
-    pub fn start(&mut self) {
+    pub fn setup(&mut self) {
         // Set priority for the `EXTI0` line to `1`.
         unsafe {
             self.p.core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
@@ -35,7 +35,7 @@ impl<'a> Button<'a> {
         self.p.device.PWR.csr.modify(|_, w| w.ewup1().set_bit());
     }
 
-    pub fn stop(&mut self) {
+    pub fn teardown(&mut self) {
         self.p.core.NVIC.disable(Interrupt::EXTI0_1);
 
         // Disable waker.

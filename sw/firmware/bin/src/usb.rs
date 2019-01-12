@@ -111,7 +111,7 @@ impl<'a> USB<'a> {
         f(USB::new(p, state));
     }
 
-    pub fn start(&mut self) {
+    pub fn setup(&mut self) {
         self.state.address = 0;
 
         self.update_device_status(DeviceStatus::Default);
@@ -137,7 +137,7 @@ impl<'a> USB<'a> {
         self.p.device.USB.bcdr.modify(|_, w| w.dppu().set_bit());
     }
 
-    pub fn stop(&mut self) {
+    pub fn teardown(&mut self) {
         self.close_device_endpoints();
         self.close_control_endpoints();
 
