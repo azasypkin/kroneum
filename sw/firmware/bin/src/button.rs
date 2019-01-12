@@ -18,7 +18,7 @@ pub struct Button<'a> {
 }
 
 impl<'a> Button<'a> {
-    fn new(p: &'a mut AppPeripherals) -> Button<'a> {
+    fn new(p: &'a mut AppPeripherals) -> Self {
         Button { p }
     }
 

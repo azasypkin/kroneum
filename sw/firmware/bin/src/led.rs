@@ -12,7 +12,7 @@ pub struct LED<'a> {
 }
 
 impl<'a> LED<'a> {
-    fn new(p: &'a mut AppPeripherals) -> LED<'a> {
+    fn new(p: &'a mut AppPeripherals) -> Self {
         LED { p }
     }
 
@@ -20,7 +20,7 @@ impl<'a> LED<'a> {
         self.turn_off(color);
 
         self.turn_on(color);
-        SysTick::delay_ms(&mut self.p.core.SYST, 300);
+        SysTick::delay_ms(&mut self.p.core.SYST, 250);
         self.turn_off(color)
     }
 

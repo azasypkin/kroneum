@@ -100,7 +100,7 @@ impl<'a> USB<'a> {
         p: &'a mut AppPeripherals,
         state: &'a mut UsbState,
         pma: &'a PacketMemoryArea,
-    ) -> USB<'a> {
+    ) -> Self {
         USB { p, pma, state }
     }
 
