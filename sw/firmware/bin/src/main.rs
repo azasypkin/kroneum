@@ -21,7 +21,7 @@ use stm32f0x2::{interrupt, Peripherals};
 
 use button::Button;
 use led::{LEDColor, LED};
-use usb::{DeviceState, USB};
+use usb::{DeviceStatus, USB};
 
 pub struct AppPeripherals {
     device: Peripherals,
@@ -181,7 +181,7 @@ fn EXTI0_1() {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
 
         USB::acquire(&mut state.p, &mut state.usb, |mut usb| {
-            if let DeviceState::None = usb.get_state() {
+            if let DeviceStatus::None = usb.get_status() {
                 usb.start();
             } else {
                 usb.stop();

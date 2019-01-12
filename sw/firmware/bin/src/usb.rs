@@ -25,7 +25,7 @@ enum EndpointStatus {
 }
 
 #[derive(Copy, Clone)]
-pub enum DeviceState {
+pub enum DeviceStatus {
     // USB isn't started.
     None,
     // Device is starting, or has disconnected.
@@ -36,13 +36,13 @@ pub enum DeviceState {
     Configured,
     // Device is suspended.
     Suspended,
-    // Synthetic state for the woken up device,
+    // Synthetic status for the woken up device,
     WokenUp,
 }
 
-// The possible states for the control endpoint.
+// The possible statuses for the control endpoint.
 #[derive(Copy, Clone)]
-enum ControlEndpointState {
+enum ControlEndpointStatus {
     Idle,
     Setup(u16),
     DataIn,
@@ -54,9 +54,9 @@ enum ControlEndpointState {
 
 #[derive(Copy, Clone)]
 pub struct UsbState {
-    device_state: DeviceState,
-    suspended_device_state: Option<DeviceState>,
-    control_endpoint_state: ControlEndpointState,
+    device_status: DeviceStatus,
+    suspended_device_status: Option<DeviceStatus>,
+    control_endpoint_status: ControlEndpointStatus,
     setup_data_length: u16,
     address: u8,
     configuration_index: u8,
@@ -68,9 +68,9 @@ pub struct UsbState {
 impl Default for UsbState {
     fn default() -> Self {
         UsbState {
-            device_state: DeviceState::None,
-            suspended_device_state: None,
-            control_endpoint_state: ControlEndpointState::Idle,
+            device_status: DeviceStatus::None,
+            suspended_device_status: None,
+            control_endpoint_status: ControlEndpointStatus::Idle,
             setup_data_length: 0,
             address: 0,
             configuration_index: 0,
@@ -114,7 +114,7 @@ impl<'a> USB<'a> {
     pub fn start(&mut self) {
         self.state.address = 0;
 
-        self.update_device_state(DeviceState::Default);
+        self.update_device_status(DeviceStatus::Default);
 
         self.p.device.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
         self.p.core.NVIC.enable(Interrupt::USB);
@@ -153,7 +153,7 @@ impl<'a> USB<'a> {
             .apb1enr
             .modify(|_, w| w.usben().clear_bit());
 
-        self.update_device_state(DeviceState::None);
+        self.update_device_status(DeviceStatus::None);
     }
 
     pub fn interrupt(&mut self) {
@@ -174,8 +174,8 @@ impl<'a> USB<'a> {
         }
     }
 
-    pub fn get_state(&self) -> &DeviceState {
-        &self.state.device_state
+    pub fn get_status(&self) -> &DeviceStatus {
+        &self.state.device_status
     }
 
     fn reset(&mut self) {
@@ -247,7 +247,7 @@ impl<'a> USB<'a> {
                 .stat_rx()
                 .bits(0b00)
         });
-        self.update_control_endpoint_state(ControlEndpointState::Setup(setup_packet_length));
+        self.update_control_endpoint_status(ControlEndpointStatus::Setup(setup_packet_length));
 
         match setup_packet.recipient {
             RequestRecipient::Device => self.handle_device_request(setup_packet),
@@ -297,8 +297,8 @@ impl<'a> USB<'a> {
                 .bits(0b00)
         });
 
-        if let ControlEndpointState::DataIn = self.state.control_endpoint_state {
-            self.update_control_endpoint_state(ControlEndpointState::DataOut);
+        if let ControlEndpointStatus::DataIn = self.state.control_endpoint_status {
+            self.update_control_endpoint_status(ControlEndpointStatus::DataOut);
 
             // Prepare for premature end of transfer.
             self.pma.set_rx_count(EndpointType::Control, 0);
@@ -366,16 +366,16 @@ impl<'a> USB<'a> {
 
     fn handle_set_address(&mut self, request_header: SetupPacket) {
         if request_header.index == 0 && request_header.length == 0 {
-            if let DeviceState::Configured = self.state.device_state {
+            if let DeviceStatus::Configured = self.state.device_status {
                 self.control_endpoint_error();
             } else {
                 let address = (request_header.value & 0x7F) as u8;
                 self.update_address(address);
                 self.send_control_zero_length_packet();
-                self.update_device_state(if address != 0 {
-                    DeviceState::Addressed
+                self.update_device_status(if address != 0 {
+                    DeviceStatus::Addressed
                 } else {
-                    DeviceState::Default
+                    DeviceStatus::Default
                 });
             }
         } else {
@@ -391,21 +391,21 @@ impl<'a> USB<'a> {
         if configuration_index > 1 {
             self.control_endpoint_error();
         } else {
-            match self.state.device_state {
-                DeviceState::Addressed => {
+            match self.state.device_status {
+                DeviceStatus::Addressed => {
                     if configuration_index != 0 {
                         self.open_device_endpoints();
                         self.send_control_zero_length_packet();
-                        self.update_device_state(DeviceState::Configured);
+                        self.update_device_status(DeviceStatus::Configured);
                     } else {
                         self.send_control_zero_length_packet();
                     }
                 }
-                DeviceState::Configured => {
+                DeviceStatus::Configured => {
                     if configuration_index == 0 {
                         self.close_control_endpoints();
                         self.send_control_zero_length_packet();
-                        self.update_device_state(DeviceState::Addressed);
+                        self.update_device_status(DeviceStatus::Addressed);
                     } else {
                         self.send_control_zero_length_packet();
                     }
@@ -419,12 +419,12 @@ impl<'a> USB<'a> {
         if request_header.length != 1 {
             self.control_endpoint_error();
         } else {
-            match self.state.device_state {
-                DeviceState::Addressed => {
+            match self.state.device_status {
+                DeviceStatus::Addressed => {
                     self.state.configuration_index = 0;
                     self.send_control_data(Some([0].as_ref()));
                 }
-                DeviceState::Configured => {
+                DeviceStatus::Configured => {
                     self.send_control_data(Some([self.state.configuration_index].as_ref()));
                 }
                 _ => self.control_endpoint_error(),
@@ -433,8 +433,8 @@ impl<'a> USB<'a> {
     }
 
     fn handle_get_status(&mut self) {
-        match self.state.device_state {
-            DeviceState::Addressed | DeviceState::Configured => {
+        match self.state.device_status {
+            DeviceStatus::Addressed | DeviceStatus::Configured => {
                 self.send_control_data(Some([3].as_ref()))
             }
             _ => {}
@@ -449,8 +449,8 @@ impl<'a> USB<'a> {
     }
 
     fn handle_clear_feature(&mut self, request_header: SetupPacket) {
-        match self.state.device_state {
-            DeviceState::Addressed | DeviceState::Configured => {
+        match self.state.device_status {
+            DeviceStatus::Addressed | DeviceStatus::Configured => {
                 if request_header.value == 1 {
                     // ACK
                     self.send_control_zero_length_packet();
@@ -461,8 +461,8 @@ impl<'a> USB<'a> {
     }
 
     fn handle_interface_request(&mut self, request_header: SetupPacket) {
-        match self.state.device_state {
-            DeviceState::Configured if (request_header.index & 0xff) <= 1 => {
+        match self.state.device_status {
+            DeviceStatus::Configured if (request_header.index & 0xff) <= 1 => {
                 self.handle_setup(request_header);
             }
             _ => self.control_endpoint_error(),
@@ -495,7 +495,7 @@ impl<'a> USB<'a> {
             Request::Two => self.send_control_data(Some([self.state.idle_state].as_ref())),
             // CUSTOM_HID_REQ_SET_REPORT
             Request::SetConfiguration => {
-                self.update_control_endpoint_state(ControlEndpointState::DataOut);
+                self.update_control_endpoint_status(ControlEndpointStatus::DataOut);
                 self.pma
                     .set_rx_count(EndpointType::Control, request_header.length);
                 self.set_rx_endpoint_status(EndpointType::Control, EndpointStatus::Valid);
@@ -546,13 +546,13 @@ impl<'a> USB<'a> {
         let endpoint_address = request_header.index as u8;
         match request_header.request {
             Request::SetFeature => {
-                match self.state.device_state {
-                    DeviceState::Addressed => {
+                match self.state.device_status {
+                    DeviceStatus::Addressed => {
                         if endpoint_address & 0x7f != 0 {
                             self.stall_endpoint(endpoint_address);
                         }
                     }
-                    DeviceState::Configured => {
+                    DeviceStatus::Configured => {
                         // USB_FEATURE_EP_HALT
                         if request_header.value == 0 && endpoint_address & 0x7f != 0 {
                             self.stall_endpoint(endpoint_address);
@@ -565,13 +565,13 @@ impl<'a> USB<'a> {
                 }
             }
             Request::ClearFeature => {
-                match self.state.device_state {
-                    DeviceState::Addressed => {
+                match self.state.device_status {
+                    DeviceStatus::Addressed => {
                         if endpoint_address & 0x7f != 0 {
                             self.stall_endpoint(endpoint_address);
                         }
                     }
-                    DeviceState::Configured => {
+                    DeviceStatus::Configured => {
                         // USB_FEATURE_EP_HALT
                         if request_header.value == 0 && endpoint_address & 0x7f != 0 {
                             self.unstall_endpoint(endpoint_address);
@@ -582,13 +582,13 @@ impl<'a> USB<'a> {
                 }
             }
             Request::GetStatus => {
-                match self.state.device_state {
-                    DeviceState::Addressed => {
+                match self.state.device_status {
+                    DeviceStatus::Addressed => {
                         if endpoint_address & 0x7f != 0 {
                             self.stall_endpoint(endpoint_address);
                         }
                     }
-                    DeviceState::Configured => {
+                    DeviceStatus::Configured => {
                         // SHOULD BE:  status=isStalled(ep_addr) ? 1 : 0; sendControlData(&status,2);
                         self.send_control_data(Some([0x0, 0x0].as_ref()));
                     }
@@ -717,12 +717,12 @@ impl<'a> USB<'a> {
     }
 
     fn send_control_data(&mut self, data: Option<&[u8]>) {
-        self.update_control_endpoint_state(ControlEndpointState::DataIn);
+        self.update_control_endpoint_status(ControlEndpointStatus::DataIn);
         self.send_data(EndpointType::Control, data);
     }
 
     fn send_control_zero_length_packet(&mut self) {
-        self.update_control_endpoint_state(ControlEndpointState::StatusIn);
+        self.update_control_endpoint_status(ControlEndpointStatus::StatusIn);
         self.send_data(EndpointType::Control, None);
     }
 
@@ -747,27 +747,27 @@ impl<'a> USB<'a> {
             .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
     }
 
-    fn update_device_state(&mut self, device_state: DeviceState) {
-        match (self.state.device_state, self.state.suspended_device_state) {
-            (DeviceState::Suspended, _) => {
-                self.state.device_state = device_state;
-                self.state.suspended_device_state = Some(self.state.device_state);
+    fn update_device_status(&mut self, device_status: DeviceStatus) {
+        match (self.state.device_status, self.state.suspended_device_status) {
+            (DeviceStatus::Suspended, _) => {
+                self.state.device_status = device_status;
+                self.state.suspended_device_status = Some(self.state.device_status);
             }
-            (DeviceState::WokenUp, Some(previous_device_state)) => {
-                self.state.device_state = previous_device_state;
-                self.state.suspended_device_state = None;
+            (DeviceStatus::WokenUp, Some(previous_device_status)) => {
+                self.state.device_status = previous_device_status;
+                self.state.suspended_device_status = None;
             }
-            (DeviceState::WokenUp, None) => {}
-            _ => self.state.device_state = device_state,
+            (DeviceStatus::WokenUp, None) => {}
+            _ => self.state.device_status = device_status,
         }
     }
 
-    fn update_control_endpoint_state(&mut self, control_endpoint_state: ControlEndpointState) {
-        if let ControlEndpointState::Setup(data_length) = control_endpoint_state {
+    fn update_control_endpoint_status(&mut self, control_endpoint_status: ControlEndpointStatus) {
+        if let ControlEndpointStatus::Setup(data_length) = control_endpoint_status {
             self.state.setup_data_length = data_length;
         }
 
-        self.state.control_endpoint_state = control_endpoint_state;
+        self.state.control_endpoint_status = control_endpoint_status;
     }
 
     fn update_address(&mut self, address: u8) {
