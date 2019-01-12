@@ -112,6 +112,8 @@ impl<'a> USB<'a> {
     }
 
     pub fn setup(&mut self) {
+        self.start_clock();
+
         self.state.address = 0;
 
         self.update_device_status(DeviceStatus::Default);
@@ -154,6 +156,8 @@ impl<'a> USB<'a> {
             .modify(|_, w| w.usben().clear_bit());
 
         self.update_device_status(DeviceStatus::None);
+
+        self.stop_clock();
     }
 
     pub fn interrupt(&mut self) {
@@ -172,6 +176,62 @@ impl<'a> USB<'a> {
         if self.p.device.USB.istr.read().ctr().bit_is_set() {
             self.correct_transfer();
         }
+    }
+
+    fn start_clock(&self) {
+        // Enable HSI48.
+        self.p.device.RCC.cr2.modify(|_, w| w.hsi48on().set_bit());
+        while self.p.device.RCC.cr2.read().hsi48rdy().bit_is_clear() {}
+
+        // Enable clock recovery system from USB SOF frames.
+        self.p.device.RCC.apb1enr.modify(|_, w| w.crsen().set_bit());
+
+        // Before configuration, reset CRS registers to their default values.
+        self.p
+            .device
+            .RCC
+            .apb1rstr
+            .modify(|_, w| w.crsrst().set_bit());
+        self.p
+            .device
+            .RCC
+            .apb1rstr
+            .modify(|_, w| w.crsrst().clear_bit());
+
+        // Configure Frequency Error Measurement.
+
+        // Enable Automatic trimming.
+        self.p.device.CRS.cr.modify(|_, w| w.autotrimen().set_bit());
+        // Enable Frequency error counter.
+        self.p.device.CRS.cr.modify(|_, w| w.cen().set_bit());
+    }
+
+    fn stop_clock(&self) {
+        // Disable Frequency error counter.
+        self.p.device.CRS.cr.modify(|_, w| w.cen().clear_bit());
+
+        // Reset CRS registers to their default values.
+        self.p
+            .device
+            .RCC
+            .apb1rstr
+            .modify(|_, w| w.crsrst().set_bit());
+        self.p
+            .device
+            .RCC
+            .apb1rstr
+            .modify(|_, w| w.crsrst().clear_bit());
+
+        // Disable clock recovery system from USB SOF frames.
+        self.p
+            .device
+            .RCC
+            .apb1enr
+            .modify(|_, w| w.crsen().clear_bit());
+
+        // Disable HSI48.
+        self.p.device.RCC.cr2.modify(|_, w| w.hsi48on().clear_bit());
+        while self.p.device.RCC.cr2.read().hsi48rdy().bit_is_set() {}
     }
 
     fn reset(&mut self) {

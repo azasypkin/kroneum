@@ -52,42 +52,6 @@ where
     });
 }
 
-fn start_usb_clock(p: &AppPeripherals) {
-    // Enable HSI48.
-    p.device.RCC.cr2.modify(|_, w| w.hsi48on().set_bit());
-    while p.device.RCC.cr2.read().hsi48rdy().bit_is_clear() {}
-
-    // Enable clock recovery system from USB SOF frames.
-    p.device.RCC.apb1enr.modify(|_, w| w.crsen().set_bit());
-
-    // Before configuration, reset CRS registers to their default values.
-    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().set_bit());
-    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().clear_bit());
-
-    // Configure Frequency Error Measurement.
-
-    // Enable Automatic trimming.
-    p.device.CRS.cr.modify(|_, w| w.autotrimen().set_bit());
-    // Enable Frequency error counter.
-    p.device.CRS.cr.modify(|_, w| w.cen().set_bit());
-}
-
-fn stop_usb_clock(p: &AppPeripherals) {
-    // Disable Frequency error counter.
-    p.device.CRS.cr.modify(|_, w| w.cen().clear_bit());
-
-    // Reset CRS registers to their default values.
-    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().set_bit());
-    p.device.RCC.apb1rstr.modify(|_, w| w.crsrst().clear_bit());
-
-    // Disable clock recovery system from USB SOF frames.
-    p.device.RCC.apb1enr.modify(|_, w| w.crsen().clear_bit());
-
-    // Disable HSI48.
-    p.device.RCC.cr2.modify(|_, w| w.hsi48on().clear_bit());
-    while p.device.RCC.cr2.read().hsi48rdy().bit_is_set() {}
-}
-
 fn setup_standby_mode(p: &mut AppPeripherals) {
     // Select STANDBY mode.
     p.device.PWR.cr.modify(|_, w| w.pdds().set_bit());
@@ -232,11 +196,9 @@ fn EXTI0_1() {
         });
 
         if let DeviceStatus::None = state.usb.device_status {
-            start_usb_clock(&state.p);
             USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
         } else {
             USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-            stop_usb_clock(&state.p);
         }
 
         RTC::acquire(&mut state.p, |mut rtc| {
