@@ -2,8 +2,9 @@ mod descriptors;
 pub mod pma;
 mod setup_packet;
 
-use cortex_m::Peripherals as CorePeripherals;
-use stm32f0x2::{Interrupt, Peripherals};
+use crate::led::{LEDColor, LED};
+use crate::AppPeripherals;
+use stm32f0x2::Interrupt;
 
 use descriptors::*;
 use pma::PacketMemoryArea;
@@ -89,30 +90,22 @@ impl Default for UsbState {
  */
 
 pub struct USB<'a> {
-    core_peripherals: &'a mut CorePeripherals,
-    peripherals: &'a Peripherals,
+    p: &'a mut AppPeripherals,
     pma: &'a PacketMemoryArea,
     state: &'a mut UsbState,
 }
 
 impl<'a> USB<'a> {
     pub fn new(
-        core_peripherals: &'a mut CorePeripherals,
-        peripherals: &'a Peripherals,
+        p: &'a mut AppPeripherals,
         state: &'a mut UsbState,
         pma: &'a PacketMemoryArea,
     ) -> USB<'a> {
-        USB {
-            core_peripherals,
-            peripherals,
-            pma,
-            state,
-        }
+        USB { p, pma, state }
     }
 
     pub fn acquire<'b, F>(
-        core_peripherals: &'b mut CorePeripherals,
-        peripherals: &'b Peripherals,
+        p: &'b mut AppPeripherals,
         state: &'b mut UsbState,
         pma: &'b PacketMemoryArea,
         f: F,
@@ -120,7 +113,7 @@ impl<'a> USB<'a> {
     where
         F: FnOnce(USB),
     {
-        f(USB::new(core_peripherals, peripherals, state, pma));
+        f(USB::new(p, state, pma));
     }
 
     pub fn start(&mut self) {
@@ -128,46 +121,39 @@ impl<'a> USB<'a> {
 
         self.update_device_state(DeviceState::Default);
 
-        self.peripherals
-            .RCC
-            .apb1enr
-            .modify(|_, w| w.usben().set_bit());
-        self.core_peripherals.NVIC.enable(Interrupt::USB);
+        self.p.device.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
+        self.p.core.NVIC.enable(Interrupt::USB);
 
         // Reset the peripheral.
-        self.peripherals
+        self.p
+            .device
             .USB
             .cntr
             .modify(|_, w| w.pdwn().clear_bit().fres().set_bit());
-        self.peripherals
-            .USB
-            .cntr
-            .modify(|_, w| w.fres().clear_bit());
+        self.p.device.USB.cntr.modify(|_, w| w.fres().clear_bit());
 
         // Reset any pending interrupts.
-        self.peripherals.USB.istr.reset();
+        self.p.device.USB.istr.reset();
 
         self.set_interrupt_mask();
 
         self.pma.init();
 
-        self.peripherals.USB.bcdr.modify(|_, w| w.dppu().set_bit());
+        self.p.device.USB.bcdr.modify(|_, w| w.dppu().set_bit());
     }
 
     pub fn stop(&mut self) {
         self.close_device_endpoints();
         self.close_control_endpoints();
 
-        self.core_peripherals.NVIC.disable(Interrupt::USB);
+        self.p.core.NVIC.disable(Interrupt::USB);
 
         // Tell the host that we're gone by disabling pull-up on DP.
-        self.peripherals
-            .USB
-            .bcdr
-            .modify(|_, w| w.dppu().clear_bit());
+        self.p.device.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
 
         // USB clock off.
-        self.peripherals
+        self.p
+            .device
             .RCC
             .apb1enr
             .modify(|_, w| w.usben().clear_bit());
@@ -176,25 +162,19 @@ impl<'a> USB<'a> {
     }
 
     pub fn interrupt(&mut self) {
-        if self.peripherals.USB.istr.read().reset().bit_is_set() {
+        if self.p.device.USB.istr.read().reset().bit_is_set() {
             self.reset();
         }
 
-        if self.peripherals.USB.istr.read().err().bit_is_set() {
-            self.peripherals
-                .USB
-                .istr
-                .write(|w| unsafe { w.bits(0xDFFF) });
+        if self.p.device.USB.istr.read().err().bit_is_set() {
+            self.p.device.USB.istr.write(|w| unsafe { w.bits(0xDFFF) });
         }
 
         // Clear SUSP, SOF and ESOF
-        self.peripherals
-            .USB
-            .istr
-            .write(|w| unsafe { w.bits(0xF4FF) });
+        self.p.device.USB.istr.write(|w| unsafe { w.bits(0xF4FF) });
 
         // Correct endpoint transfer
-        if self.peripherals.USB.istr.read().ctr().bit_is_set() {
+        if self.p.device.USB.istr.read().ctr().bit_is_set() {
             self.correct_transfer();
         }
     }
@@ -204,10 +184,7 @@ impl<'a> USB<'a> {
     }
 
     fn reset(&mut self) {
-        self.peripherals
-            .USB
-            .istr
-            .write(|w| unsafe { w.bits(0xFBFF) });
+        self.p.device.USB.istr.write(|w| unsafe { w.bits(0xFBFF) });
 
         self.update_address(0);
         self.open_control_endpoints();
@@ -216,8 +193,8 @@ impl<'a> USB<'a> {
     fn correct_transfer(&mut self) {
         // USB_ISTR_CTR is read only and will be automatically cleared by
         // hardware when we've processed all endpoint results.
-        while self.peripherals.USB.istr.read().ctr().bit_is_set() {
-            let istr = self.peripherals.USB.istr.read();
+        while self.p.device.USB.istr.read().ctr().bit_is_set() {
+            let istr = self.p.device.USB.istr.read();
             let endpoint = istr.ep_id().bits();
             let is_out = istr.dir().bit_is_set();
 
@@ -230,9 +207,9 @@ impl<'a> USB<'a> {
                     }
                 }
                 1 => {
-                    if is_out && self.peripherals.USB.ep1r.read().ctr_rx().bit_is_set() {
+                    if is_out && self.p.device.USB.ep1r.read().ctr_rx().bit_is_set() {
                         self.handle_device_out_transfer();
-                    } else if !is_out && self.peripherals.USB.ep1r.read().ctr_tx().bit_is_set() {
+                    } else if !is_out && self.p.device.USB.ep1r.read().ctr_tx().bit_is_set() {
                         self.handle_device_in_transfer();
                     }
                 }
@@ -242,9 +219,9 @@ impl<'a> USB<'a> {
     }
 
     fn handle_control_out_transfer(&mut self) {
-        if self.peripherals.USB.ep0r.read().setup().bit_is_set() {
+        if self.p.device.USB.ep0r.read().setup().bit_is_set() {
             self.handle_control_setup_out_transfer();
-        } else if self.peripherals.USB.ep0r.read().ctr_rx().bit_is_set() {
+        } else if self.p.device.USB.ep0r.read().ctr_rx().bit_is_set() {
             self.handle_control_data_out_transfer();
         }
     }
@@ -261,7 +238,7 @@ impl<'a> USB<'a> {
         ));
 
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
+        self.p.device.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .ctr_tx()
@@ -287,7 +264,7 @@ impl<'a> USB<'a> {
 
     fn handle_control_data_out_transfer(&self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
+        self.p.device.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .ctr_tx()
@@ -310,7 +287,7 @@ impl<'a> USB<'a> {
 
     fn handle_control_in_transfer(&mut self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        self.peripherals.USB.ep0r.modify(|_, w| unsafe {
+        self.p.device.USB.ep0r.modify(|_, w| unsafe {
             w.ctr_tx()
                 .clear_bit()
                 .ctr_rx()
@@ -334,7 +311,8 @@ impl<'a> USB<'a> {
         }
 
         if self.state.address > 0 {
-            self.peripherals
+            self.p
+                .device
                 .USB
                 .daddr
                 .write(|w| unsafe { w.add().bits(self.state.address).ef().set_bit() });
@@ -626,9 +604,9 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_device_out_transfer(&self) {
+    fn handle_device_out_transfer(&mut self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        self.peripherals.USB.ep1r.modify(|_, w| unsafe {
+        self.p.device.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_rx()
                 .clear_bit()
                 .ctr_tx()
@@ -655,7 +633,7 @@ impl<'a> USB<'a> {
             (self.pma.read(endpoint_type, 4) & 0xff00) >> 8,
         ];
 
-        if data[0] == 6
+        let led_color = if data[0] == 6
             && data[1] == 1
             && data[2] == 2
             && data[3] == 3
@@ -663,10 +641,12 @@ impl<'a> USB<'a> {
             && data[5] == 5
             && data[6] == 6
         {
-            self.blue_on();
+            LEDColor::Blue
         } else {
-            self.red_on();
-        }
+            LEDColor::Red
+        };
+
+        LED::acquire(&mut self.p, |led| led.turn_on(&led_color));
 
         self.pma.set_rx_count(EndpointType::Device, 0);
         self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);
@@ -674,7 +654,7 @@ impl<'a> USB<'a> {
 
     fn handle_device_in_transfer(&self) {
         // Clear the 'correct transfer for reception' bit for this endpoint.
-        self.peripherals.USB.ep1r.modify(|_, w| unsafe {
+        self.p.device.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_tx()
                 .clear_bit()
                 .ctr_rx()
@@ -725,7 +705,7 @@ impl<'a> USB<'a> {
     }
 
     fn control_endpoint_error(&self) {
-        self.peripherals.USB.ep0r.modify(|r, w| unsafe {
+        self.p.device.USB.ep0r.modify(|r, w| unsafe {
             w.stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Stall))
                 .stat_rx()
@@ -765,7 +745,8 @@ impl<'a> USB<'a> {
     }
 
     fn set_interrupt_mask(&self) {
-        self.peripherals
+        self.p
+            .device
             .USB
             .cntr
             .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
@@ -796,14 +777,14 @@ impl<'a> USB<'a> {
 
     fn update_address(&mut self, address: u8) {
         if address == 0 {
-            self.peripherals.USB.daddr.write(|w| w.ef().set_bit());
+            self.p.device.USB.daddr.write(|w| w.ef().set_bit());
         }
 
         self.state.address = address;
     }
 
     fn open_control_endpoints(&self) {
-        self.peripherals.USB.ep0r.write(|w| unsafe {
+        self.p.device.USB.ep0r.write(|w| unsafe {
             w.ep_type()
                 .bits(0b01)
                 .ctr_rx()
@@ -818,7 +799,7 @@ impl<'a> USB<'a> {
     }
 
     fn open_device_endpoints(&self) {
-        self.peripherals.USB.ep1r.modify(|r, w| unsafe {
+        self.p.device.USB.ep1r.modify(|r, w| unsafe {
             w.ep_type()
                 .bits(0b11)
                 .ea()
@@ -835,7 +816,7 @@ impl<'a> USB<'a> {
     }
 
     fn close_control_endpoints(&self) {
-        self.peripherals.USB.ep0r.modify(|r, w| unsafe {
+        self.p.device.USB.ep0r.modify(|r, w| unsafe {
             w.stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
@@ -844,7 +825,7 @@ impl<'a> USB<'a> {
     }
 
     fn close_device_endpoints(&self) {
-        self.peripherals.USB.ep1r.modify(|r, w| unsafe {
+        self.p.device.USB.ep1r.modify(|r, w| unsafe {
             w.stat_tx()
                 .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
@@ -860,7 +841,7 @@ impl<'a> USB<'a> {
         // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
         match endpoint {
             EndpointType::Control => {
-                self.peripherals.USB.ep0r.modify(|r, w| unsafe {
+                self.p.device.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_rx()
                         .bits(self.get_status_bits(r.stat_rx().bits(), status))
                         .ctr_tx()
@@ -875,7 +856,7 @@ impl<'a> USB<'a> {
                         .bits(0b00)
                 });
             }
-            EndpointType::Device => self.peripherals.USB.ep1r.modify(|r, w| unsafe {
+            EndpointType::Device => self.p.device.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_rx()
                     .bits(self.get_status_bits(r.stat_rx().bits(), status))
                     .ctr_tx()
@@ -896,7 +877,7 @@ impl<'a> USB<'a> {
         // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
         match endpoint {
             EndpointType::Control => {
-                self.peripherals.USB.ep0r.modify(|r, w| unsafe {
+                self.p.device.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_tx()
                         .bits(self.get_status_bits(r.stat_tx().bits(), status))
                         .ctr_tx()
@@ -911,7 +892,7 @@ impl<'a> USB<'a> {
                         .bits(0b00)
                 });
             }
-            EndpointType::Device => self.peripherals.USB.ep1r.modify(|r, w| unsafe {
+            EndpointType::Device => self.p.device.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_tx()
                     .bits(self.get_status_bits(r.stat_tx().bits(), status))
                     .ctr_tx()
@@ -927,24 +908,4 @@ impl<'a> USB<'a> {
             }),
         }
     }
-
-    /* fn blue_off(&self) {
-        self.peripherals.GPIOA.bsrr.write(|w| w.br2().set_bit());
-    }*/
-
-    fn blue_on(&self) {
-        self.peripherals.GPIOA.bsrr.write(|w| w.bs2().set_bit());
-    }
-
-    pub fn red_on(&self) {
-        self.peripherals.GPIOA.bsrr.write(|w| w.bs4().set_bit());
-    }
-
-    pub fn green_on(&self) {
-        self.peripherals.GPIOA.bsrr.write(|w| w.bs3().set_bit());
-    }
-
-    /* fn green_off(&self) {
-        self.peripherals.GPIOA.bsrr.write(|w| w.br3().set_bit());
-    }*/
 }
