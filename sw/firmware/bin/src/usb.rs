@@ -91,29 +91,24 @@ impl Default for UsbState {
 
 pub struct USB<'a> {
     p: &'a mut AppPeripherals,
-    pma: &'a PacketMemoryArea,
+    pma: PacketMemoryArea,
     state: &'a mut UsbState,
 }
 
 impl<'a> USB<'a> {
-    pub fn new(
-        p: &'a mut AppPeripherals,
-        state: &'a mut UsbState,
-        pma: &'a PacketMemoryArea,
-    ) -> Self {
-        USB { p, pma, state }
+    pub fn new(p: &'a mut AppPeripherals, state: &'a mut UsbState) -> Self {
+        USB {
+            p,
+            pma: PacketMemoryArea {},
+            state,
+        }
     }
 
-    pub fn acquire<'b, F>(
-        p: &'b mut AppPeripherals,
-        state: &'b mut UsbState,
-        pma: &'b PacketMemoryArea,
-        f: F,
-    ) -> ()
+    pub fn acquire<'b, F>(p: &'b mut AppPeripherals, state: &'b mut UsbState, f: F) -> ()
     where
         F: FnOnce(USB),
     {
-        f(USB::new(p, state, pma));
+        f(USB::new(p, state));
     }
 
     pub fn start(&mut self) {

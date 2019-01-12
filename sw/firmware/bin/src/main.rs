@@ -21,7 +21,7 @@ use stm32f0x2::{interrupt, Peripherals};
 
 use button::Button;
 use led::{LEDColor, LED};
-use usb::{pma::PacketMemoryArea, DeviceState, USB};
+use usb::{DeviceState, USB};
 
 pub struct AppPeripherals {
     device: Peripherals,
@@ -31,7 +31,6 @@ pub struct AppPeripherals {
 struct AppState {
     p: AppPeripherals,
     usb: usb::UsbState,
-    pma: PacketMemoryArea,
 }
 
 static STATE: Mutex<RefCell<Option<AppState>>> = Mutex::new(RefCell::new(None));
@@ -162,7 +161,6 @@ fn main() -> ! {
                 device: Peripherals::take().unwrap(),
             },
             usb: usb::UsbState::default(),
-            pma: PacketMemoryArea {},
         });
     });
 
@@ -171,9 +169,7 @@ fn main() -> ! {
 
         Button::acquire(&mut state.p, |mut button| button.start());
 
-        USB::acquire(&mut state.p, &mut state.usb, &mut state.pma, |mut usb| {
-            usb.start()
-        });
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.start());
     });
 
     loop {}
@@ -184,7 +180,7 @@ fn EXTI0_1() {
     interrupt_free(|state| {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
 
-        USB::acquire(&mut state.p, &mut state.usb, &state.pma, |mut usb| {
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| {
             if let DeviceState::None = usb.get_state() {
                 usb.start();
             } else {
@@ -201,7 +197,7 @@ fn EXTI0_1() {
 #[interrupt]
 fn USB() {
     interrupt_free(|state| {
-        USB::acquire(&mut state.p, &mut state.usb, &state.pma, |mut usb| {
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| {
             usb.interrupt();
         });
     });
