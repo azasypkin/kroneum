@@ -19,8 +19,8 @@ use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
 
 use button::Button;
-use usb::{pma::PacketMemoryArea, USB};
 use systick::SysTick;
+use usb::{pma::PacketMemoryArea, USB};
 
 struct AppState {
     device_peripherals: Peripherals,
@@ -189,9 +189,31 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI0_1() {
     interrupt_free(|state| {
-        state.device_peripherals.GPIOA.bsrr.write(|w| w.bs2().set_bit());
+        state
+            .device_peripherals
+            .GPIOA
+            .bsrr
+            .write(|w| w.bs2().set_bit());
         SysTick::delay_ms(&mut state.core_peripherals.SYST, 300);
-        state.device_peripherals.GPIOA.bsrr.write(|w| w.br2().set_bit());
+        state
+            .device_peripherals
+            .GPIOA
+            .bsrr
+            .write(|w| w.br2().set_bit());
+
+        USB::acquire(
+            &mut state.core_peripherals,
+            &state.device_peripherals,
+            &mut state.usb,
+            &state.pma,
+            |mut usb| {
+                if let usb::DeviceState::None = usb.get_state() {
+                    usb.start();
+                } else {
+                    usb.stop();
+                }
+            },
+        );
 
         Button::acquire(
             &mut state.core_peripherals,

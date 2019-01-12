@@ -24,7 +24,7 @@ enum EndpointStatus {
 }
 
 #[derive(Copy, Clone)]
-enum DeviceState {
+pub enum DeviceState {
     // USB isn't started.
     None,
     // Device is starting, or has disconnected.
@@ -171,6 +171,8 @@ impl<'a> USB<'a> {
             .RCC
             .apb1enr
             .modify(|_, w| w.usben().clear_bit());
+
+        self.update_device_state(DeviceState::None);
     }
 
     pub fn interrupt(&mut self) {
@@ -195,6 +197,10 @@ impl<'a> USB<'a> {
         if self.peripherals.USB.istr.read().ctr().bit_is_set() {
             self.correct_transfer();
         }
+    }
+
+    pub fn get_state(&self) -> &DeviceState {
+        &self.state.device_state
     }
 
     fn reset(&mut self) {
