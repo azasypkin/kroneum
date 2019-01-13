@@ -13,40 +13,51 @@ pub enum PressType {
     Long,
 }
 
-pub struct Button<'a> {
+pub struct Buttons<'a> {
     p: &'a mut AppPeripherals,
 }
 
-impl<'a> Button<'a> {
+impl<'a> Buttons<'a> {
     fn new(p: &'a mut AppPeripherals) -> Self {
-        Button { p }
+        Buttons { p }
     }
 
     pub fn setup(&mut self) {
-        // Set priority for the `EXTI0` line to `1`.
+        // Set priority for the `EXTI0` and `EXTI2` line to `1`.
         unsafe {
             self.p.core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
+            self.p.core.NVIC.set_priority(Interrupt::EXTI2_3, 1);
         }
 
         // Enable the interrupt in the NVIC.
         self.p.core.NVIC.enable(Interrupt::EXTI0_1);
+        self.p.core.NVIC.enable(Interrupt::EXTI2_3);
 
-        // Enable waker.
-        self.p.device.PWR.csr.modify(|_, w| w.ewup1().set_bit());
+        // Enable wakers.
+        self.p
+            .device
+            .PWR
+            .csr
+            .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
     }
 
     pub fn teardown(&mut self) {
         self.p.core.NVIC.disable(Interrupt::EXTI0_1);
+        self.p.core.NVIC.disable(Interrupt::EXTI2_3);
 
         // Disable waker.
-        self.p.device.PWR.csr.modify(|_, w| w.ewup1().clear_bit());
+        self.p
+            .device
+            .PWR
+            .csr
+            .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
     }
 
     pub fn acquire<F, R>(p: &mut AppPeripherals, f: F) -> R
     where
-        F: FnOnce(Button) -> R,
+        F: FnOnce(Buttons) -> R,
     {
-        f(Button::new(p))
+        f(Buttons::new(p))
     }
 
     pub fn get_press_type(&mut self, limit: PressType) -> PressType {
@@ -74,7 +85,11 @@ impl<'a> Button<'a> {
     }
 
     pub fn clear_pending_interrupt(&self) {
-        // Clear exti line 0 flag.
-        self.p.device.EXTI.pr.modify(|_, w| w.pif0().set_bit());
+        // Clear exti line 0 and 2 flags.
+        self.p
+            .device
+            .EXTI
+            .pr
+            .modify(|_, w| w.pif0().set_bit().pif2().set_bit());
     }
 }

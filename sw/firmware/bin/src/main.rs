@@ -6,7 +6,7 @@
 extern crate panic_semihosting;
 
 mod beeper;
-mod button;
+mod buttons;
 mod config;
 mod led;
 mod rtc;
@@ -22,7 +22,7 @@ use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
 
 use beeper::Beeper;
-use button::Button;
+use buttons::Buttons;
 use led::{LEDColor, LED};
 use rtc::RTC;
 use usb::{DeviceStatus, UsbState, USB};
@@ -87,36 +87,44 @@ fn system_init(p: &AppPeripherals) {
 
     // -----------Buttons----------------
 
-    // Enable EXTI0 interrupt line for PA0.
+    // Enable EXTI0 interrupt line for PA0 and EXTI2 for PA2.
     p.device
         .SYSCFG_COMP
         .syscfg_exticr1
-        .modify(|_, w| unsafe { w.exti0().bits(0) });
+        .modify(|_, w| unsafe { w.exti0().bits(0).exti2().bits(0) });
 
-    // Configure PA0 to trigger an interrupt event on the EXTI0 line on a rising edge.
-    p.device.EXTI.rtsr.modify(|_, w| w.tr0().set_bit());
+    // Configure PA0/PA2 to trigger an interrupt event on the EXTI0/EXTI2 line on a rising edge.
+    p.device
+        .EXTI
+        .rtsr
+        .modify(|_, w| w.tr0().set_bit().tr2().set_bit());
 
-    // Unmask the external interrupt line EXTI0 by setting the bit corresponding to the
-    // EXTI0 "bit 0" in the EXT_IMR register.
-    p.device.EXTI.imr.modify(|_, w| w.mr0().set_bit());
+    // Unmask the external interrupt line EXTI0\EXTI2 by setting the bit corresponding to the
+    // EXTI0\EXTI2 "bit 0/2" in the EXT_IMR register.
+    p.device
+        .EXTI
+        .imr
+        .modify(|_, w| w.mr0().set_bit().mr2().set_bit());
 
     // ---------GPIO------------------
 
     // Enable clock for GPIO Port A.
     p.device.RCC.ahbenr.modify(|_, w| w.iopaen().set_bit());
 
-    // Switch PA0 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function mode and
-    // PA2, PA3 and PA4 to output.
+    // Switch PA0 (button), PA2 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function
+    // mode and PA3, PA4 and PA5 to output.
     let moder_af = 0b10;
     let moder_out = 0b01;
     p.device.GPIOA.moder.modify(|_, w| unsafe {
         w.moder0()
             .bits(moder_af)
             .moder2()
-            .bits(moder_out)
+            .bits(moder_af)
             .moder3()
             .bits(moder_out)
             .moder4()
+            .bits(moder_out)
+            .moder5()
             .bits(moder_out)
             .moder7()
             .bits(moder_af)
@@ -126,11 +134,11 @@ fn system_init(p: &AppPeripherals) {
             .bits(moder_af)
     });
 
-    // Enable pull-down for PA0.
+    // Enable pull-down for PA0 and PA2.
     p.device
         .GPIOA
         .pupdr
-        .modify(|_, w| unsafe { w.pupdr0().bits(0b10) });
+        .modify(|_, w| unsafe { w.pupdr0().bits(0b10).pupdr2().bits(0b10) });
 
     // Set "high" output speed for PA7, PA11 and PA12.
     let speed_high = 0b11;
@@ -143,13 +151,17 @@ fn system_init(p: &AppPeripherals) {
             .bits(speed_high)
     });
 
-    // Set alternative function #2 for PA0 (WKUP1) and PA7 (TIM1_CH1N).
+    // Set alternative function #2 for PA0 (WKUP1), PA2 (WKUP4) and PA7 (TIM1_CH1N).
     let af2_wkup = 0b0010;
     let af2_tim1 = 0b0010;
-    p.device
-        .GPIOA
-        .afrl
-        .modify(|_, w| unsafe { w.afrl0().bits(af2_wkup).afrl7().bits(af2_tim1) });
+    p.device.GPIOA.afrl.modify(|_, w| unsafe {
+        w.afrl0()
+            .bits(af2_wkup)
+            .afrl2()
+            .bits(af2_wkup)
+            .afrl7()
+            .bits(af2_tim1)
+    });
 
     // Set alternative function #2 (USB) for PA11 and PA12.
     let af2_usb = 0b0010;
@@ -175,7 +187,7 @@ fn main() -> ! {
 
     interrupt_free(|state| {
         system_init(&state.p);
-        Button::acquire(&mut state.p, |mut button| button.setup());
+        Buttons::acquire(&mut state.p, |mut buttons| buttons.setup());
         setup_standby_mode(&mut state.p);
     });
 
@@ -185,13 +197,24 @@ fn main() -> ! {
 }
 
 #[interrupt]
+fn EXTI2_3() {
+    interrupt_free(|state| {
+        LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Red));
+
+        Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
+
+        teardown_standby_mode(&mut state.p)
+    });
+}
+
+#[interrupt]
 fn EXTI0_1() {
     interrupt_free(|state| {
         LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
 
         Beeper::acquire(&mut state.p, |mut beeper| {
             beeper.setup();
-            beeper.play_melody();
+            beeper.play_setup();
             beeper.teardown();
         });
 
@@ -217,7 +240,7 @@ fn EXTI0_1() {
             });
         });
 
-        Button::acquire(&mut state.p, |button| button.clear_pending_interrupt());
+        Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
 
         teardown_standby_mode(&mut state.p)
     });
@@ -228,7 +251,7 @@ fn RTC() {
     interrupt_free(|state| {
         Beeper::acquire(&mut state.p, |mut beeper| {
             beeper.setup();
-            beeper.play_reset();
+            beeper.play_melody();
             beeper.teardown();
         });
 
