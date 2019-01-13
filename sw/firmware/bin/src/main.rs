@@ -217,9 +217,7 @@ fn EXTI0_1() {
             });
         });
 
-        Button::acquire(&mut state.p, |button| {
-            button.clear_pending_interrupt();
-        });
+        Button::acquire(&mut state.p, |button| button.clear_pending_interrupt());
 
         teardown_standby_mode(&mut state.p)
     });
@@ -248,9 +246,7 @@ fn RTC() {
 #[interrupt]
 fn USB() {
     interrupt_free(|state| {
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| {
-            usb.interrupt();
-        });
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.interrupt());
     });
 }
 
