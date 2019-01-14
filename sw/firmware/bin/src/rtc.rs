@@ -13,8 +13,8 @@ impl Time {
         self.seconds += seconds;
 
         if self.seconds >= 60 {
-            self.seconds -= 60;
-            self.add_minutes(1);
+            self.seconds = self.seconds % 60;
+            self.add_minutes(self.seconds / 60);
         }
     }
 
@@ -22,8 +22,8 @@ impl Time {
         self.minutes += minutes;
 
         if self.minutes >= 60 {
-            self.minutes -= 60;
-            self.add_hours(1);
+            self.minutes = self.minutes % 60;
+            self.add_hours(self.minutes / 60);
         }
     }
 
@@ -33,6 +33,20 @@ impl Time {
         if self.hours >= 24 {
             self.hours -= 24;
         }
+    }
+
+    pub fn from_seconds(seconds: u8) -> Self {
+        let mut time = Time::default();
+        time.add_seconds(seconds);
+        time
+    }
+
+    pub fn from_minutes(minutes: u8) -> Self {
+        Time::from_seconds(minutes * 60)
+    }
+
+    pub fn from_hours(hours: u8) -> Self {
+        Time::from_minutes(hours * 60)
     }
 }
 

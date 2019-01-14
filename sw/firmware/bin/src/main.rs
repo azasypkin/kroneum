@@ -109,12 +109,12 @@ fn RTC() {
             beeper.teardown();
         });
 
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-
         RTC::acquire(&mut state.p, |mut rtc| {
             rtc.teardown();
             rtc.clear_pending_interrupt();
         });
+
+        state.mode = SystemMode::Idle;
 
         setup_standby_mode(&mut state.p);
     });
@@ -188,6 +188,17 @@ fn on_press(state: &mut SystemState) {
                         beeper.teardown();
                     });
 
+                    RTC::acquire(&mut state.p, |mut rtc| {
+                        rtc.setup();
+
+                        let mut time = Time::default();
+                        rtc.configure_time(&time);
+
+                        time.add_hours(*counter);
+
+                        rtc.configure_alarm(&time);
+                    });
+
                     state.mode = SystemMode::Alarm;
                 }
                 _ => {}
@@ -212,6 +223,20 @@ fn on_press(state: &mut SystemState) {
                 beeper.play_reset();
                 beeper.beep_n(*counter);
                 beeper.teardown();
+            });
+
+            RTC::acquire(&mut state.p, |mut rtc| {
+                rtc.setup();
+
+                let mut time = Time::default();
+                rtc.configure_time(&time);
+
+                match button_i {
+                    ButtonPressType::Long => time.add_seconds(*counter),
+                    _ => time.add_minutes(*counter),
+                };
+
+                rtc.configure_alarm(&time);
             });
 
             state.mode = SystemMode::Alarm;
