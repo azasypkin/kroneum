@@ -1,5 +1,6 @@
 use crate::{
     beeper::Beeper,
+    buttons::{ButtonPressType, Buttons},
     rtc::{Time, RTC},
     usb::{UsbState, USB},
     Peripherals,
@@ -38,11 +39,17 @@ impl<'a> System<'a> {
         System { p, state }
     }
 
-    pub fn acquire<'b, F>(p: &'b mut Peripherals, state: &'b mut SystemState, f: F) -> ()
+    pub fn acquire<'b, F, R>(p: &'b mut Peripherals, state: &'b mut SystemState, f: F) -> R
     where
-        F: FnOnce(System),
+        F: FnOnce(System) -> R,
     {
-        f(System::new(p, state));
+        f(System::new(p, state))
+    }
+
+    pub fn setup(&mut self) {
+        Buttons::acquire(&mut self.p, |mut buttons| buttons.setup());
+
+        self.set_mode(SystemMode::Idle);
     }
 
     pub fn set_mode(&mut self, mode: SystemMode) {
@@ -126,6 +133,64 @@ impl<'a> System<'a> {
         USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
             usb.interrupt()
         });
+    }
+
+    pub fn on_button_press(&mut self) -> bool {
+        let has_pending_interrupt =
+            Buttons::acquire(&mut self.p, |buttons| buttons.has_pending_interrupt());
+        if !has_pending_interrupt {
+            return false;
+        }
+
+        let (button_i, button_x) = Buttons::acquire(&mut self.p, |mut buttons| buttons.interrupt());
+
+        match (self.state.mode.clone(), button_i, button_x) {
+            (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
+                self.set_mode(SystemMode::Setup(0));
+
+                let (button_i, button_x) =
+                    Buttons::acquire(&mut self.p, |mut buttons| buttons.interrupt());
+
+                match (mode, button_i, button_x) {
+                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Idle)
+                    }
+                    (_, ButtonPressType::Long, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Config)
+                    }
+                    (SystemMode::Setup(counter), _, _) => {
+                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter)))
+                    }
+                    _ => {}
+                }
+            }
+            (SystemMode::Idle, ButtonPressType::Long, _)
+            | (SystemMode::Idle, _, ButtonPressType::Long)
+            | (SystemMode::Alarm(_), ButtonPressType::Long, _)
+            | (SystemMode::Alarm(_), _, ButtonPressType::Long) => {
+                self.set_mode(SystemMode::Setup(0))
+            }
+            (SystemMode::Setup(counter), ButtonPressType::Long, _)
+            | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
+                let time = match button_i {
+                    ButtonPressType::Long => Time::from_seconds(counter as u32),
+                    _ => Time::from_minutes(counter as u32),
+                };
+
+                self.set_mode(SystemMode::Alarm(time));
+            }
+            (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
+                self.set_mode(SystemMode::Setup(counter + 1))
+            }
+            (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
+                self.set_mode(SystemMode::Setup(counter + 10))
+            }
+            _ => {}
+        }
+
+        Buttons::acquire(&mut self.p, |buttons| buttons.clear_pending_interrupt());
+
+        true
     }
 
     fn toggle_standby_mode(&mut self, on: bool) {

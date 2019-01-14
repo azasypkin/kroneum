@@ -22,9 +22,7 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
-use buttons::{ButtonPressType, Buttons};
 use led::{LEDColor, LED};
-use rtc::Time;
 use system::{System, SystemMode, SystemState};
 
 pub struct Peripherals {
@@ -56,11 +54,7 @@ fn main() -> ! {
     interrupt_free(|state| {
         init(&state.p);
 
-        System::acquire(&mut state.p, &mut state.system, |mut system| {
-            system.set_mode(SystemMode::Idle);
-        });
-
-        Buttons::acquire(&mut state.p, |mut buttons| buttons.setup());
+        System::acquire(&mut state.p, &mut state.system, |mut system| system.setup());
     });
 
     loop {
@@ -71,14 +65,22 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI2_3() {
     interrupt_free(|state| {
-        on_press(state);
+        if System::acquire(&mut state.p, &mut state.system, |mut system| {
+            system.on_button_press()
+        }) {
+            indicate_mode(state);
+        }
     });
 }
 
 #[interrupt]
 fn EXTI0_1() {
     interrupt_free(|state| {
-        on_press(state);
+        if System::acquire(&mut state.p, &mut state.system, |mut system| {
+            system.on_button_press()
+        }) {
+            indicate_mode(state);
+        }
     });
 }
 
@@ -110,75 +112,7 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
     loop {}
 }
 
-fn on_press(state: &mut State) {
-    let has_pending_interrupt =
-        Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
-    if !has_pending_interrupt {
-        return;
-    }
-
-    let (button_i, button_x) = Buttons::acquire(&mut state.p, |mut buttons| buttons.interrupt());
-
-    match (state.system.mode.clone(), button_i, button_x) {
-        (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
-            System::acquire(&mut state.p, &mut state.system, |mut system| {
-                system.set_mode(SystemMode::Setup(0));
-            });
-
-            let (button_i, button_x) =
-                Buttons::acquire(&mut state.p, |mut buttons| buttons.interrupt());
-
-            match (mode, button_i, button_x) {
-                (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
-                    System::acquire(&mut state.p, &mut state.system, |mut system| {
-                        system.set_mode(SystemMode::Idle);
-                    });
-                }
-                (_, ButtonPressType::Long, ButtonPressType::Long) => {
-                    System::acquire(&mut state.p, &mut state.system, |mut system| {
-                        system.set_mode(SystemMode::Config);
-                    });
-                }
-                (SystemMode::Setup(counter), _, _) => {
-                    System::acquire(&mut state.p, &mut state.system, |mut system| {
-                        system.set_mode(SystemMode::Alarm(Time::from_hours(counter)));
-                    });
-                }
-                _ => {}
-            }
-        }
-        (SystemMode::Idle, ButtonPressType::Long, _)
-        | (SystemMode::Idle, _, ButtonPressType::Long)
-        | (SystemMode::Alarm(_), ButtonPressType::Long, _)
-        | (SystemMode::Alarm(_), _, ButtonPressType::Long) => {
-            System::acquire(&mut state.p, &mut state.system, |mut system| {
-                system.set_mode(SystemMode::Setup(0));
-            });
-        }
-        (SystemMode::Setup(counter), ButtonPressType::Long, _)
-        | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
-            let time = match button_i {
-                ButtonPressType::Long => Time::from_seconds(counter as u32),
-                _ => Time::from_minutes(counter as u32),
-            };
-
-            System::acquire(&mut state.p, &mut state.system, |mut system| {
-                system.set_mode(SystemMode::Alarm(time));
-            });
-        }
-        (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
-            System::acquire(&mut state.p, &mut state.system, |mut system| {
-                system.set_mode(SystemMode::Setup(counter + 1));
-            });
-        }
-        (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
-            System::acquire(&mut state.p, &mut state.system, |mut system| {
-                system.set_mode(SystemMode::Setup(counter + 10));
-            });
-        }
-        _ => {}
-    }
-
+fn indicate_mode(state: &mut State) {
     let system_mode = &state.system.mode;
     LED::acquire(&mut state.p, |mut led| {
         match system_mode {
@@ -192,8 +126,6 @@ fn on_press(state: &mut State) {
             }
         };
     });
-
-    Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
 }
 
 fn interrupt_free<F>(f: F) -> ()
