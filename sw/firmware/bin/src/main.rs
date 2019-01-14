@@ -22,7 +22,6 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
-use beeper::Beeper;
 use buttons::{ButtonPressType, Buttons};
 use led::{LEDColor, LED};
 use rtc::Time;
@@ -131,12 +130,6 @@ fn on_press(state: &mut State) {
 
             match (mode, button_i, button_x) {
                 (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
-                    Beeper::acquire(&mut state.p, |mut beeper| {
-                        beeper.setup();
-                        beeper.play_reset();
-                        beeper.teardown();
-                    });
-
                     System::acquire(&mut state.p, &mut state.system, |mut system| {
                         system.set_mode(SystemMode::Idle);
                     });
@@ -147,7 +140,6 @@ fn on_press(state: &mut State) {
                     });
                 }
                 (SystemMode::Setup(counter), _, _) => {
-                    // Hour alarm.
                     System::acquire(&mut state.p, &mut state.system, |mut system| {
                         system.set_mode(SystemMode::Alarm(Time::from_hours(counter)));
                     });

@@ -53,6 +53,15 @@ impl<'a> System<'a> {
                 USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
                     usb.teardown()
                 });
+
+                // If we are exiting `Config` mode let's play special signal.
+                if let SystemMode::Setup(_) = self.state.mode {
+                    Beeper::acquire(&mut self.p, |mut beeper| {
+                        beeper.setup();
+                        beeper.play_reset();
+                        beeper.teardown();
+                    });
+                }
             }
             SystemMode::Config => {
                 Beeper::acquire(&mut self.p, |mut beeper| {
