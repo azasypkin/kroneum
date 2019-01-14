@@ -1,7 +1,7 @@
 use crate::SystemPeripherals;
 use stm32f0x2::Interrupt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,

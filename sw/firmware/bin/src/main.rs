@@ -35,7 +35,7 @@ pub struct SystemPeripherals {
 #[derive(Debug)]
 enum SystemMode {
     Idle,
-    Setup(Time),
+    Setup(u8),
     Alarm,
     Config,
 }
@@ -160,6 +160,7 @@ fn on_press(state: &mut SystemState) {
                     });
 
                     USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
+                    setup_standby_mode(&mut state.p);
 
                     state.mode = SystemMode::Idle;
                 }
@@ -176,10 +177,17 @@ fn on_press(state: &mut SystemState) {
                     state.mode = SystemMode::Config;
                 }
                 (SystemMode::Alarm, _, _) | (SystemMode::Idle, _, _) => {
-                    state.mode = SystemMode::Setup(Time::default())
+                    state.mode = SystemMode::Setup(0)
                 }
-                (SystemMode::Setup(_), _, _) => {
+                (SystemMode::Setup(counter), _, _) => {
                     // Hour alarm.
+                    Beeper::acquire(&mut state.p, |mut beeper| {
+                        beeper.setup();
+                        beeper.play_reset();
+                        beeper.beep_n(*counter);
+                        beeper.teardown();
+                    });
+
                     state.mode = SystemMode::Alarm;
                 }
                 _ => {}
@@ -195,25 +203,36 @@ fn on_press(state: &mut SystemState) {
                 beeper.teardown();
             });
 
-            state.mode = SystemMode::Setup(Time::default())
+            state.mode = SystemMode::Setup(0)
         }
-        (SystemMode::Setup(_), ButtonPressType::Long, _)
-        | (SystemMode::Setup(_), _, ButtonPressType::Long) => {
+        (SystemMode::Setup(counter), ButtonPressType::Long, _)
+        | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
             Beeper::acquire(&mut state.p, |mut beeper| {
                 beeper.setup();
                 beeper.play_reset();
+                beeper.beep_n(*counter);
                 beeper.teardown();
             });
 
             state.mode = SystemMode::Alarm;
         }
-        (SystemMode::Setup(_), ButtonPressType::Short, _)
-        | (SystemMode::Setup(_), _, ButtonPressType::Short) => {
+        (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
             Beeper::acquire(&mut state.p, |mut beeper| {
                 beeper.setup();
                 beeper.beep();
                 beeper.teardown();
             });
+
+            state.mode = SystemMode::Setup(counter + 1);
+        }
+        (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
+            Beeper::acquire(&mut state.p, |mut beeper| {
+                beeper.setup();
+                beeper.beep();
+                beeper.teardown();
+            });
+
+            state.mode = SystemMode::Setup(counter + 10);
         }
         _ => {}
     }
