@@ -22,26 +22,222 @@ use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals};
 
 use beeper::Beeper;
-use buttons::Buttons;
+use buttons::{ButtonPressType, Buttons};
 use led::{LEDColor, LED};
-use rtc::RTC;
+use rtc::{Time, RTC};
 use usb::{DeviceStatus, UsbState, USB};
 
-pub struct AppPeripherals {
+pub struct SystemPeripherals {
     device: Peripherals,
     core: CorePeripherals,
 }
 
-struct AppState {
-    p: AppPeripherals,
+#[derive(Debug)]
+enum SystemMode {
+    Idle,
+    Setup(Time),
+    Alarm,
+    Config,
+}
+
+struct SystemState {
+    p: SystemPeripherals,
+    mode: SystemMode,
     usb: UsbState,
 }
 
-static STATE: Mutex<RefCell<Option<AppState>>> = Mutex::new(RefCell::new(None));
+static STATE: Mutex<RefCell<Option<SystemState>>> = Mutex::new(RefCell::new(None));
+
+// Read about interrupt setup sequence at:
+// http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
+#[entry]
+fn main() -> ! {
+    free(|cs| {
+        *STATE.borrow(cs).borrow_mut() = Some(SystemState {
+            p: SystemPeripherals {
+                core: cortex_m::Peripherals::take().unwrap(),
+                device: Peripherals::take().unwrap(),
+            },
+            mode: SystemMode::Idle,
+            usb: UsbState::default(),
+        });
+    });
+
+    interrupt_free(|state| {
+        system_init(&state.p);
+        Buttons::acquire(&mut state.p, |mut buttons| buttons.setup());
+        setup_standby_mode(&mut state.p);
+    });
+
+    loop {
+        cortex_m::asm::wfi();
+    }
+}
+
+#[interrupt]
+fn EXTI2_3() {
+    interrupt_free(|state| {
+        let has_pending_interrupt =
+            Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
+        if !has_pending_interrupt {
+            return;
+        }
+
+        on_press(state);
+    });
+}
+
+#[interrupt]
+fn EXTI0_1() {
+    interrupt_free(|state| {
+        let has_pending_interrupt =
+            Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
+        if !has_pending_interrupt {
+            return;
+        }
+
+        on_press(state);
+    });
+}
+
+#[interrupt]
+fn RTC() {
+    interrupt_free(|state| {
+        Beeper::acquire(&mut state.p, |mut beeper| {
+            beeper.setup();
+            beeper.play_melody();
+            beeper.teardown();
+        });
+
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
+
+        RTC::acquire(&mut state.p, |mut rtc| {
+            rtc.teardown();
+            rtc.clear_pending_interrupt();
+        });
+
+        setup_standby_mode(&mut state.p);
+    });
+}
+
+#[interrupt]
+fn USB() {
+    interrupt_free(|state| {
+        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.interrupt());
+    });
+}
+
+#[exception]
+fn DefaultHandler(irqn: i16) {
+    panic!("unhandled exception (IRQn={})", irqn);
+}
+
+#[exception]
+fn HardFault(_ef: &ExceptionFrame) -> ! {
+    loop {}
+}
+
+fn on_press(state: &mut SystemState) {
+    let (button_i, button_x) = Buttons::acquire(&mut state.p, |mut buttons| buttons.interrupt());
+
+    match (&state.mode, button_i, button_x) {
+        (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
+            Beeper::acquire(&mut state.p, |mut beeper| {
+                beeper.setup();
+                beeper.play_setup();
+                beeper.teardown();
+            });
+
+            let (button_i, button_x) =
+                Buttons::acquire(&mut state.p, |mut buttons| buttons.interrupt());
+
+            match (mode, button_i, button_x) {
+                (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
+                    Beeper::acquire(&mut state.p, |mut beeper| {
+                        beeper.setup();
+                        beeper.beep_n(5);
+                        beeper.teardown();
+                    });
+
+                    USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
+
+                    state.mode = SystemMode::Idle;
+                }
+                (_, ButtonPressType::Long, ButtonPressType::Long) => {
+                    Beeper::acquire(&mut state.p, |mut beeper| {
+                        beeper.setup();
+                        beeper.beep_n(5);
+                        beeper.teardown();
+                    });
+
+                    USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
+                    teardown_standby_mode(&mut state.p);
+
+                    state.mode = SystemMode::Config;
+                }
+                (SystemMode::Alarm, _, _) | (SystemMode::Idle, _, _) => {
+                    state.mode = SystemMode::Setup(Time::default())
+                }
+                (SystemMode::Setup(_), _, _) => {
+                    // Hour alarm.
+                    state.mode = SystemMode::Alarm;
+                }
+                _ => {}
+            }
+        }
+        (SystemMode::Idle, ButtonPressType::Long, _)
+        | (SystemMode::Idle, _, ButtonPressType::Long)
+        | (SystemMode::Alarm, ButtonPressType::Long, _)
+        | (SystemMode::Alarm, _, ButtonPressType::Long) => {
+            Beeper::acquire(&mut state.p, |mut beeper| {
+                beeper.setup();
+                beeper.play_setup();
+                beeper.teardown();
+            });
+
+            state.mode = SystemMode::Setup(Time::default())
+        }
+        (SystemMode::Setup(_), ButtonPressType::Long, _)
+        | (SystemMode::Setup(_), _, ButtonPressType::Long) => {
+            Beeper::acquire(&mut state.p, |mut beeper| {
+                beeper.setup();
+                beeper.play_reset();
+                beeper.teardown();
+            });
+
+            state.mode = SystemMode::Alarm;
+        }
+        (SystemMode::Setup(_), ButtonPressType::Short, _)
+        | (SystemMode::Setup(_), _, ButtonPressType::Short) => {
+            Beeper::acquire(&mut state.p, |mut beeper| {
+                beeper.setup();
+                beeper.beep();
+                beeper.teardown();
+            });
+        }
+        _ => {}
+    }
+
+    let system_mode = &state.mode;
+    LED::acquire(&mut state.p, |mut led| {
+        match system_mode {
+            SystemMode::Idle => led.blink(&LEDColor::Red),
+            SystemMode::Setup(_) => led.blink(&LEDColor::Blue),
+            SystemMode::Alarm => led.blink(&LEDColor::Green),
+            SystemMode::Config => {
+                led.blink(&LEDColor::Blue);
+                led.blink(&LEDColor::Green);
+                led.blink(&LEDColor::Red);
+            }
+        };
+    });
+
+    Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
+}
 
 fn interrupt_free<F>(f: F) -> ()
 where
-    F: FnOnce(&mut AppState),
+    F: FnOnce(&mut SystemState),
 {
     free(|cs| {
         if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {
@@ -52,7 +248,7 @@ where
     });
 }
 
-fn setup_standby_mode(p: &mut AppPeripherals) {
+fn setup_standby_mode(p: &mut SystemPeripherals) {
     // Select STANDBY mode.
     p.device.PWR.cr.modify(|_, w| w.pdds().set_bit());
 
@@ -62,7 +258,7 @@ fn setup_standby_mode(p: &mut AppPeripherals) {
     p.core.SCB.set_sleepdeep();
 }
 
-fn teardown_standby_mode(p: &mut AppPeripherals) {
+fn teardown_standby_mode(p: &mut SystemPeripherals) {
     // Disable STANDBY mode.
     p.device.PWR.cr.modify(|_, w| w.pdds().clear_bit());
 
@@ -72,12 +268,12 @@ fn teardown_standby_mode(p: &mut AppPeripherals) {
     p.core.SCB.clear_sleepdeep();
 }
 
-fn clear_wakeup_flag(p: &AppPeripherals) {
+fn clear_wakeup_flag(p: &SystemPeripherals) {
     p.device.PWR.cr.modify(|_, w| w.cwuf().set_bit());
 }
 
 /// Initialize the system, configure clock, GPIOs and interrupts.
-fn system_init(p: &AppPeripherals) {
+fn system_init(p: &SystemPeripherals) {
     // Remap PA9-10 to PA11-12 for USB.
     p.device.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
     p.device
@@ -169,116 +365,4 @@ fn system_init(p: &AppPeripherals) {
         .GPIOA
         .afrh
         .modify(|_, w| unsafe { w.afrh11().bits(af2_usb).afrh12().bits(af2_usb) });
-}
-
-// Read about interrupt setup sequence at:
-// http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
-#[entry]
-fn main() -> ! {
-    free(|cs| {
-        *STATE.borrow(cs).borrow_mut() = Some(AppState {
-            p: AppPeripherals {
-                core: cortex_m::Peripherals::take().unwrap(),
-                device: Peripherals::take().unwrap(),
-            },
-            usb: UsbState::default(),
-        });
-    });
-
-    interrupt_free(|state| {
-        system_init(&state.p);
-        Buttons::acquire(&mut state.p, |mut buttons| buttons.setup());
-        setup_standby_mode(&mut state.p);
-    });
-
-    loop {
-        cortex_m::asm::wfi();
-    }
-}
-
-#[interrupt]
-fn EXTI2_3() {
-    interrupt_free(|state| {
-        LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Red));
-
-        Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
-
-        teardown_standby_mode(&mut state.p)
-    });
-}
-
-#[interrupt]
-fn EXTI0_1() {
-    interrupt_free(|state| {
-        LED::acquire(&mut state.p, |mut led| led.blink(&LEDColor::Blue));
-
-        Beeper::acquire(&mut state.p, |mut beeper| {
-            beeper.setup();
-            beeper.play_setup();
-            beeper.teardown();
-        });
-
-        if let DeviceStatus::None = state.usb.device_status {
-            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
-        } else {
-            USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-        }
-
-        RTC::acquire(&mut state.p, |mut rtc| {
-            rtc.setup();
-
-            rtc.configure_time(&rtc::Time {
-                hours: 1,
-                minutes: 0,
-                seconds: 0,
-            });
-
-            rtc.configure_alarm(&rtc::Time {
-                hours: 1,
-                minutes: 0,
-                seconds: 10,
-            });
-        });
-
-        Buttons::acquire(&mut state.p, |button| button.clear_pending_interrupt());
-
-        teardown_standby_mode(&mut state.p)
-    });
-}
-
-#[interrupt]
-fn RTC() {
-    interrupt_free(|state| {
-        Beeper::acquire(&mut state.p, |mut beeper| {
-            beeper.setup();
-            beeper.play_melody();
-            beeper.teardown();
-        });
-
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-
-        RTC::acquire(&mut state.p, |mut rtc| {
-            rtc.teardown();
-            rtc.clear_pending_interrupt();
-        });
-
-        setup_standby_mode(&mut state.p);
-    });
-}
-
-#[interrupt]
-fn USB() {
-    interrupt_free(|state| {
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.interrupt());
-    });
-}
-
-#[exception]
-fn DefaultHandler(irqn: i16) {
-    panic!("unhandled exception (IRQn={})", irqn);
-}
-
-#[exception]
-fn HardFault(_ef: &ExceptionFrame) -> ! {
-    loop {}
 }

@@ -1,4 +1,4 @@
-use crate::AppPeripherals;
+use crate::SystemPeripherals;
 use stm32f0x2::Interrupt;
 
 #[derive(Debug)]
@@ -36,12 +36,22 @@ impl Time {
     }
 }
 
+impl Default for Time {
+    fn default() -> Self {
+        Time {
+            seconds: 0,
+            minutes: 0,
+            hours: 0,
+        }
+    }
+}
+
 pub struct RTC<'a> {
-    p: &'a mut AppPeripherals,
+    p: &'a mut SystemPeripherals,
 }
 
 impl<'a> RTC<'a> {
-    fn new(p: &'a mut AppPeripherals) -> Self {
+    fn new(p: &'a mut SystemPeripherals) -> Self {
         RTC { p }
     }
 
@@ -88,7 +98,7 @@ impl<'a> RTC<'a> {
         while self.p.device.RCC.csr.read().lsirdy().bit_is_set() {}
     }
 
-    pub fn acquire<'b, F, R>(p: &'a mut AppPeripherals, f: F) -> R
+    pub fn acquire<'b, F, R>(p: &'a mut SystemPeripherals, f: F) -> R
     where
         F: FnOnce(RTC) -> R,
     {

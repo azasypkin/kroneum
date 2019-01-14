@@ -1,24 +1,34 @@
 use crate::systick::SysTick;
-use crate::AppPeripherals;
+use crate::SystemPeripherals;
 
 use stm32f0x2::Interrupt;
 
 /// Defines type of the press (short, long, very long).
-pub enum PressType {
+#[derive(Copy, Clone, PartialEq)]
+pub enum ButtonPressType {
     /// Button is not pressed.
     None,
     /// Button is keep pressed for less then a second.
     Short,
-    /// Button is pressed for more than a second, but less than 3 seconds.
+    /// Button is pressed for more than a second, but less than 2 seconds.
     Long,
 }
 
+impl ButtonPressType {
+    pub fn is_none(&self) -> bool {
+        match *self {
+            ButtonPressType::None => true,
+            _ => false,
+        }
+    }
+}
+
 pub struct Buttons<'a> {
-    p: &'a mut AppPeripherals,
+    p: &'a mut SystemPeripherals,
 }
 
 impl<'a> Buttons<'a> {
-    fn new(p: &'a mut AppPeripherals) -> Self {
+    fn new(p: &'a mut SystemPeripherals) -> Self {
         Buttons { p }
     }
 
@@ -53,35 +63,60 @@ impl<'a> Buttons<'a> {
             .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
     }
 
-    pub fn acquire<F, R>(p: &mut AppPeripherals, f: F) -> R
+    pub fn acquire<F, R>(p: &mut SystemPeripherals, f: F) -> R
     where
         F: FnOnce(Buttons) -> R,
     {
         f(Buttons::new(p))
     }
 
-    pub fn get_press_type(&mut self, limit: PressType) -> PressType {
-        if self.p.device.GPIOA.idr.read().idr0().bit_is_clear() {
-            return PressType::None;
-        }
+    pub fn interrupt(&mut self) -> (ButtonPressType, ButtonPressType) {
+        let reg = &self.p.device.GPIOA.idr.read();
 
-        let n = match limit {
-            PressType::None => 0u8,
-            PressType::Short => 2u8,
-            PressType::Long => 6u8,
+        let mut button_one_state = if reg.idr0().bit_is_set() {
+            ButtonPressType::Short
+        } else {
+            ButtonPressType::None
         };
 
-        for i in 1..n + 1 {
+        let mut button_ten_state = if reg.idr2().bit_is_set() {
+            ButtonPressType::Short
+        } else {
+            ButtonPressType::None
+        };
+
+        if button_one_state.is_none() && button_ten_state.is_none() {
+            return (button_one_state, button_ten_state);
+        }
+
+        for i in 1u8..8u8 {
             SysTick::delay_ms(&mut self.p.core.SYST, 250);
-            if self.p.device.GPIOA.idr.read().idr0().bit_is_clear() {
-                return match i {
-                    1...2 => PressType::Short,
-                    _ => PressType::Long,
-                };
+            let reg = self.p.device.GPIOA.idr.read();
+            if reg.idr0().bit_is_clear() && reg.idr2().bit_is_clear() {
+                break;
+            }
+
+            let (new_state, works_for_none) = match i {
+                0...4 => (ButtonPressType::Short, true),
+                5...8 => (ButtonPressType::Long, false),
+                _ => break,
+            };
+
+            if reg.idr0().bit_is_set() && (!button_one_state.is_none() || works_for_none) {
+                button_one_state = new_state;
+            }
+
+            if reg.idr2().bit_is_set() && (!button_ten_state.is_none() || works_for_none) {
+                button_ten_state = new_state;
             }
         }
 
-        limit
+        (button_one_state, button_ten_state)
+    }
+
+    pub fn has_pending_interrupt(&self) -> bool {
+        let reg = self.p.device.EXTI.pr.read();
+        reg.pif0().bit_is_set() || reg.pif2().bit_is_set()
     }
 
     pub fn clear_pending_interrupt(&self) {

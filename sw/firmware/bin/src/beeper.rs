@@ -1,4 +1,4 @@
-use crate::{config, systick::SysTick, AppPeripherals};
+use crate::{config, systick::SysTick, SystemPeripherals};
 
 const EIGHTH_NOTE: u32 = 150;
 const QUARTER_DOT_NOTE: u32 = 450;
@@ -7,11 +7,11 @@ const QUARTER_NOTE: u32 = 300;
 const SCALES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988];
 
 pub struct Beeper<'a> {
-    p: &'a mut AppPeripherals,
+    p: &'a mut SystemPeripherals,
 }
 
 impl<'a> Beeper<'a> {
-    fn new(p: &'a mut AppPeripherals) -> Self {
+    fn new(p: &'a mut SystemPeripherals) -> Self {
         Beeper { p }
     }
 
@@ -100,7 +100,7 @@ impl<'a> Beeper<'a> {
             .modify(|_, w| w.tim1en().clear_bit());
     }
 
-    pub fn acquire<'b, F>(p: &'a mut AppPeripherals, f: F) -> ()
+    pub fn acquire<'b, F>(p: &'a mut SystemPeripherals, f: F) -> ()
     where
         F: FnOnce(Beeper),
     {

@@ -3,7 +3,7 @@ pub mod pma;
 mod setup_packet;
 
 use crate::led::{LEDColor, LED};
-use crate::AppPeripherals;
+use crate::SystemPeripherals;
 use stm32f0x2::Interrupt;
 
 use descriptors::*;
@@ -90,13 +90,13 @@ impl Default for UsbState {
  */
 
 pub struct USB<'a> {
-    p: &'a mut AppPeripherals,
+    p: &'a mut SystemPeripherals,
     pma: PacketMemoryArea,
     state: &'a mut UsbState,
 }
 
 impl<'a> USB<'a> {
-    pub fn new(p: &'a mut AppPeripherals, state: &'a mut UsbState) -> Self {
+    pub fn new(p: &'a mut SystemPeripherals, state: &'a mut UsbState) -> Self {
         USB {
             p,
             pma: PacketMemoryArea {},
@@ -104,7 +104,7 @@ impl<'a> USB<'a> {
         }
     }
 
-    pub fn acquire<'b, F>(p: &'b mut AppPeripherals, state: &'b mut UsbState, f: F) -> ()
+    pub fn acquire<'b, F>(p: &'b mut SystemPeripherals, state: &'b mut UsbState, f: F) -> ()
     where
         F: FnOnce(USB),
     {

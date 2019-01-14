@@ -1,4 +1,4 @@
-use crate::{systick::SysTick, AppPeripherals};
+use crate::{systick::SysTick, SystemPeripherals};
 
 /// Defines the color to operate on.
 pub enum LEDColor {
@@ -8,11 +8,11 @@ pub enum LEDColor {
 }
 
 pub struct LED<'a> {
-    p: &'a mut AppPeripherals,
+    p: &'a mut SystemPeripherals,
 }
 
 impl<'a> LED<'a> {
-    fn new(p: &'a mut AppPeripherals) -> Self {
+    fn new(p: &'a mut SystemPeripherals) -> Self {
         LED { p }
     }
 
@@ -42,7 +42,7 @@ impl<'a> LED<'a> {
         }
     }
 
-    pub fn acquire<F, R>(p: &mut AppPeripherals, f: F) -> R
+    pub fn acquire<F, R>(p: &mut SystemPeripherals, f: F) -> R
     where
         F: FnOnce(LED) -> R,
     {
