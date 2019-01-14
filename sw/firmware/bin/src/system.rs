@@ -1,6 +1,7 @@
 use crate::{
     beeper::Beeper,
     rtc::{Time, RTC},
+    usb::{UsbState, USB},
     Peripherals,
 };
 
@@ -15,12 +16,14 @@ pub enum SystemMode {
 #[derive(Copy, Clone)]
 pub struct SystemState {
     pub mode: SystemMode,
+    usb_state: UsbState,
 }
 
 impl Default for SystemState {
     fn default() -> Self {
         SystemState {
             mode: SystemMode::Idle,
+            usb_state: UsbState::default(),
         }
     }
 }
@@ -46,6 +49,10 @@ impl<'a> System<'a> {
         match &mode {
             SystemMode::Idle => {
                 self.toggle_standby_mode(true);
+
+                USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
+                    usb.teardown()
+                });
             }
             SystemMode::Config => {
                 Beeper::acquire(&mut self.p, |mut beeper| {
@@ -55,6 +62,10 @@ impl<'a> System<'a> {
                 });
 
                 self.toggle_standby_mode(false);
+
+                USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
+                    usb.setup()
+                });
             }
             SystemMode::Setup(0) => {
                 Beeper::acquire(&mut self.p, |mut beeper| {
@@ -100,6 +111,12 @@ impl<'a> System<'a> {
         RTC::acquire(&mut self.p, |mut rtc| rtc.teardown());
 
         self.set_mode(SystemMode::Idle);
+    }
+
+    pub fn on_usb_packet(&mut self) {
+        USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
+            usb.interrupt()
+        });
     }
 
     fn toggle_standby_mode(&mut self, on: bool) {

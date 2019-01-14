@@ -27,7 +27,6 @@ use buttons::{ButtonPressType, Buttons};
 use led::{LEDColor, LED};
 use rtc::Time;
 use system::{System, SystemMode, SystemState};
-use usb::{UsbState, USB};
 
 pub struct Peripherals {
     device: DevicePeripherals,
@@ -37,7 +36,6 @@ pub struct Peripherals {
 struct State {
     p: Peripherals,
     system: SystemState,
-    usb: UsbState,
 }
 
 static STATE: Mutex<RefCell<Option<State>>> = Mutex::new(RefCell::new(None));
@@ -53,7 +51,6 @@ fn main() -> ! {
                 device: DevicePeripherals::take().unwrap(),
             },
             system: SystemState::default(),
-            usb: UsbState::default(),
         });
     });
 
@@ -98,7 +95,9 @@ fn RTC() {
 #[interrupt]
 fn USB() {
     interrupt_free(|state| {
-        USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.interrupt());
+        System::acquire(&mut state.p, &mut state.system, |mut system| {
+            system.on_usb_packet();
+        });
     });
 }
 
@@ -138,15 +137,11 @@ fn on_press(state: &mut State) {
                         beeper.teardown();
                     });
 
-                    USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-
                     System::acquire(&mut state.p, &mut state.system, |mut system| {
                         system.set_mode(SystemMode::Idle);
                     });
                 }
                 (_, ButtonPressType::Long, ButtonPressType::Long) => {
-                    USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
-
                     System::acquire(&mut state.p, &mut state.system, |mut system| {
                         system.set_mode(SystemMode::Config);
                     });
