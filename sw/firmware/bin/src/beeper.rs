@@ -158,7 +158,7 @@ impl<'a> Beeper<'a> {
     pub fn beep_n(&mut self, n: u8) {
         for i in 1..n + 1 {
             self.toggle_pwm(true);
-            self.play_note(SCALES[7], QUARTER_NOTE);
+            self.play_note(SCALES[7], EIGHTH_NOTE);
             self.toggle_pwm(false);
 
             if i < n {

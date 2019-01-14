@@ -1,5 +1,4 @@
-use crate::systick::SysTick;
-use crate::Peripherals;
+use crate::{systick::SysTick, Peripherals};
 
 use stm32f0x2::Interrupt;
 

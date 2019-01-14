@@ -2,8 +2,10 @@ mod descriptors;
 pub mod pma;
 mod setup_packet;
 
-use crate::led::{LEDColor, LED};
-use crate::Peripherals;
+use crate::{
+    led::{LEDColor, LED},
+    Peripherals,
+};
 use stm32f0x2::Interrupt;
 
 use descriptors::*;

@@ -20,7 +20,7 @@ impl<'a> LED<'a> {
         self.turn_off(color);
 
         self.turn_on(color);
-        SysTick::delay_ms(&mut self.p.core.SYST, 250);
+        SysTick::delay_ms(&mut self.p.core.SYST, 100);
         self.turn_off(color)
     }
 
