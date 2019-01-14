@@ -1,5 +1,5 @@
 use crate::systick::SysTick;
-use crate::SystemPeripherals;
+use crate::Peripherals;
 
 use stm32f0x2::Interrupt;
 
@@ -24,11 +24,11 @@ impl ButtonPressType {
 }
 
 pub struct Buttons<'a> {
-    p: &'a mut SystemPeripherals,
+    p: &'a mut Peripherals,
 }
 
 impl<'a> Buttons<'a> {
-    fn new(p: &'a mut SystemPeripherals) -> Self {
+    fn new(p: &'a mut Peripherals) -> Self {
         Buttons { p }
     }
 
@@ -63,7 +63,7 @@ impl<'a> Buttons<'a> {
             .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
     }
 
-    pub fn acquire<F, R>(p: &mut SystemPeripherals, f: F) -> R
+    pub fn acquire<F, R>(p: &mut Peripherals, f: F) -> R
     where
         F: FnOnce(Buttons) -> R,
     {

@@ -1,7 +1,7 @@
-use crate::SystemPeripherals;
+use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,
@@ -9,21 +9,25 @@ pub struct Time {
 }
 
 impl Time {
-    pub fn add_seconds(&mut self, seconds: u8) {
-        self.seconds += seconds;
+    pub fn add_seconds(&mut self, seconds: u32) {
+        let new_value = seconds + self.seconds as u32;
 
-        if self.seconds >= 60 {
-            self.seconds = self.seconds % 60;
-            self.add_minutes(self.seconds / 60);
+        if new_value >= 60 {
+            self.seconds = (new_value % 60) as u8;
+            self.add_minutes(new_value / 60);
+        } else {
+            self.seconds = new_value as u8;
         }
     }
 
-    pub fn add_minutes(&mut self, minutes: u8) {
-        self.minutes += minutes;
+    pub fn add_minutes(&mut self, minutes: u32) {
+        let new_value = minutes + self.minutes as u32;
 
-        if self.minutes >= 60 {
-            self.minutes = self.minutes % 60;
-            self.add_hours(self.minutes / 60);
+        if new_value >= 60 {
+            self.minutes = (new_value % 60) as u8;
+            self.add_hours((new_value / 60) as u8);
+        } else {
+            self.minutes = new_value as u8;
         }
     }
 
@@ -35,18 +39,18 @@ impl Time {
         }
     }
 
-    pub fn from_seconds(seconds: u8) -> Self {
+    pub fn from_seconds(seconds: u32) -> Self {
         let mut time = Time::default();
         time.add_seconds(seconds);
         time
     }
 
-    pub fn from_minutes(minutes: u8) -> Self {
+    pub fn from_minutes(minutes: u32) -> Self {
         Time::from_seconds(minutes * 60)
     }
 
     pub fn from_hours(hours: u8) -> Self {
-        Time::from_minutes(hours * 60)
+        Time::from_minutes((hours * 60) as u32)
     }
 }
 
@@ -61,11 +65,11 @@ impl Default for Time {
 }
 
 pub struct RTC<'a> {
-    p: &'a mut SystemPeripherals,
+    p: &'a mut Peripherals,
 }
 
 impl<'a> RTC<'a> {
-    fn new(p: &'a mut SystemPeripherals) -> Self {
+    fn new(p: &'a mut Peripherals) -> Self {
         RTC { p }
     }
 
@@ -110,9 +114,11 @@ impl<'a> RTC<'a> {
         // Disable the LSI.
         self.p.device.RCC.csr.modify(|_, w| w.lsion().clear_bit());
         while self.p.device.RCC.csr.read().lsirdy().bit_is_set() {}
+
+        self.clear_pending_interrupt();
     }
 
-    pub fn acquire<'b, F, R>(p: &'a mut SystemPeripherals, f: F) -> R
+    pub fn acquire<'b, F, R>(p: &'a mut Peripherals, f: F) -> R
     where
         F: FnOnce(RTC) -> R,
     {
@@ -138,7 +144,6 @@ impl<'a> RTC<'a> {
         // Wait until it is allowed to modify alarm A value.
         while self.p.device.RTC.isr.read().alrawf().bit_is_clear() {}
 
-        // Modify alarm A mask to have an interrupt each minute.
         self.p.device.RTC.alrmar.modify(|_, w| {
             unsafe {
                 w.ht().bits(time.hours / 10);
@@ -149,12 +154,13 @@ impl<'a> RTC<'a> {
                 w.su().bits(time.seconds % 10);
             }
 
+            // Seconds, minutes and hours matter, but not day.
             w.msk1()
                 .clear_bit()
                 .msk2()
-                .set_bit()
+                .clear_bit()
                 .msk3()
-                .set_bit()
+                .clear_bit()
                 .msk4()
                 .set_bit()
         });

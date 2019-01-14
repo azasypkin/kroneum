@@ -10,6 +10,7 @@ mod buttons;
 mod config;
 mod led;
 mod rtc;
+mod system;
 mod systick;
 mod usb;
 
@@ -19,54 +20,51 @@ use cortex_m::{
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
-use stm32f0x2::{interrupt, Peripherals};
+use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
 use beeper::Beeper;
 use buttons::{ButtonPressType, Buttons};
 use led::{LEDColor, LED};
-use rtc::{Time, RTC};
-use usb::{DeviceStatus, UsbState, USB};
+use rtc::Time;
+use system::{System, SystemMode, SystemState};
+use usb::{UsbState, USB};
 
-pub struct SystemPeripherals {
-    device: Peripherals,
+pub struct Peripherals {
+    device: DevicePeripherals,
     core: CorePeripherals,
 }
 
-#[derive(Debug)]
-enum SystemMode {
-    Idle,
-    Setup(u8),
-    Alarm,
-    Config,
-}
-
-struct SystemState {
-    p: SystemPeripherals,
-    mode: SystemMode,
+struct State {
+    p: Peripherals,
+    system: SystemState,
     usb: UsbState,
 }
 
-static STATE: Mutex<RefCell<Option<SystemState>>> = Mutex::new(RefCell::new(None));
+static STATE: Mutex<RefCell<Option<State>>> = Mutex::new(RefCell::new(None));
 
 // Read about interrupt setup sequence at:
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
 #[entry]
 fn main() -> ! {
     free(|cs| {
-        *STATE.borrow(cs).borrow_mut() = Some(SystemState {
-            p: SystemPeripherals {
-                core: cortex_m::Peripherals::take().unwrap(),
-                device: Peripherals::take().unwrap(),
+        *STATE.borrow(cs).borrow_mut() = Some(State {
+            p: Peripherals {
+                core: CorePeripherals::take().unwrap(),
+                device: DevicePeripherals::take().unwrap(),
             },
-            mode: SystemMode::Idle,
+            system: SystemState::default(),
             usb: UsbState::default(),
         });
     });
 
     interrupt_free(|state| {
-        system_init(&state.p);
+        init(&state.p);
+
+        System::acquire(&mut state.p, &mut state.system, |mut system| {
+            system.set_mode(SystemMode::Idle);
+        });
+
         Buttons::acquire(&mut state.p, |mut buttons| buttons.setup());
-        setup_standby_mode(&mut state.p);
     });
 
     loop {
@@ -77,12 +75,6 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI2_3() {
     interrupt_free(|state| {
-        let has_pending_interrupt =
-            Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
-        if !has_pending_interrupt {
-            return;
-        }
-
         on_press(state);
     });
 }
@@ -90,12 +82,6 @@ fn EXTI2_3() {
 #[interrupt]
 fn EXTI0_1() {
     interrupt_free(|state| {
-        let has_pending_interrupt =
-            Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
-        if !has_pending_interrupt {
-            return;
-        }
-
         on_press(state);
     });
 }
@@ -103,20 +89,9 @@ fn EXTI0_1() {
 #[interrupt]
 fn RTC() {
     interrupt_free(|state| {
-        Beeper::acquire(&mut state.p, |mut beeper| {
-            beeper.setup();
-            beeper.play_melody();
-            beeper.teardown();
+        System::acquire(&mut state.p, &mut state.system, |mut system| {
+            system.on_rtc_alarm();
         });
-
-        RTC::acquire(&mut state.p, |mut rtc| {
-            rtc.teardown();
-            rtc.clear_pending_interrupt();
-        });
-
-        state.mode = SystemMode::Idle;
-
-        setup_standby_mode(&mut state.p);
     });
 }
 
@@ -137,15 +112,19 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
     loop {}
 }
 
-fn on_press(state: &mut SystemState) {
+fn on_press(state: &mut State) {
+    let has_pending_interrupt =
+        Buttons::acquire(&mut state.p, |buttons| buttons.has_pending_interrupt());
+    if !has_pending_interrupt {
+        return;
+    }
+
     let (button_i, button_x) = Buttons::acquire(&mut state.p, |mut buttons| buttons.interrupt());
 
-    match (&state.mode, button_i, button_x) {
+    match (state.system.mode.clone(), button_i, button_x) {
         (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
-            Beeper::acquire(&mut state.p, |mut beeper| {
-                beeper.setup();
-                beeper.play_setup();
-                beeper.teardown();
+            System::acquire(&mut state.p, &mut state.system, |mut system| {
+                system.set_mode(SystemMode::Setup(0));
             });
 
             let (button_i, button_x) =
@@ -155,119 +134,70 @@ fn on_press(state: &mut SystemState) {
                 (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
                     Beeper::acquire(&mut state.p, |mut beeper| {
                         beeper.setup();
-                        beeper.beep_n(5);
+                        beeper.play_reset();
                         beeper.teardown();
                     });
 
                     USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.teardown());
-                    setup_standby_mode(&mut state.p);
 
-                    state.mode = SystemMode::Idle;
+                    System::acquire(&mut state.p, &mut state.system, |mut system| {
+                        system.set_mode(SystemMode::Idle);
+                    });
                 }
                 (_, ButtonPressType::Long, ButtonPressType::Long) => {
-                    Beeper::acquire(&mut state.p, |mut beeper| {
-                        beeper.setup();
-                        beeper.beep_n(5);
-                        beeper.teardown();
-                    });
-
                     USB::acquire(&mut state.p, &mut state.usb, |mut usb| usb.setup());
-                    teardown_standby_mode(&mut state.p);
 
-                    state.mode = SystemMode::Config;
-                }
-                (SystemMode::Alarm, _, _) | (SystemMode::Idle, _, _) => {
-                    state.mode = SystemMode::Setup(0)
+                    System::acquire(&mut state.p, &mut state.system, |mut system| {
+                        system.set_mode(SystemMode::Config);
+                    });
                 }
                 (SystemMode::Setup(counter), _, _) => {
                     // Hour alarm.
-                    Beeper::acquire(&mut state.p, |mut beeper| {
-                        beeper.setup();
-                        beeper.play_reset();
-                        beeper.beep_n(*counter);
-                        beeper.teardown();
+                    System::acquire(&mut state.p, &mut state.system, |mut system| {
+                        system.set_mode(SystemMode::Alarm(Time::from_hours(counter)));
                     });
-
-                    RTC::acquire(&mut state.p, |mut rtc| {
-                        rtc.setup();
-
-                        let mut time = Time::default();
-                        rtc.configure_time(&time);
-
-                        time.add_hours(*counter);
-
-                        rtc.configure_alarm(&time);
-                    });
-
-                    state.mode = SystemMode::Alarm;
                 }
                 _ => {}
             }
         }
         (SystemMode::Idle, ButtonPressType::Long, _)
         | (SystemMode::Idle, _, ButtonPressType::Long)
-        | (SystemMode::Alarm, ButtonPressType::Long, _)
-        | (SystemMode::Alarm, _, ButtonPressType::Long) => {
-            Beeper::acquire(&mut state.p, |mut beeper| {
-                beeper.setup();
-                beeper.play_setup();
-                beeper.teardown();
+        | (SystemMode::Alarm(_), ButtonPressType::Long, _)
+        | (SystemMode::Alarm(_), _, ButtonPressType::Long) => {
+            System::acquire(&mut state.p, &mut state.system, |mut system| {
+                system.set_mode(SystemMode::Setup(0));
             });
-
-            state.mode = SystemMode::Setup(0)
         }
         (SystemMode::Setup(counter), ButtonPressType::Long, _)
         | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
-            Beeper::acquire(&mut state.p, |mut beeper| {
-                beeper.setup();
-                beeper.play_reset();
-                beeper.beep_n(*counter);
-                beeper.teardown();
+            let time = match button_i {
+                ButtonPressType::Long => Time::from_seconds(counter as u32),
+                _ => Time::from_minutes(counter as u32),
+            };
+
+            System::acquire(&mut state.p, &mut state.system, |mut system| {
+                system.set_mode(SystemMode::Alarm(time));
             });
-
-            RTC::acquire(&mut state.p, |mut rtc| {
-                rtc.setup();
-
-                let mut time = Time::default();
-                rtc.configure_time(&time);
-
-                match button_i {
-                    ButtonPressType::Long => time.add_seconds(*counter),
-                    _ => time.add_minutes(*counter),
-                };
-
-                rtc.configure_alarm(&time);
-            });
-
-            state.mode = SystemMode::Alarm;
         }
         (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
-            Beeper::acquire(&mut state.p, |mut beeper| {
-                beeper.setup();
-                beeper.beep();
-                beeper.teardown();
+            System::acquire(&mut state.p, &mut state.system, |mut system| {
+                system.set_mode(SystemMode::Setup(counter + 1));
             });
-
-            state.mode = SystemMode::Setup(counter + 1);
         }
         (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
-            Beeper::acquire(&mut state.p, |mut beeper| {
-                beeper.setup();
-                beeper.beep();
-                beeper.teardown();
+            System::acquire(&mut state.p, &mut state.system, |mut system| {
+                system.set_mode(SystemMode::Setup(counter + 10));
             });
-
-            state.mode = SystemMode::Setup(counter + 10);
         }
         _ => {}
     }
 
-    let system_mode = &state.mode;
+    let system_mode = &state.system.mode;
     LED::acquire(&mut state.p, |mut led| {
         match system_mode {
             SystemMode::Idle => led.blink(&LEDColor::Red),
             SystemMode::Setup(_) => led.blink(&LEDColor::Blue),
-            SystemMode::Alarm => led.blink(&LEDColor::Green),
+            SystemMode::Alarm(_) => led.blink(&LEDColor::Green),
             SystemMode::Config => {
                 led.blink(&LEDColor::Blue);
                 led.blink(&LEDColor::Green);
@@ -281,7 +211,7 @@ fn on_press(state: &mut SystemState) {
 
 fn interrupt_free<F>(f: F) -> ()
 where
-    F: FnOnce(&mut SystemState),
+    F: FnOnce(&mut State),
 {
     free(|cs| {
         if let Some(s) = STATE.borrow(cs).borrow_mut().as_mut() {
@@ -292,32 +222,8 @@ where
     });
 }
 
-fn setup_standby_mode(p: &mut SystemPeripherals) {
-    // Select STANDBY mode.
-    p.device.PWR.cr.modify(|_, w| w.pdds().set_bit());
-
-    clear_wakeup_flag(p);
-
-    // Set SLEEPDEEP bit of Cortex-M0 System Control Register.
-    p.core.SCB.set_sleepdeep();
-}
-
-fn teardown_standby_mode(p: &mut SystemPeripherals) {
-    // Disable STANDBY mode.
-    p.device.PWR.cr.modify(|_, w| w.pdds().clear_bit());
-
-    clear_wakeup_flag(p);
-
-    // Clear SLEEPDEEP bit of Cortex-M0 System Control Register.
-    p.core.SCB.clear_sleepdeep();
-}
-
-fn clear_wakeup_flag(p: &SystemPeripherals) {
-    p.device.PWR.cr.modify(|_, w| w.cwuf().set_bit());
-}
-
 /// Initialize the system, configure clock, GPIOs and interrupts.
-fn system_init(p: &SystemPeripherals) {
+fn init(p: &Peripherals) {
     // Remap PA9-10 to PA11-12 for USB.
     p.device.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
     p.device
