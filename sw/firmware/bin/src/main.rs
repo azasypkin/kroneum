@@ -173,16 +173,22 @@ fn init(p: &Peripherals) {
 
     // ---------GPIO------------------
 
-    // Enable clock for GPIO Port A.
-    p.device.RCC.ahbenr.modify(|_, w| w.iopaen().set_bit());
+    // Enable clock for GPIO Port A, B and F.
+    p.device
+        .RCC
+        .ahbenr
+        .modify(|_, w| w.iopaen().set_bit().iopben().set_bit().iopfen().set_bit());
 
     // Switch PA0 (button), PA2 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function
     // mode and PA3, PA4 and PA5 to output.
     let moder_af = 0b10;
     let moder_out = 0b01;
+    let moder_ain = 0b11;
     p.device.GPIOA.moder.modify(|_, w| unsafe {
         w.moder0()
             .bits(moder_af)
+            .moder1()
+            .bits(moder_ain)
             .moder2()
             .bits(moder_af)
             .moder3()
@@ -191,6 +197,8 @@ fn init(p: &Peripherals) {
             .bits(moder_out)
             .moder5()
             .bits(moder_out)
+            .moder6()
+            .bits(moder_ain)
             .moder7()
             .bits(moder_af)
             .moder11()
@@ -199,11 +207,29 @@ fn init(p: &Peripherals) {
             .bits(moder_af)
     });
 
-    // Enable pull-down for PA0 and PA2.
+    // Enable AIN for GPIO B and F to reduce power consumption.
     p.device
-        .GPIOA
-        .pupdr
-        .modify(|_, w| unsafe { w.pupdr0().bits(0b10).pupdr2().bits(0b10) });
+        .GPIOB
+        .moder
+        .modify(|_, w| unsafe { w.moder1().bits(moder_ain).moder8().bits(moder_ain) });
+    p.device
+        .GPIOF
+        .moder
+        .modify(|_, w| unsafe { w.moder0().bits(moder_ain).moder1().bits(moder_ain) });
+
+    p.device
+        .RCC
+        .ahbenr
+        .modify(|_, w| w.iopben().clear_bit().iopfen().clear_bit());
+
+    // Enable pull-down for PA0 and PA2.
+    let enable_pull_down = 0b10;
+    p.device.GPIOA.pupdr.modify(|_, w| unsafe {
+        w.pupdr0()
+            .bits(enable_pull_down)
+            .pupdr2()
+            .bits(enable_pull_down)
+    });
 
     // Set "high" output speed for PA7, PA11 and PA12.
     let speed_high = 0b11;
