@@ -1,4 +1,5 @@
 (fp_lib_table
   (lib (name ht7333-a)(type KiCad)(uri ${KIPRJMOD}/libs/ht7333-a.pretty)(options "")(descr ""))
   (lib (name Buzzer_Murata_PKMCS0909E4000-R1)(type KiCad)(uri ${KIPRJMOD}/libs/Buzzer_Murata_PKMCS0909E4000-R1.pretty)(options "")(descr ""))
+  (lib (name tl3342)(type KiCad)(uri ${KIPRJMOD}/libs/tl3342.pretty)(options "")(descr ""))
 )
