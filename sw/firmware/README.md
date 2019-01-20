@@ -79,3 +79,14 @@ does not contain any `bitWidth` that equals to `0` and generate Rust lib with `s
 4. To reload program on the MCU use `monitor reset halt`
 
 5. RTC & Low Power modes: https://github.com/mattico/stm32f0-Discovery_Tools/blob/master/ST_Example_Projects/Projects/Peripheral_Examples/PWR_CurrentConsumption/stm32f0xx_lp_modes.c
+
+
+## Useful links
+
+1. [The Embedded Rust Book](https://rust-embedded.github.io/book)
+2. [Firmware for Anne Pro Keyboard written in Rust](https://github.com/ah-/anne-key)
+3. [USB HID device development on STM32 F042](http://andybrown.me.uk/2016/01/09/f042usbhid/)
+4. [A development board for the STM32F042 TSSOP package](http://andybrown.me.uk/2015/10/31/stm32f042dev/) and [schematics](http://andybrown.me.uk/wp-content/images/stm32f042dev/schematic.pdf)
+5. [STM32F042 Breakout](http://ebrombaugh.studionebula.com/embedded/stm32f042breakout/index.html)
+6. [Tim's Open Micro USB](https://github.com/im-tomu)
+7. [Online Circuit Simulator](http://www.falstad.com/circuit/circuitjs.html?startCircuit=lrc.txt)
