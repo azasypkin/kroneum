@@ -9,7 +9,7 @@ const DEVICE_OUT_PMA_ADDRESS: u16 = 0xD0;
 
 #[doc = r" USB PMA"]
 #[repr(C)]
-pub struct PacketMemoryAreaAccessor {
+pub(super) struct PacketMemoryAreaAccessor {
     // The PMA consists of 256 u16 words separated by u16 gaps, so lets
     // represent that as 512 u16 words which we'll only use every other of.
     cells: [vcell::VolatileCell<u16>; 256],
@@ -105,7 +105,7 @@ impl PacketMemoryAreaAccessor {
 }
 
 #[repr(C)]
-pub struct PacketMemoryArea {}
+pub(super) struct PacketMemoryArea {}
 
 impl PacketMemoryArea {
     #[doc = r" Returns a pointer to the register block"]

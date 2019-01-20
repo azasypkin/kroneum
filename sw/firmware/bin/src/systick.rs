@@ -1,7 +1,7 @@
 use crate::config;
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
-pub struct SysTick {}
+pub struct SysTick;
 
 impl SysTick {
     pub fn delay_us(systick: &mut SYST, us: u32) {

@@ -1,38 +1,38 @@
-pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
+pub(super) const LANG_ID_DESCRIPTOR: [u8; 4] = [
     0x04, 0x03, // 4 (length)
     0x09, 0x04, // English - US
 ];
 
 // To get unicode code in JS web console use e.g. `0x${'K'.charCodeAt(0).toString(16)}`
-pub const MANUFACTURER_STR: [u8; 24] = [
+pub(super) const MANUFACTURER_STR: [u8; 24] = [
     0x18, 0x03, // 24 (length)
     b'K', 0x00, b'r', 0x00, b'o', 0x00, b'n', 0x00, b'e', 0x00, b'u', 0x00, b'm', 0x00, b' ', 0x00,
     b'C', 0x00, b'o', 0x00, b'.', 0x00,
 ];
 
-pub const PRODUCT_STR: [u8; 16] = [
+pub(super) const PRODUCT_STR: [u8; 16] = [
     0x10, 0x03, // 16 (length)
     b'K', 0x00, b'r', 0x00, b'o', 0x00, b'n', 0x00, b'e', 0x00, b'u', 0x00, b'm', 0x00,
 ];
 
-pub const SERIAL_NUMBER_STR: [u8; 12] = [
+pub(super) const SERIAL_NUMBER_STR: [u8; 12] = [
     0x0c, 0x03, // 12 (length)
     b'1', 0x00, b'.', 0x00, b'0', 0x00, b'.', 0x00, b'0', 0x00,
 ];
 
-pub const CONF_STR: [u8; 26] = [
+pub(super) const CONF_STR: [u8; 26] = [
     0x1a, 0x03, // 26 (length)
     b'K', 0x00, b'r', 0x00, b'o', 0x00, b'n', 0x00, b'e', 0x00, b'u', 0x00, b'm', 0x00, b' ', 0x00,
     b'c', 0x00, b'o', 0x00, b'n', 0x00, b'f', 0x00,
 ];
 
-pub const INTERFACE_STR: [u8; 22] = [
+pub(super) const INTERFACE_STR: [u8; 22] = [
     0x16, 0x03, // 22 (length)
     b'K', 0x00, b'r', 0x00, b'o', 0x00, b'n', 0x00, b'e', 0x00, b'u', 0x00, b'm', 0x00, b' ', 0x00,
     b'i', 0x00, b'f', 0x00,
 ];
 
-pub const DEV_DESC: [u8; 18] = [
+pub(super) const DEV_DESC: [u8; 18] = [
     0x12, // bLength
     0x01, // bDescriptorType (Device)
     0x00, 0x02, // bcdUSB 2.00
@@ -49,7 +49,7 @@ pub const DEV_DESC: [u8; 18] = [
     0x01, // bNumConfigurations 1
 ];
 
-pub const CONF_DESC: [u8; 41] = [
+pub(super) const CONF_DESC: [u8; 41] = [
     0x09, // bLength
     0x02, // bDescriptorType (Configuration)
     0x29, 0x00, // wTotalLength
@@ -92,7 +92,7 @@ pub const CONF_DESC: [u8; 41] = [
 ];
 
 // The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
-pub const HID_DESC: [u8; 9] = [
+pub(super) const HID_DESC: [u8; 9] = [
     0x09, // bLength: CUSTOM_HID Descriptor size
     0x21, // bDescriptorType (HID)
     0x11, 0x01, // bcdHID 1.11
@@ -102,7 +102,7 @@ pub const HID_DESC: [u8; 9] = [
     0x20, 0x00, // wDescriptorLength[0] 32
 ];
 
-pub const REPORT_DESC: [u8; 32] = [
+pub(super) const REPORT_DESC: [u8; 32] = [
     0x05, 0x01, // USAGE_PAGE (Generic Desktop)
     0x09, 0x00, // USAGE (Undefined)
     0xa1, 0x01, // COLLECTION (Application)

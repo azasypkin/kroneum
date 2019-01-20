@@ -13,7 +13,7 @@ use pma::PacketMemoryArea;
 use setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
 
 #[derive(Copy, Clone)]
-pub enum EndpointType {
+enum EndpointType {
     Control = 0b0,
     Device = 0b1,
 }
@@ -27,7 +27,7 @@ enum EndpointStatus {
 }
 
 #[derive(Copy, Clone)]
-pub enum DeviceStatus {
+enum DeviceStatus {
     // USB isn't started.
     None,
     // Device is starting, or has disconnected.
@@ -56,7 +56,7 @@ enum ControlEndpointStatus {
 
 #[derive(Copy, Clone)]
 pub struct UsbState {
-    pub device_status: DeviceStatus,
+    device_status: DeviceStatus,
     suspended_device_status: Option<DeviceStatus>,
     control_endpoint_status: ControlEndpointStatus,
     setup_data_length: u16,
