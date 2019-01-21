@@ -1,7 +1,7 @@
 (export (version D)
   (design
     (source "/projects/kroneum/hw/pcb/Rev 0.2/kroneum.sch")
-    (date "Fri 18 Jan 2019 11:43:51 PM CET")
+    (date "Mon 21 Jan 2019 10:51:09 PM CET")
     (tool "Eeschema 5.0.1")
     (sheet (number 1) (name /) (tstamps /)
       (title_block
@@ -132,6 +132,7 @@
       (tstamp 5C22D4D9))
     (comp (ref J2)
       (value SWD)
+      (footprint Connector_PinSocket_1.27mm:PinSocket_2x03_P1.27mm_Vertical_SMD)
       (datasheet ~)
       (libsource (lib Connector_Generic) (part Conn_02x03_Counter_Clockwise) (description "Generic connector, double row, 02x03, counter clockwise pin numbering scheme (similar to DIP packge numbering), script generated (kicad-library-utils/schlib/autogen/connector/)"))
       (sheetpath (names /) (tstamps /))
