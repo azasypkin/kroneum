@@ -34,7 +34,7 @@
   )
 
   (setup
-    (last_trace_width 0.508)
+    (last_trace_width 0.762)
     (user_trace_width 0.4064)
     (user_trace_width 0.4572)
     (user_trace_width 0.508)
@@ -44,7 +44,7 @@
     (trace_clearance 0.2)
     (zone_clearance 0.508)
     (zone_45_only no)
-    (trace_min 0.2)
+    (trace_min 0.25)
     (segment_width 0.2)
     (edge_width 0.15)
     (via_size 0.8)
