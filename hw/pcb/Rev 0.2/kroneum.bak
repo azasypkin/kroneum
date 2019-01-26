@@ -413,7 +413,7 @@ F 1 "BAT54C" V 5355 4388 50  0000 L CNN
 F 2 "Package_TO_SOT_SMD:SOT-23" H 5475 4425 50  0001 L CNN
 F 3 "http://www.diodes.com/_files/datasheets/ds11005.pdf" H 5320 4300 50  0001 C CNN
 	1    5400 4300
-	0    -1   1    0   
+	0    -1   -1   0   
 $EndComp
 Wire Wire Line
 	5700 4150 5700 4300
@@ -509,44 +509,38 @@ Text GLabel 2400 2850 1    50   Input ~ 0
 SDA
 Text GLabel 2300 2850 1    50   Input ~ 0
 SCL
-Text GLabel 4350 2400 1    50   Input ~ 0
+Text GLabel 4450 2400 1    50   Input ~ 0
 NRST
-Text GLabel 4250 2400 1    50   Input ~ 0
-SWCLK
-Text GLabel 4150 2400 1    50   Input ~ 0
-SWDIO
-Text GLabel 4650 2400 1    50   Input ~ 0
-SCL
 Text GLabel 4550 2400 1    50   Input ~ 0
+SWCLK
+Text GLabel 4650 2400 1    50   Input ~ 0
+SWDIO
+Text GLabel 4150 2400 1    50   Input ~ 0
+SCL
+Text GLabel 4250 2400 1    50   Input ~ 0
 SDA
-Wire Wire Line
-	4750 2400 4750 1800
 $Comp
 L power:GND #PWR05
 U 1 1 5C4A8CEA
-P 4650 1800
-F 0 "#PWR05" H 4650 1550 50  0001 C CNN
-F 1 "GND" H 4655 1627 50  0000 C CNN
-F 2 "" H 4650 1800 50  0001 C CNN
-F 3 "" H 4650 1800 50  0001 C CNN
-	1    4650 1800
+P 5000 2400
+F 0 "#PWR05" H 5000 2150 50  0001 C CNN
+F 1 "GND" H 5005 2227 50  0000 C CNN
+F 2 "" H 5000 2400 50  0001 C CNN
+F 3 "" H 5000 2400 50  0001 C CNN
+	1    5000 2400
 	1    0    0    -1  
 $EndComp
 $Comp
 L power:VDD #PWR04
 U 1 1 5C4A93B8
-P 4850 1900
-F 0 "#PWR04" H 4850 1750 50  0001 C CNN
-F 1 "VDD" H 4867 2073 50  0000 C CNN
-F 2 "" H 4850 1900 50  0001 C CNN
-F 3 "" H 4850 1900 50  0001 C CNN
-	1    4850 1900
+P 4750 2400
+F 0 "#PWR04" H 4750 2250 50  0001 C CNN
+F 1 "VDD" H 4860 2480 50  0000 C CNN
+F 2 "" H 4750 2400 50  0001 C CNN
+F 3 "" H 4750 2400 50  0001 C CNN
+	1    4750 2400
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	4850 1900 4850 2400
-Wire Wire Line
-	4650 1800 4750 1800
 $Comp
 L Connector_Generic:Conn_01x08 J2
 U 1 1 5C4ADBE0
@@ -558,6 +552,8 @@ F 3 "~" H 4550 2600 50  0001 C CNN
 	1    4550 2600
 	0    1    1    0   
 $EndComp
-Text GLabel 4450 2400 1    50   Input ~ 0
+Text GLabel 4350 2400 1    50   Input ~ 0
 BOOT0
+Wire Wire Line
+	4850 2400 5000 2400
 $EndSCHEMATC
