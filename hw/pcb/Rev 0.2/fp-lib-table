@@ -3,4 +3,5 @@
   (lib (name Buzzer_Murata_PKMCS0909E4000-R1)(type KiCad)(uri ${KIPRJMOD}/libs/Buzzer_Murata_PKMCS0909E4000-R1.pretty)(options "")(descr ""))
   (lib (name tl3342)(type KiCad)(uri ${KIPRJMOD}/libs/tl3342.pretty)(options "")(descr ""))
   (lib (name micro_usb)(type KiCad)(uri ${KIPRJMOD}/libs/micro_usb.pretty)(options "")(descr ""))
+  (lib (name tssop-20x6.5mmx4)(type KiCad)(uri ${KIPRJMOD}/libs/tssop-20x6.5mmx4.pretty)(options "")(descr ""))
 )

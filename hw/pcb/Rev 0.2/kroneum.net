@@ -1,7 +1,7 @@
 (export (version D)
   (design
     (source "/projects/kroneum/hw/pcb/Rev 0.2/kroneum.sch")
-    (date "Sat 26 Jan 2019 11:17:28 PM CET")
+    (date "Wed 30 Jan 2019 11:37:14 PM CET")
     (tool "Eeschema 5.0.1")
     (sheet (number 1) (name /) (tstamps /)
       (title_block
@@ -17,7 +17,7 @@
   (components
     (comp (ref U1)
       (value STM32F042F4Px)
-      (footprint Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm)
+      (footprint tssop-20x6.5mmx4:TSSOP-20_4.4x6.5mm_P0.65mm)
       (datasheet http://www.st.com/st-web-ui/static/active/en/resource/technical/document/datasheet/DM00105814.pdf)
       (libsource (lib MCU_ST_STM32F0) (part STM32F042F4Px) (description "ARM Cortex-M0 MCU, 16KB flash, 6KB RAM, 48MHz, 2-3.6V, 16 GPIO, TSSOP-20"))
       (sheetpath (names /) (tstamps /))
