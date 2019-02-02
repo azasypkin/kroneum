@@ -34,7 +34,7 @@
   )
 
   (setup
-    (last_trace_width 0.4064)
+    (last_trace_width 0.25)
     (user_trace_width 0.4064)
     (user_trace_width 0.4572)
     (user_trace_width 0.508)
@@ -62,7 +62,7 @@
     (mod_edge_width 0.15)
     (mod_text_size 1 1)
     (mod_text_width 0.15)
-    (pad_size 1.2 1.9)
+    (pad_size 1.7 1.7)
     (pad_drill 0.9)
     (pad_to_mask_clearance 0.051)
     (solder_mask_min_width 0.25)
@@ -999,7 +999,7 @@
     )
   )
 
-  (module Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical (layer F.Cu) (tedit 5C561873) (tstamp 5C4CD52E)
+  (module Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical (layer F.Cu) (tedit 5C561F06) (tstamp 5C4CD52E)
     (at 137.48 120.87 90)
     (descr "Through hole straight socket strip, 1x08, 2.54mm pitch, single row (from Kicad 4.0.7), script generated")
     (tags "Through hole socket strip THT 1x08 2.54mm single row")
@@ -1038,7 +1038,7 @@
       (net 21 SWCLK))
     (pad 5 thru_hole oval (at 0 10.16 90) (size 1.7 1.7) (drill 0.9) (layers *.Cu *.Mask)
       (net 19 NRST))
-    (pad 6 thru_hole oval (at 0 12.7 90) (size 1.7 1.7) (drill 1) (layers *.Cu *.Mask)
+    (pad 6 thru_hole oval (at 0 12.7 90) (size 1.7 1.7) (drill 0.9) (layers *.Cu *.Mask)
       (net 23 SCL))
     (pad 7 thru_hole oval (at 0 15.24 90) (size 1.7 1.7) (drill 0.9) (layers *.Cu *.Mask)
       (net 22 SDA))

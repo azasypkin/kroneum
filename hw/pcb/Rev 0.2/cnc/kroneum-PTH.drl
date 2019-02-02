@@ -1,10 +1,9 @@
 M48
-;DRILL file {KiCad 5.0.1} date Sat 02 Feb 2019 11:24:36 PM CET
+;DRILL file {KiCad 5.0.1} date Sat 02 Feb 2019 11:52:00 PM CET
 ;FORMAT={-:-/ absolute / metric / decimal}
 FMAT,2
 METRIC,TZ
 T1C0.900
-T2C1.000
 %
 G90
 G05
@@ -25,9 +24,8 @@ X-31.31Y12.11
 X-28.77Y12.11
 X-26.23Y12.11
 X-23.69Y12.11
+X-21.15Y12.11
 X-18.61Y12.11
 X-16.07Y12.11
-T2
-X-21.15Y12.11
 T0
 M30
