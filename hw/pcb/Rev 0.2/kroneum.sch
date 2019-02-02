@@ -372,15 +372,15 @@ USB_VBUS
 $Comp
 L power:GND #PWR0101
 U 1 1 5C229126
-P 4800 5100
-F 0 "#PWR0101" H 4800 4850 50  0001 C CNN
-F 1 "GND" H 4805 4927 50  0000 C CNN
-F 2 "" H 4800 5100 50  0001 C CNN
-F 3 "" H 4800 5100 50  0001 C CNN
-	1    4800 5100
+P 4800 5200
+F 0 "#PWR0101" H 4800 4950 50  0001 C CNN
+F 1 "GND" H 4805 5027 50  0000 C CNN
+F 2 "" H 4800 5200 50  0001 C CNN
+F 3 "" H 4800 5200 50  0001 C CNN
+	1    4800 5200
 	1    0    0    -1  
 $EndComp
-Text GLabel 4250 4800 0    50   Input ~ 0
+Text GLabel 4050 4800 0    50   Input ~ 0
 USB_VBUS
 $Comp
 L Device:Battery_Cell BT1
@@ -417,8 +417,6 @@ F 3 "http://www.diodes.com/_files/datasheets/ds11005.pdf" H 5320 4300 50  0001 C
 $EndComp
 Wire Wire Line
 	5700 4150 5700 4300
-Wire Wire Line
-	5150 4650 5400 4650
 Wire Wire Line
 	5400 4650 5400 4600
 Wire Wire Line
@@ -556,4 +554,51 @@ Text GLabel 4150 2400 1    50   Input ~ 0
 BOOT0
 Wire Wire Line
 	4850 2400 5000 2400
+$Comp
+L Device:C C2
+U 1 1 5C561B67
+P 4450 5150
+F 0 "C2" V 4700 5150 50  0000 C CNN
+F 1 "10u" V 4600 5150 50  0000 C CNN
+F 2 "Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder" H 4488 5000 50  0001 C CNN
+F 3 "~" H 4450 5150 50  0001 C CNN
+	1    4450 5150
+	0    1    1    0   
+$EndComp
+$Comp
+L Device:C C4
+U 1 1 5C563CA4
+P 5150 5150
+F 0 "C4" V 5400 5150 50  0000 C CNN
+F 1 "10u" V 5300 5150 50  0000 C CNN
+F 2 "Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder" H 5188 5000 50  0001 C CNN
+F 3 "~" H 5150 5150 50  0001 C CNN
+	1    5150 5150
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	5150 4650 5300 4650
+Connection ~ 5300 4650
+Wire Wire Line
+	5300 4650 5400 4650
+Wire Wire Line
+	4050 4800 4200 4800
+Connection ~ 4200 4800
+Wire Wire Line
+	4200 4800 4250 4800
+Wire Wire Line
+	4200 5150 4300 5150
+Wire Wire Line
+	4200 4800 4200 5150
+Wire Wire Line
+	5300 4650 5300 5150
+Wire Wire Line
+	4800 5100 4800 5150
+Wire Wire Line
+	4600 5150 4800 5150
+Connection ~ 4800 5150
+Wire Wire Line
+	4800 5150 4800 5200
+Wire Wire Line
+	4800 5150 5000 5150
 $EndSCHEMATC
