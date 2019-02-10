@@ -1,3 +1,4 @@
+pub mod command_packet;
 mod descriptors;
 pub mod pma;
 mod setup_packet;
@@ -5,6 +6,7 @@ mod setup_packet;
 use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
+pub use command_packet::CommandPacket;
 use descriptors::*;
 use pma::PacketMemoryArea;
 use setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
@@ -159,7 +161,10 @@ impl<'a> USB<'a> {
         self.stop_clock();
     }
 
-    pub fn interrupt(&mut self) {
+    pub fn interrupt<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut Peripherals, CommandPacket),
+    {
         if self.p.device.USB.istr.read().reset().bit_is_set() {
             self.reset();
         }
@@ -173,7 +178,7 @@ impl<'a> USB<'a> {
 
         // Correct endpoint transfer
         if self.p.device.USB.istr.read().ctr().bit_is_set() {
-            self.correct_transfer();
+            self.correct_transfer(f);
         }
     }
 
@@ -240,7 +245,10 @@ impl<'a> USB<'a> {
         self.open_control_endpoints();
     }
 
-    fn correct_transfer(&mut self) {
+    fn correct_transfer<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut Peripherals, CommandPacket),
+    {
         // USB_ISTR_CTR is read only and will be automatically cleared by
         // hardware when we've processed all endpoint results.
         while self.p.device.USB.istr.read().ctr().bit_is_set() {
@@ -258,7 +266,7 @@ impl<'a> USB<'a> {
                 }
                 1 => {
                     if is_out && self.p.device.USB.ep1r.read().ctr_rx().bit_is_set() {
-                        self.handle_device_out_transfer();
+                        self.handle_device_out_transfer(&mut f);
                     } else if !is_out && self.p.device.USB.ep1r.read().ctr_tx().bit_is_set() {
                         self.handle_device_in_transfer();
                     }
@@ -654,7 +662,10 @@ impl<'a> USB<'a> {
         }
     }
 
-    fn handle_device_out_transfer(&mut self) {
+    fn handle_device_out_transfer<F>(&mut self, f: &mut F)
+    where
+        F: FnMut(&mut Peripherals, CommandPacket),
+    {
         // Clear the 'correct transfer for reception' bit for this endpoint.
         self.p.device.USB.ep1r.modify(|_, w| unsafe {
             w.ctr_rx()
@@ -673,15 +684,15 @@ impl<'a> USB<'a> {
 
         // Here we can check the amount of data and do smth with it....
         let endpoint_type = EndpointType::Device;
-        let data = [
-            self.pma.get_rx_count(endpoint_type),
-            self.pma.read(endpoint_type, 0) & 0xff,
-            (self.pma.read(endpoint_type, 0) & 0xff00) >> 8,
-            self.pma.read(endpoint_type, 2) & 0xff,
-            (self.pma.read(endpoint_type, 2) & 0xff00) >> 8,
-            self.pma.read(endpoint_type, 4) & 0xff,
-            (self.pma.read(endpoint_type, 4) & 0xff00) >> 8,
-        ];
+
+        let command_packet_length = self.pma.get_rx_count(endpoint_type);
+        let command_packet = CommandPacket::from((
+            self.pma.read(endpoint_type, 0),
+            self.pma.read(endpoint_type, 2),
+            self.pma.read(endpoint_type, 4),
+        ));
+
+        f(&mut self.p, command_packet);
 
         self.pma.set_rx_count(EndpointType::Device, 0);
         self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);

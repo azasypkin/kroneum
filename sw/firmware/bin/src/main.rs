@@ -1,6 +1,5 @@
 #![no_main]
 #![no_std]
-#![feature(uniform_paths)]
 #![feature(non_exhaustive)]
 
 extern crate panic_semihosting;
@@ -21,7 +20,7 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
-use system::{System, SystemMode, SystemState};
+use system::{System, SystemState};
 
 pub struct Peripherals {
     device: DevicePeripherals,

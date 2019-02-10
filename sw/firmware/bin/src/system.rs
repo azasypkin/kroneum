@@ -2,7 +2,7 @@ use crate::{
     beeper::Beeper,
     buttons::{ButtonPressType, Buttons},
     rtc::{Time, RTC},
-    usb::{UsbState, USB},
+    usb::{CommandPacket, UsbState, USB},
     Peripherals,
 };
 
@@ -131,7 +131,15 @@ impl<'a> System<'a> {
 
     pub fn on_usb_packet(&mut self) {
         USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
-            usb.interrupt()
+            usb.interrupt(|p, command_packet| {
+                if let CommandPacket::Beep(num) = command_packet {
+                    Beeper::acquire(p, |mut beeper| {
+                        beeper.setup();
+                        beeper.beep_n(num);
+                        beeper.teardown();
+                    });
+                }
+            })
         });
     }
 
