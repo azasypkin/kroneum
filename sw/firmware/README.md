@@ -90,3 +90,4 @@ does not contain any `bitWidth` that equals to `0` and generate Rust lib with `s
 5. [STM32F042 Breakout](http://ebrombaugh.studionebula.com/embedded/stm32f042breakout/index.html)
 6. [Tim's Open Micro USB](https://github.com/im-tomu)
 7. [Online Circuit Simulator](http://www.falstad.com/circuit/circuitjs.html?startCircuit=lrc.txt)
+8. [ifUSB repo](https://github.com/julbouln/ifusb) and [USB multi protocol interface tool](https://hackaday.io/project/14864-ifusb)
