@@ -5,4 +5,6 @@ authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+clap = "2.32.0"
+humantime = "1.2.0"
 libusb = "0.3"
