@@ -8,7 +8,6 @@ extern crate panic_semihosting;
 mod beeper;
 mod buttons;
 mod config;
-mod led;
 mod rtc;
 mod system;
 mod systick;
@@ -22,7 +21,6 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
-use led::{LEDColor, LED};
 use system::{System, SystemMode, SystemState};
 
 pub struct Peripherals {
@@ -65,22 +63,18 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI2_3() {
     interrupt_free(|state| {
-        if System::acquire(&mut state.p, &mut state.system, |mut system| {
+        System::acquire(&mut state.p, &mut state.system, |mut system| {
             system.on_button_press()
-        }) {
-            indicate_mode(state);
-        }
+        });
     });
 }
 
 #[interrupt]
 fn EXTI0_1() {
     interrupt_free(|state| {
-        if System::acquire(&mut state.p, &mut state.system, |mut system| {
+        System::acquire(&mut state.p, &mut state.system, |mut system| {
             system.on_button_press()
-        }) {
-            indicate_mode(state);
-        }
+        });
     });
 }
 
@@ -110,22 +104,6 @@ fn DefaultHandler(irqn: i16) {
 #[exception]
 fn HardFault(_ef: &ExceptionFrame) -> ! {
     loop {}
-}
-
-fn indicate_mode(state: &mut State) {
-    let system_mode = &state.system.mode;
-    LED::acquire(&mut state.p, |mut led| {
-        match system_mode {
-            SystemMode::Idle => led.blink(&LEDColor::Red),
-            SystemMode::Setup(_) => led.blink(&LEDColor::Blue),
-            SystemMode::Alarm(_) => led.blink(&LEDColor::Green),
-            SystemMode::Config => {
-                led.blink(&LEDColor::Blue);
-                led.blink(&LEDColor::Green);
-                led.blink(&LEDColor::Red);
-            }
-        };
-    });
 }
 
 fn interrupt_free<F>(f: F) -> ()
@@ -180,9 +158,8 @@ fn init(p: &Peripherals) {
         .modify(|_, w| w.iopaen().set_bit().iopben().set_bit().iopfen().set_bit());
 
     // Switch PA0 (button), PA2 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function
-    // mode and PA3, PA4 and PA5 to output.
+    // mode and PA1, PA3-6 to AIN to reduce power consumption.
     let moder_af = 0b10;
-    let moder_out = 0b01;
     let moder_ain = 0b11;
     p.device.GPIOA.moder.modify(|_, w| unsafe {
         w.moder0()
@@ -192,11 +169,11 @@ fn init(p: &Peripherals) {
             .moder2()
             .bits(moder_af)
             .moder3()
-            .bits(moder_out)
+            .bits(moder_ain)
             .moder4()
-            .bits(moder_out)
+            .bits(moder_ain)
             .moder5()
-            .bits(moder_out)
+            .bits(moder_ain)
             .moder6()
             .bits(moder_ain)
             .moder7()

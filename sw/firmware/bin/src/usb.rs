@@ -2,10 +2,7 @@ mod descriptors;
 pub mod pma;
 mod setup_packet;
 
-use crate::{
-    led::{LEDColor, LED},
-    Peripherals,
-};
+use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
 use descriptors::*;
@@ -685,21 +682,6 @@ impl<'a> USB<'a> {
             self.pma.read(endpoint_type, 4) & 0xff,
             (self.pma.read(endpoint_type, 4) & 0xff00) >> 8,
         ];
-
-        let led_color = if data[0] == 6
-            && data[1] == 1
-            && data[2] == 2
-            && data[3] == 3
-            && data[4] == 4
-            && data[5] == 5
-            && data[6] == 6
-        {
-            LEDColor::Blue
-        } else {
-            LEDColor::Red
-        };
-
-        LED::acquire(&mut self.p, |led| led.turn_on(&led_color));
 
         self.pma.set_rx_count(EndpointType::Device, 0);
         self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);
