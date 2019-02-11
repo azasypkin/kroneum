@@ -63,19 +63,11 @@ impl<'a> System<'a> {
 
                 // If we are exiting `Config` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    Beeper::acquire(&mut self.p, |mut beeper| {
-                        beeper.setup();
-                        beeper.play_reset();
-                        beeper.teardown();
-                    });
+                    Beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
                 }
             }
             SystemMode::Config => {
-                Beeper::acquire(&mut self.p, |mut beeper| {
-                    beeper.setup();
-                    beeper.play_reset();
-                    beeper.teardown();
-                });
+                Beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
 
                 self.toggle_standby_mode(false);
 
@@ -84,25 +76,15 @@ impl<'a> System<'a> {
                 });
             }
             SystemMode::Setup(0) => {
-                Beeper::acquire(&mut self.p, |mut beeper| {
-                    beeper.setup();
-                    beeper.play_setup();
-                    beeper.teardown();
-                });
+                Beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
             }
             SystemMode::Setup(c) if c > &0 => {
-                Beeper::acquire(&mut self.p, |mut beeper| {
-                    beeper.setup();
-                    beeper.beep();
-                    beeper.teardown();
-                });
+                Beeper::acquire(&mut self.p, |beeper| beeper.beep());
             }
             SystemMode::Alarm(time) => {
-                Beeper::acquire(&mut self.p, |mut beeper| {
-                    beeper.setup();
+                Beeper::acquire(&mut self.p, |beeper| {
                     beeper.beep_n(time.minutes);
                     beeper.play_setup();
-                    beeper.teardown();
                 });
 
                 RTC::acquire(&mut self.p, |mut rtc| {
@@ -118,11 +100,7 @@ impl<'a> System<'a> {
     }
 
     pub fn on_rtc_alarm(&mut self) {
-        Beeper::acquire(&mut self.p, |mut beeper| {
-            beeper.setup();
-            beeper.play_melody();
-            beeper.teardown();
-        });
+        Beeper::acquire(&mut self.p, |beeper| beeper.play_melody());
 
         RTC::acquire(&mut self.p, |mut rtc| rtc.teardown());
 
@@ -133,13 +111,15 @@ impl<'a> System<'a> {
         USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
             usb.interrupt(|p, command_packet| {
                 if let CommandPacket::Beep(num) = command_packet {
-                    Beeper::acquire(p, |mut beeper| {
-                        beeper.setup();
-                        beeper.beep_n(num);
-                        beeper.teardown();
+                    Beeper::acquire(p, |beeper| beeper.beep_n(num));
+                } else if let CommandPacket::SetAlarm(time) = command_packet {
+                    RTC::acquire(p, |mut rtc| {
+                        rtc.setup();
+                        rtc.configure_time(&Time::default());
+                        rtc.configure_alarm(&time);
                     });
                 }
-            })
+            });
         });
     }
 

@@ -8,14 +8,85 @@ const SCALES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932
 
 pub struct Beeper<'a> {
     p: &'a mut Peripherals,
+    phantom: core::marker::PhantomData<()>,
 }
 
 impl<'a> Beeper<'a> {
-    fn new(p: &'a mut Peripherals) -> Self {
-        Beeper { p }
+    pub fn acquire<'b, F>(p: &'a mut Peripherals, f: F) -> ()
+    where
+        F: FnOnce(&mut Beeper),
+    {
+        let mut beeper = Beeper {
+            p,
+            phantom: core::marker::PhantomData,
+        };
+
+        beeper.setup();
+        f(&mut beeper);
+        beeper.teardown();
     }
 
-    pub fn setup(&self) {
+    pub fn play_melody(&mut self) {
+        self.toggle_pwm(true);
+
+        self.play_note(SCALES[7], QUARTER_NOTE); // G
+        self.play_note(SCALES[7], QUARTER_NOTE); // G
+        self.play_note(SCALES[8], QUARTER_NOTE); // A
+        self.play_note(SCALES[10], QUARTER_NOTE); // B
+        self.play_note(SCALES[10], QUARTER_NOTE); // B
+        self.play_note(SCALES[8], QUARTER_NOTE); // A
+        self.play_note(SCALES[7], QUARTER_NOTE); // G
+        self.play_note(SCALES[5], QUARTER_NOTE); // F
+        self.play_note(SCALES[3], QUARTER_NOTE); // D#
+        self.play_note(SCALES[3], QUARTER_NOTE); // E
+        self.play_note(SCALES[5], QUARTER_NOTE); // F
+        self.play_note(SCALES[7], QUARTER_NOTE); // G
+        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
+        self.play_note(SCALES[5], EIGHTH_NOTE); // F
+        self.play_note(SCALES[5], QUARTER_DOT_NOTE); // F.
+
+        self.toggle_pwm(false);
+    }
+
+    pub fn play_setup(&mut self) {
+        self.toggle_pwm(true);
+
+        self.play_note(SCALES[3], QUARTER_NOTE); // D#
+        self.play_note(SCALES[3], QUARTER_NOTE); // E
+
+        self.toggle_pwm(false);
+    }
+
+    pub fn play_reset(&mut self) {
+        self.toggle_pwm(true);
+
+        self.play_note(SCALES[5], QUARTER_NOTE); // F
+        self.play_note(SCALES[5], EIGHTH_NOTE); // F
+        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
+        self.play_note(SCALES[5], QUARTER_NOTE); // F
+        self.play_note(SCALES[5], EIGHTH_NOTE); // F
+        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
+
+        self.toggle_pwm(false);
+    }
+
+    pub fn beep(&mut self) {
+        self.beep_n(1);
+    }
+
+    pub fn beep_n(&mut self, n: u8) {
+        for i in 1..n + 1 {
+            self.toggle_pwm(true);
+            self.play_note(SCALES[7], EIGHTH_NOTE);
+            self.toggle_pwm(false);
+
+            if i < n {
+                SysTick::delay_ms(&mut self.p.core.SYST, 100);
+            }
+        }
+    }
+
+    fn setup(&self) {
         // Enable TIM1 clock.
         self.p
             .device
@@ -88,7 +159,7 @@ impl<'a> Beeper<'a> {
         self.p.device.TIM1.cr1.modify(|_, w| w.cen().set_bit());
     }
 
-    pub fn teardown(&self) {
+    fn teardown(&self) {
         // Disable counter.
         self.p.device.TIM1.cr1.modify(|_, w| w.cen().clear_bit());
 
@@ -98,73 +169,6 @@ impl<'a> Beeper<'a> {
             .RCC
             .apb2enr
             .modify(|_, w| w.tim1en().clear_bit());
-    }
-
-    pub fn acquire<'b, F>(p: &'a mut Peripherals, f: F) -> ()
-    where
-        F: FnOnce(Beeper),
-    {
-        f(Beeper::new(p));
-    }
-
-    pub fn play_melody(&mut self) {
-        self.toggle_pwm(true);
-
-        self.play_note(SCALES[7], QUARTER_NOTE); // G
-        self.play_note(SCALES[7], QUARTER_NOTE); // G
-        self.play_note(SCALES[8], QUARTER_NOTE); // A
-        self.play_note(SCALES[10], QUARTER_NOTE); // B
-        self.play_note(SCALES[10], QUARTER_NOTE); // B
-        self.play_note(SCALES[8], QUARTER_NOTE); // A
-        self.play_note(SCALES[7], QUARTER_NOTE); // G
-        self.play_note(SCALES[5], QUARTER_NOTE); // F
-        self.play_note(SCALES[3], QUARTER_NOTE); // D#
-        self.play_note(SCALES[3], QUARTER_NOTE); // E
-        self.play_note(SCALES[5], QUARTER_NOTE); // F
-        self.play_note(SCALES[7], QUARTER_NOTE); // G
-        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
-        self.play_note(SCALES[5], EIGHTH_NOTE); // F
-        self.play_note(SCALES[5], QUARTER_DOT_NOTE); // F.
-
-        self.toggle_pwm(false);
-    }
-
-    pub fn play_setup(&mut self) {
-        self.toggle_pwm(true);
-
-        self.play_note(SCALES[3], QUARTER_NOTE); // D#
-        self.play_note(SCALES[3], QUARTER_NOTE); // E
-
-        self.toggle_pwm(false);
-    }
-
-    pub fn play_reset(&mut self) {
-        self.toggle_pwm(true);
-
-        self.play_note(SCALES[5], QUARTER_NOTE); // F
-        self.play_note(SCALES[5], EIGHTH_NOTE); // F
-        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
-        self.play_note(SCALES[5], QUARTER_NOTE); // F
-        self.play_note(SCALES[5], EIGHTH_NOTE); // F
-        self.play_note(SCALES[7], QUARTER_DOT_NOTE); // G.
-
-        self.toggle_pwm(false);
-    }
-
-    pub fn beep(&mut self) {
-        self.beep_n(1);
-    }
-
-    pub fn beep_n(&mut self, n: u8) {
-        for i in 1..n + 1 {
-            self.toggle_pwm(true);
-            self.play_note(SCALES[7], EIGHTH_NOTE);
-            self.toggle_pwm(false);
-
-            if i < n {
-                SysTick::delay_ms(&mut self.p.core.SYST, 100);
-            }
-        }
     }
 
     fn play_note(&mut self, note: u32, delay: u32) {
