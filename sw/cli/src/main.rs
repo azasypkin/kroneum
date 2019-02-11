@@ -8,12 +8,12 @@ const INTERFACE: u8 = 0;
 struct KroneumDevice<'a> {
     descriptor: libusb::DeviceDescriptor,
     device: libusb::Device<'a>,
-    handle: Option<libusb::DeviceHandle<'a>>,
+    handle: libusb::DeviceHandle<'a>,
     detached_kernel_driver: bool,
 }
 
 impl<'a> KroneumDevice<'a> {
-    fn find(context: &'a libusb::Context) -> Result<KroneumDevice<'a>, String> {
+    fn open(context: &'a libusb::Context) -> Result<KroneumDevice<'a>, String> {
         let devices = context
             .devices()
             .or_else(|err| Err(format!("Failed to retrieve device list: {:?}", err)))?;
@@ -32,40 +32,14 @@ impl<'a> KroneumDevice<'a> {
             }
         }
 
-        let (device, device_descriptor) = device_and_descriptor.ok_or_else(|| {
+        let (device, descriptor) = device_and_descriptor.ok_or_else(|| {
             format!(
                 "Couldn't find device with VID `0x{:04x}` and PID `0x{:04x}`.",
                 KRONEUM_VID, KRONEUM_PID
             )
         })?;
 
-        Ok(KroneumDevice {
-            device,
-            descriptor: device_descriptor,
-            handle: None,
-            detached_kernel_driver: false,
-        })
-    }
-
-    fn get_bus_number(&self) -> u8 {
-        self.device.bus_number()
-    }
-
-    fn get_address(&self) -> u8 {
-        self.device.address()
-    }
-
-    fn get_vendor_id(&self) -> u16 {
-        self.descriptor.vendor_id()
-    }
-
-    fn get_product_id(&self) -> u16 {
-        self.descriptor.product_id()
-    }
-
-    fn open(&mut self) -> Result<(), String> {
-        let (mut device_handle, detached_kernel_driver) = self
-            .device
+        let (mut handle, detached_kernel_driver) = device
             .open()
             .or_else(|err| Err(format!("Failed to open device: {:?}", err)))
             .and_then(|mut device_handle| {
@@ -86,70 +60,71 @@ impl<'a> KroneumDevice<'a> {
                 Ok((device_handle, detached_kernel_driver))
             })?;
 
-        device_handle
+        handle
             .claim_interface(INTERFACE)
             .or_else(|err| Err(format!("Failed to claim interface 0: {:?}", err)))?;
 
-        self.handle = Some(device_handle);
-        self.detached_kernel_driver = detached_kernel_driver;
+        Ok(KroneumDevice {
+            device,
+            descriptor,
+            handle,
+            detached_kernel_driver,
+        })
+    }
 
-        Ok(())
+    fn get_bus_number(&self) -> u8 {
+        self.device.bus_number()
+    }
+
+    fn get_address(&self) -> u8 {
+        self.device.address()
+    }
+
+    fn get_vendor_id(&self) -> u16 {
+        self.descriptor.vendor_id()
+    }
+
+    fn get_product_id(&self) -> u16 {
+        self.descriptor.product_id()
     }
 
     fn close(&mut self) -> Result<(), String> {
-        if let Some(handle) = &mut self.handle {
-            handle
-                .release_interface(INTERFACE)
-                .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))?;
+        self.handle
+            .release_interface(INTERFACE)
+            .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))?;
 
-            if self.detached_kernel_driver {
-                handle
-                    .attach_kernel_driver(INTERFACE)
-                    .or_else(|err| Err(format!("Failed to attach kernel driver: {:?}", err)))?
-            }
-
-            self.handle = None;
-            self.detached_kernel_driver = false;
+        if self.detached_kernel_driver {
+            self.handle
+                .attach_kernel_driver(INTERFACE)
+                .or_else(|err| Err(format!("Failed to attach kernel driver: {:?}", err)))
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn read_lang(&self) -> Result<libusb::Language, String> {
-        if let Some(handle) = &self.handle {
-            handle
-                .read_languages(Duration::from_secs(5))
-                .or_else(|err| Err(format!("Failed to retrieve device languages: {:?}", err)))
-                .and_then(|languages| {
-                    languages
-                        .first()
-                        .ok_or_else(|| "No languages were returned from device.".to_string())
-                        .map(|lang| *lang)
-                })
-        } else {
-            Err("Kroneum is not open".to_string())
-        }
+        self.handle
+            .read_languages(Duration::from_secs(5))
+            .or_else(|err| Err(format!("Failed to retrieve device languages: {:?}", err)))
+            .and_then(|languages| {
+                languages
+                    .first()
+                    .ok_or_else(|| "No languages were returned from device.".to_string())
+                    .map(|lang| *lang)
+            })
     }
 
     fn read_manufacturer(&self, lang: libusb::Language) -> Result<String, String> {
-        if let Some(handle) = &self.handle {
-            handle
-                .read_manufacturer_string(lang, &self.descriptor, Duration::from_secs(5))
-                .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))
-        } else {
-            Err("Kroneum is not open".to_string())
-        }
+        self.handle
+            .read_manufacturer_string(lang, &self.descriptor, Duration::from_secs(5))
+            .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))
     }
 
     fn send_data(&self, data: &[u8]) -> Result<(), String> {
-        if let Some(handle) = &self.handle {
-            handle
-                .write_interrupt(1, data, Duration::from_secs(5))
-                .map(|_| ())
-                .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
-        } else {
-            Err("Kroneum is not open".to_string())
-        }
+        self.handle
+            .write_interrupt(1, data, Duration::from_secs(5))
+            .map(|_| ())
+            .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 }
 
@@ -193,8 +168,7 @@ fn main() -> Result<(), String> {
 
     context.set_log_level(libusb::LogLevel::Info);
 
-    let mut kroneum = KroneumDevice::find(&context)?;
-    kroneum.open()?;
+    let mut kroneum = KroneumDevice::open(&context)?;
 
     if let Some(matches) = matches.subcommand_matches("beep") {
         let number_of_beeps: u8 = matches
