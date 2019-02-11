@@ -68,7 +68,7 @@ impl PacketMemoryAreaAccessor {
     pub fn write(&self, endpoint: EndpointType, buf: &[u8]) {
         match endpoint {
             EndpointType::Control => self.write_buffer_u8(CONTROL_IN_PMA_ADDRESS as usize, buf),
-            EndpointType::Device => self.write_buffer_u8(DEVICE_OUT_PMA_ADDRESS as usize, buf),
+            EndpointType::Device => self.write_buffer_u8(DEVICE_IN_PMA_ADDRESS as usize, buf),
         }
     }
 
