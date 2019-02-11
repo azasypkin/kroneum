@@ -163,7 +163,7 @@ impl<'a> USB<'a> {
 
     pub fn interrupt<F>(&mut self, f: F)
     where
-        F: FnMut(&mut Peripherals, CommandPacket),
+        F: FnMut(&mut Peripherals, CommandPacket) -> Option<[u8; 6]>,
     {
         if self.p.device.USB.istr.read().reset().bit_is_set() {
             self.reset();
@@ -247,7 +247,7 @@ impl<'a> USB<'a> {
 
     fn correct_transfer<F>(&mut self, mut f: F)
     where
-        F: FnMut(&mut Peripherals, CommandPacket),
+        F: FnMut(&mut Peripherals, CommandPacket) -> Option<[u8; 6]>,
     {
         // USB_ISTR_CTR is read only and will be automatically cleared by
         // hardware when we've processed all endpoint results.
@@ -664,7 +664,7 @@ impl<'a> USB<'a> {
 
     fn handle_device_out_transfer<F>(&mut self, f: &mut F)
     where
-        F: FnMut(&mut Peripherals, CommandPacket),
+        F: FnMut(&mut Peripherals, CommandPacket) -> Option<[u8; 6]>,
     {
         // Clear the 'correct transfer for reception' bit for this endpoint.
         self.p.device.USB.ep1r.modify(|_, w| unsafe {
@@ -692,7 +692,10 @@ impl<'a> USB<'a> {
             self.pma.read(endpoint_type, 4),
         ));
 
-        f(&mut self.p, command_packet);
+        let response_data = f(&mut self.p, command_packet);
+        if let Some(data) = response_data {
+            self.send_data(endpoint_type, Some(&data));
+        }
 
         self.pma.set_rx_count(EndpointType::Device, 0);
         self.set_rx_endpoint_status(EndpointType::Device, EndpointStatus::Valid);

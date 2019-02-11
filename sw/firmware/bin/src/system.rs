@@ -75,17 +75,10 @@ impl<'a> System<'a> {
                     usb.setup()
                 });
             }
-            SystemMode::Setup(0) => {
-                Beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
-            }
-            SystemMode::Setup(c) if c > &0 => {
-                Beeper::acquire(&mut self.p, |beeper| beeper.beep());
-            }
+            SystemMode::Setup(0) => Beeper::acquire(&mut self.p, |beeper| beeper.play_setup()),
+            SystemMode::Setup(c) if *c > 0 => Beeper::acquire(&mut self.p, |beeper| beeper.beep()),
             SystemMode::Alarm(time) => {
-                Beeper::acquire(&mut self.p, |beeper| {
-                    beeper.beep_n(time.minutes);
-                    beeper.play_setup();
-                });
+                Beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
 
                 RTC::acquire(&mut self.p, |mut rtc| {
                     rtc.setup();
@@ -118,7 +111,13 @@ impl<'a> System<'a> {
                         rtc.configure_time(&Time::default());
                         rtc.configure_alarm(&time);
                     });
+                } else if let CommandPacket::GetAlarm = command_packet {
+                    Beeper::acquire(p, |beeper| beeper.beep_n(1));
+                    let alarm = RTC::acquire(p, |rtc| rtc.get_alarm());
+                    return Some([alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
                 }
+
+                None
             });
         });
     }

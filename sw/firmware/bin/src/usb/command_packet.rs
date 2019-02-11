@@ -3,6 +3,7 @@ use crate::rtc::Time;
 pub enum CommandPacket {
     Unknown,
     Beep(u8),
+    GetAlarm,
     SetAlarm(Time),
 }
 
@@ -16,6 +17,7 @@ impl From<(u16, u16, u16)> for CommandPacket {
                 minutes: ((data_1 & 0xff00) >> 8) as u8,
                 seconds: (data_2 & 0xff) as u8,
             }),
+            2 => CommandPacket::GetAlarm,
             _ => CommandPacket::Unknown,
         }
     }

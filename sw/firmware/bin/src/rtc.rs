@@ -238,13 +238,23 @@ impl<'a> RTC<'a> {
         self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0x64) });
     }
 
-    pub fn get_time(&self) -> Time {
-        let tr = self.p.device.RTC.tr.read();
+    pub fn get_alarm(&self) -> Time {
+        let reg = self.p.device.RTC.alrmar.read();
 
         Time {
-            hours: tr.ht().bits() * 10 + tr.hu().bits(),
-            minutes: tr.mnt().bits() * 10 + tr.mnu().bits(),
-            seconds: tr.st().bits() * 10 + tr.su().bits(),
+            hours: reg.ht().bits() * 10 + reg.hu().bits(),
+            minutes: reg.mnt().bits() * 10 + reg.mnu().bits(),
+            seconds: reg.st().bits() * 10 + reg.su().bits(),
+        }
+    }
+
+    pub fn get_time(&self) -> Time {
+        let reg = self.p.device.RTC.tr.read();
+
+        Time {
+            hours: reg.ht().bits() * 10 + reg.hu().bits(),
+            minutes: reg.mnt().bits() * 10 + reg.mnu().bits(),
+            seconds: reg.st().bits() * 10 + reg.su().bits(),
         }
     }
 }
