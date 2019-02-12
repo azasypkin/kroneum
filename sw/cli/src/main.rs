@@ -1,29 +1,29 @@
 mod device;
+mod device_hidapi;
 
 use clap::{App, Arg, SubCommand};
 use device::Device;
+use device_hidapi::DeviceHIDAPI;
 use std::time::Duration;
 
 // 24 hours.
 const MAX_ALARM_SECONDS: u32 = 3600 * 24;
 
-fn on_get_info(device: &Device) -> Result<(), String> {
-    let lang = device.read_lang()?;
+fn on_get_info(device: &impl Device) -> Result<(), String> {
     println!(
-        "Kroneum ({}):\nSupported language: 0x{:04x} \nManufacturer: {}",
+        "Kroneum ({}):\nManufacturer: {}",
         device.get_identifier(),
-        lang.lang_id(),
-        device.read_manufacturer(lang)?
+        device.get_manufacturer()?
     );
 
     Ok(())
 }
 
-fn on_beep(device: &Device, number_of_beeps: u8) -> Result<(), String> {
+fn on_beep(device: &impl Device, number_of_beeps: u8) -> Result<(), String> {
     device.send_data([0, 0, number_of_beeps].as_ref())
 }
 
-fn on_set_alarm(device: &Device, alarm_in_seconds: u32) -> Result<(), String> {
+fn on_set_alarm(device: &impl Device, alarm_in_seconds: u32) -> Result<(), String> {
     if alarm_in_seconds >= MAX_ALARM_SECONDS {
         return Err("Alarm is limited to 23h 59m 59s".to_string());
     }
@@ -35,15 +35,13 @@ fn on_set_alarm(device: &Device, alarm_in_seconds: u32) -> Result<(), String> {
     device.send_data([1, 0, hours as u8, minutes as u8, seconds as u8].as_ref())
 }
 
-fn on_get_alarm(device: &Device) -> Result<(), String> {
+fn on_get_alarm(device: &impl Device) -> Result<(), String> {
     device.send_data([2].as_ref())?;
     let (_, data) = device.read_data()?;
 
     println!(
         "Current alarm is set to: {}h {}m {}s",
-        data[0],
-        data[1],
-        data[2]
+        data[0], data[1], data[2]
     );
 
     Ok(())
@@ -54,6 +52,13 @@ fn main() -> Result<(), String> {
         .version("0.1.0")
         .author("Aleh Zasypkin <aleh.zasypkin@gmail.com>")
         .about("Allows to manage and configure Kroneum devices.")
+        .arg(
+            Arg::with_name("hidapi")
+                .long("hid-api")
+                .short("h")
+                .help("Uses HIDAPI instead of LibUSB.")
+                .takes_value(false),
+        )
         .subcommand(
             SubCommand::with_name("beep")
                 .about("Makes Kroneum beep <NUMBER> of times")
@@ -85,11 +90,7 @@ fn main() -> Result<(), String> {
         )
         .get_matches();
 
-    let mut context = libusb::Context::new()
-        .or_else(|err| Err(format!("Failed to create context: {:?}", err)))?;
-    context.set_log_level(libusb::LogLevel::Info);
-
-    let mut device = Device::open(&context)?;
+    let device = DeviceHIDAPI::open()?;
 
     if let Some(matches) = matches.subcommand_matches("beep") {
         let number_of_beeps: u8 = matches
@@ -99,7 +100,7 @@ fn main() -> Result<(), String> {
 
         on_beep(&device, number_of_beeps)?;
     } else if let Some(_) = matches.subcommand_matches("info") {
-       on_get_info(&device)?;
+        on_get_info(&device)?;
     } else if let Some(matches) = matches.subcommand_matches("alarm") {
         match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {
@@ -119,5 +120,5 @@ fn main() -> Result<(), String> {
         }
     }
 
-    device.close()
+    Ok(())
 }
