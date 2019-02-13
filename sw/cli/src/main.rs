@@ -26,6 +26,7 @@ fn main() -> Result<(), String> {
                         .short("n")
                         .long("number")
                         .takes_value(true)
+                        .default_value("1")
                         .help("Defines number of beeps"),
                 ),
         )
@@ -50,22 +51,27 @@ fn main() -> Result<(), String> {
         .get_matches();
 
     let device = DeviceHIDAPI::open()?;
-
-    if let Some(matches) = matches.subcommand_matches("beep") {
-        device.beep(
-            matches
-                .value_of("NUMBER")
-                .and_then(|number_str| number_str.parse::<u8>().ok())
-                .unwrap_or_else(|| 1),
-        )?;
-    } else if let Some(_) = matches.subcommand_matches("info") {
-        println!(
-            "Kroneum ({}):\nManufacturer: {}",
-            device.get_identifier(),
-            device.get_manufacturer()?
-        );
-    } else if let Some(matches) = matches.subcommand_matches("alarm") {
-        match matches.value_of("ACTION").unwrap_or_else(|| "get") {
+    match matches.subcommand() {
+        ("beep", Some(matches)) => {
+            device.beep(
+                matches
+                    .value_of("NUMBER")
+                    .ok_or_else(|| "<NUMBER> argument is not provided.".to_string())
+                    .and_then(|number_str| {
+                        number_str.parse::<u8>().or_else(|err| {
+                            Err(format!("Failed to parse <NUMBER> argument: {:?}", err))
+                        })
+                    })?,
+            )?;
+        }
+        ("info", _) => {
+            println!(
+                "Kroneum ({}):\nManufacturer: {}",
+                device.get_identifier(),
+                device.get_manufacturer()?
+            );
+        }
+        ("alarm", Some(matches)) => match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {
                 device.set_alarm(
                     matches
@@ -89,7 +95,8 @@ fn main() -> Result<(), String> {
                 );
             }
             _ => {}
-        }
+        },
+        _ => return Err("Unknown sub-command!".to_string()),
     }
 
     Ok(())
