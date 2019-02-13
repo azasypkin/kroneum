@@ -48,7 +48,7 @@ impl Device for DeviceHIDAPI {
             .ok_or_else(|| "Failed to retrieve device manufacturer.".to_string())
     }
 
-    fn send_data(&self, data: &[u8]) -> Result<(), String> {
+    fn write(&self, data: &[u8]) -> Result<(), String> {
         let mut report = vec![0];
         report.extend_from_slice(data);
 
@@ -58,7 +58,7 @@ impl Device for DeviceHIDAPI {
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    fn read_data(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
+    fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
         let mut data = [0; REPORT_SIZE];
         let count = self
             .device

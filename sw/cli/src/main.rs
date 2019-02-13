@@ -6,47 +6,6 @@ use device::Device;
 use device_hidapi::DeviceHIDAPI;
 use std::time::Duration;
 
-// 24 hours.
-const MAX_ALARM_SECONDS: u32 = 3600 * 24;
-
-fn on_get_info(device: &impl Device) -> Result<(), String> {
-    println!(
-        "Kroneum ({}):\nManufacturer: {}",
-        device.get_identifier(),
-        device.get_manufacturer()?
-    );
-
-    Ok(())
-}
-
-fn on_beep(device: &impl Device, number_of_beeps: u8) -> Result<(), String> {
-    device.send_data([0, 0, number_of_beeps].as_ref())
-}
-
-fn on_set_alarm(device: &impl Device, alarm_in_seconds: u32) -> Result<(), String> {
-    if alarm_in_seconds >= MAX_ALARM_SECONDS {
-        return Err("Alarm is limited to 23h 59m 59s".to_string());
-    }
-
-    let hours = alarm_in_seconds / 3600;
-    let minutes = (alarm_in_seconds - 3600 * hours) / 60;
-    let seconds = alarm_in_seconds - 3600 * hours - 60 * minutes;
-
-    device.send_data([1, 0, hours as u8, minutes as u8, seconds as u8].as_ref())
-}
-
-fn on_get_alarm(device: &impl Device) -> Result<(), String> {
-    device.send_data([2].as_ref())?;
-    let (_, data) = device.read_data()?;
-
-    println!(
-        "Current alarm is set to: {}h {}m {}s",
-        data[0], data[1], data[2]
-    );
-
-    Ok(())
-}
-
 fn main() -> Result<(), String> {
     let matches = App::new("Kroneum CLI")
         .version("0.1.0")
@@ -93,28 +52,41 @@ fn main() -> Result<(), String> {
     let device = DeviceHIDAPI::open()?;
 
     if let Some(matches) = matches.subcommand_matches("beep") {
-        let number_of_beeps: u8 = matches
-            .value_of("NUMBER")
-            .and_then(|number_str| number_str.parse::<u8>().ok())
-            .unwrap_or_else(|| 1);
-
-        on_beep(&device, number_of_beeps)?;
+        device.beep(
+            matches
+                .value_of("NUMBER")
+                .and_then(|number_str| number_str.parse::<u8>().ok())
+                .unwrap_or_else(|| 1),
+        )?;
     } else if let Some(_) = matches.subcommand_matches("info") {
-        on_get_info(&device)?;
+        println!(
+            "Kroneum ({}):\nManufacturer: {}",
+            device.get_identifier(),
+            device.get_manufacturer()?
+        );
     } else if let Some(matches) = matches.subcommand_matches("alarm") {
         match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {
-                let timer: Duration = matches
-                    .value_of("ALARM")
-                    .unwrap()
-                    .parse::<humantime::Duration>()
-                    .unwrap()
-                    .into();
-
-                on_set_alarm(&device, timer.as_secs() as u32)?;
+                device.set_alarm(
+                    matches
+                        .value_of("ALARM")
+                        .ok_or_else(|| "<ALARM> argument is not provided.".to_string())
+                        .and_then(|alarm_str| {
+                            alarm_str.parse::<humantime::Duration>().or_else(|err| {
+                                Err(format!("Failed to parse <ALARM> argument: {:?}", err))
+                            })
+                        })
+                        .map(|alarm_human| {
+                            let duration: Duration = alarm_human.into();
+                            duration
+                        })?,
+                )?;
             }
             "get" => {
-                on_get_alarm(&device)?;
+                println!(
+                    "Current alarm is set to: {}",
+                    humantime::Duration::from(device.get_alarm()?)
+                );
             }
             _ => {}
         }

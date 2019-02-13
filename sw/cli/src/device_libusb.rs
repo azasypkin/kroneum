@@ -114,14 +114,14 @@ impl<'a> Device for DeviceLibUSB<'a> {
             .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))
     }
 
-    fn send_data(&self, data: &[u8]) -> Result<(), String> {
+    fn write(&self, data: &[u8]) -> Result<(), String> {
         self.handle
             .write_interrupt(1, data, Duration::from_secs(5))
             .map(|_| ())
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    fn read_data(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
+    fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
         let mut data = [0; REPORT_SIZE];
         let count = self
             .handle
