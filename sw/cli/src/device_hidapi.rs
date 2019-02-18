@@ -8,25 +8,24 @@ pub struct DeviceHIDAPI {
 
 impl DeviceHIDAPI {
     pub fn open() -> Result<DeviceHIDAPI, String> {
-        let api = HidApi::new()
-            .or_else(|err| Err(format!("Failed to create HID API adapter {:?}", err)))?;
-
-        if let Some(device_info) = api
-            .devices()
-            .iter()
-            .find(|dev| dev.product_id == KRONEUM_PID && dev.vendor_id == KRONEUM_VID)
-        {
-            let device = api
-                .open(KRONEUM_VID, KRONEUM_PID)
-                .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))?;
-
-            Ok(DeviceHIDAPI {
-                device_info: device_info.clone(),
-                device,
+        HidApi::new()
+            .or_else(|err| Err(format!("Failed to create HID API adapter {:?}", err)))
+            .and_then(|api| {
+                api.devices()
+                    .iter()
+                    .find(|dev| dev.product_id == KRONEUM_PID && dev.vendor_id == KRONEUM_VID)
+                    .cloned()
+                    .ok_or_else(|| "Failed to find HID device.".to_string())
+                    .map(|device_info| (device_info, api))
             })
-        } else {
-            Err("Failed to retrieve device descriptor.".to_string())
-        }
+            .and_then(|(device_info, api)| {
+                api.open(KRONEUM_VID, KRONEUM_PID)
+                    .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))
+                    .map(|device| DeviceHIDAPI {
+                        device_info,
+                        device,
+                    })
+            })
     }
 }
 
@@ -60,11 +59,9 @@ impl Device for DeviceHIDAPI {
 
     fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
         let mut data = [0; REPORT_SIZE];
-        let count = self
-            .device
+        self.device
             .read_timeout(&mut data, 5000)
-            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))?;
-
-        Ok((count, data))
+            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
+            .map(|count| (count, data))
     }
 }
