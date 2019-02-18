@@ -85,15 +85,16 @@ impl<'a> DeviceLibUSB<'a> {
     pub fn close(&mut self) -> Result<(), String> {
         self.handle
             .release_interface(INTERFACE)
-            .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))?;
-
-        if self.detached_kernel_driver {
-            self.handle
-                .attach_kernel_driver(INTERFACE)
-                .or_else(|err| Err(format!("Failed to attach kernel driver: {:?}", err)))
-        } else {
-            Ok(())
-        }
+            .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))
+            .and_then(|_| {
+                if self.detached_kernel_driver {
+                    self.handle
+                        .attach_kernel_driver(INTERFACE)
+                        .or_else(|err| Err(format!("Failed to attach kernel driver: {:?}", err)))
+                } else {
+                    Ok(())
+                }
+            })
     }
 }
 
@@ -108,26 +109,25 @@ impl<'a> Device for DeviceLibUSB<'a> {
     }
 
     fn get_manufacturer(&self) -> Result<String, String> {
-        let lang = self.get_lang()?;
-        self.handle
-            .read_manufacturer_string(lang, &self.descriptor, Duration::from_secs(5))
-            .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))
+        self.get_lang().and_then(|lang| {
+            self.handle
+                .read_manufacturer_string(lang, &self.descriptor, Duration::from_secs(5))
+                .or_else(|err| Err(format!("Failed to retrieve device manufacturer: {:?}", err)))
+        })
     }
 
     fn write(&self, data: &[u8]) -> Result<(), String> {
         self.handle
             .write_interrupt(1, data, Duration::from_secs(5))
-            .map(|_| ())
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
+            .map(|_| ())
     }
 
     fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
         let mut data = [0; REPORT_SIZE];
-        let count = self
-            .handle
+        self.handle
             .read_interrupt(0x81, &mut data, Duration::from_secs(5))
-            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))?;
-
-        Ok((count, data))
+            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
+            .map(|count| (count, data))
     }
 }

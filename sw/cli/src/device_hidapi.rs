@@ -42,8 +42,7 @@ impl Device for DeviceHIDAPI {
     fn get_manufacturer(&self) -> Result<String, String> {
         self.device_info
             .manufacturer_string
-            .as_ref()
-            .cloned()
+            .clone()
             .ok_or_else(|| "Failed to retrieve device manufacturer.".to_string())
     }
 
