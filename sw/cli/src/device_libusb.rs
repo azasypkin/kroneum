@@ -12,62 +12,58 @@ pub struct DeviceLibUSB<'a> {
 
 impl<'a> DeviceLibUSB<'a> {
     pub fn open(context: &'a libusb::Context) -> Result<DeviceLibUSB<'a>, String> {
-        let devices = context
+        let (device, mut handle, descriptor) = context
             .devices()
-            .or_else(|err| Err(format!("Failed to retrieve device list: {:?}", err)))?;
-
-        let mut device_and_descriptor: Option<(libusb::Device, libusb::DeviceDescriptor)> = None;
-        for device in devices.iter() {
-            let device_descriptor = device
-                .device_descriptor()
-                .or_else(|err| Err(format!("Failed to retrieve device descriptor: {:?}", err)))?;
-
-            if device_descriptor.vendor_id() == KRONEUM_VID
-                && device_descriptor.product_id() == KRONEUM_PID
-            {
-                device_and_descriptor.replace((device, device_descriptor));
-                break;
-            }
-        }
-
-        let (device, descriptor) = device_and_descriptor.ok_or_else(|| {
-            format!(
-                "Couldn't find device with VID `0x{:04x}` and PID `0x{:04x}`.",
-                KRONEUM_VID, KRONEUM_PID
-            )
-        })?;
-
-        let (mut handle, detached_kernel_driver) = device
-            .open()
-            .or_else(|err| Err(format!("Failed to open device: {:?}", err)))
-            .and_then(|mut device_handle| {
-                let detached_kernel_driver =
-                    device_handle.kernel_driver_active(0).or_else(|err| {
-                        Err(format!(
-                            "Failed to determine kernel driver status {:?}",
-                            err
-                        ))
-                    })?;
-
-                if detached_kernel_driver {
-                    device_handle
-                        .detach_kernel_driver(INTERFACE)
-                        .or_else(|err| Err(format!("Failed to detach kernel driver: {:?}", err)))?;
-                }
-
-                Ok((device_handle, detached_kernel_driver))
+            .or_else(|err| Err(format!("Failed to retrieve device list: {:?}", err)))
+            .and_then(|list| {
+                list.iter()
+                    .map(|dev| dev.device_descriptor().map(|descriptor| (dev, descriptor)))
+                    .filter_map(|dev| dev.ok())
+                    .find(|(_, desc)| {
+                        desc.vendor_id() == KRONEUM_VID && desc.product_id() == KRONEUM_PID
+                    })
+                    .ok_or_else(|| "Failed to find LibUSB device.".to_string())
+            })
+            .and_then(|(dev, desc)| {
+                dev.open()
+                    .or_else(|err| Err(format!("Failed to open device: {:?}", err)))
+                    .map(|handle| (dev, handle, desc))
             })?;
 
         handle
-            .claim_interface(INTERFACE)
-            .or_else(|err| Err(format!("Failed to claim interface 0: {:?}", err)))?;
-
-        Ok(DeviceLibUSB {
-            device,
-            descriptor,
-            handle,
-            detached_kernel_driver,
-        })
+            .kernel_driver_active(INTERFACE)
+            .or_else(|err| {
+                Err(format!(
+                    "Failed to determine kernel driver status {:?}",
+                    err
+                ))
+            })
+            .and_then(|detached_kernel_driver| {
+                if detached_kernel_driver {
+                    handle
+                        .detach_kernel_driver(INTERFACE)
+                        .or_else(|err| Err(format!("Failed to detach kernel driver: {:?}", err)))
+                        .map(|_| detached_kernel_driver)
+                } else {
+                    Ok(detached_kernel_driver)
+                }
+            })
+            .and_then(|detached_kernel_driver| {
+                handle
+                    .claim_interface(INTERFACE)
+                    .or_else(|err| {
+                        Err(format!(
+                            "Failed to claim interface {}: {:?}",
+                            INTERFACE, err
+                        ))
+                    })
+                    .map(|_| DeviceLibUSB {
+                        device,
+                        descriptor,
+                        handle,
+                        detached_kernel_driver,
+                    })
+            })
     }
 
     fn get_lang(&self) -> Result<libusb::Language, String> {
@@ -85,7 +81,12 @@ impl<'a> DeviceLibUSB<'a> {
     pub fn close(&mut self) -> Result<(), String> {
         self.handle
             .release_interface(INTERFACE)
-            .or_else(|err| Err(format!("Failed to release interface 0: {:?}", err)))
+            .or_else(|err| {
+                Err(format!(
+                    "Failed to release interface {}: {:?}",
+                    INTERFACE, err
+                ))
+            })
             .and_then(|_| {
                 if self.detached_kernel_driver {
                     self.handle
