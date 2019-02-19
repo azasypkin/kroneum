@@ -12,10 +12,10 @@ fn main() -> Result<(), String> {
         .author("Aleh Zasypkin <aleh.zasypkin@gmail.com>")
         .about("Allows to manage and configure Kroneum devices.")
         .arg(
-            Arg::with_name("hidapi")
-                .long("hid-api")
-                .short("h")
-                .help("Uses HIDAPI instead of LibUSB.")
+            Arg::with_name("libusb")
+                .long("libusb")
+                .short("l")
+                .help("Uses LibUSB instead of HIDAPI.")
                 .takes_value(false),
         )
         .subcommand(

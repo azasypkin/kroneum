@@ -30,39 +30,44 @@ impl<'a> DeviceLibUSB<'a> {
                     .map(|handle| (dev, handle, desc))
             })?;
 
+        let detached_kernel_driver = if context.supports_detach_kernel_driver() {
+            handle
+                .kernel_driver_active(INTERFACE)
+                .or_else(|err| {
+                    Err(format!(
+                        "Failed to determine kernel driver status {:?}",
+                        err
+                    ))
+                })
+                .and_then(|detached_kernel_driver| {
+                    if detached_kernel_driver {
+                        handle
+                            .detach_kernel_driver(INTERFACE)
+                            .or_else(|err| {
+                                Err(format!("Failed to detach kernel driver: {:?}", err))
+                            })
+                            .map(|_| detached_kernel_driver)
+                    } else {
+                        Ok(detached_kernel_driver)
+                    }
+                })?
+        } else {
+            false
+        };
+
         handle
-            .kernel_driver_active(INTERFACE)
+            .claim_interface(INTERFACE)
             .or_else(|err| {
                 Err(format!(
-                    "Failed to determine kernel driver status {:?}",
-                    err
+                    "Failed to claim interface {}: {:?}",
+                    INTERFACE, err
                 ))
             })
-            .and_then(|detached_kernel_driver| {
-                if detached_kernel_driver {
-                    handle
-                        .detach_kernel_driver(INTERFACE)
-                        .or_else(|err| Err(format!("Failed to detach kernel driver: {:?}", err)))
-                        .map(|_| detached_kernel_driver)
-                } else {
-                    Ok(detached_kernel_driver)
-                }
-            })
-            .and_then(|detached_kernel_driver| {
-                handle
-                    .claim_interface(INTERFACE)
-                    .or_else(|err| {
-                        Err(format!(
-                            "Failed to claim interface {}: {:?}",
-                            INTERFACE, err
-                        ))
-                    })
-                    .map(|_| DeviceLibUSB {
-                        device,
-                        descriptor,
-                        handle,
-                        detached_kernel_driver,
-                    })
+            .map(|_| DeviceLibUSB {
+                device,
+                descriptor,
+                handle,
+                detached_kernel_driver,
             })
     }
 
