@@ -38,7 +38,9 @@ pub trait Device {
         self.write([2].as_ref())
             .and_then(|_| self.read())
             .map(|(_, data)| {
-                Duration::from_secs(data[0] as u64 * 3600 + data[1] as u64 * 60 + data[2] as u64)
+                Duration::from_secs(
+                    u64::from(data[0]) * 3600 + u64::from(data[1]) * 60 + u64::from(data[2]),
+                )
             })
     }
 
@@ -54,4 +56,10 @@ pub trait Device {
 
         self.write([1, 0, hours as u8, minutes as u8, seconds as u8].as_ref())
     }
+}
+
+pub trait DeviceContext<'a, D: Device, C = Self> {
+    fn create() -> Result<C, String>;
+    fn open(&'a self) -> Result<D, String>;
+    fn close(&'a self, device: D) -> Result<(), String>;
 }

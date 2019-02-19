@@ -1,7 +1,29 @@
-use crate::device::{Device, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE};
+use crate::device::{
+    Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE,
+};
 use std::time::Duration;
 
 const INTERFACE: u8 = 0;
+
+pub struct DeviceContextLibUSB {
+    context: libusb::Context,
+}
+
+impl<'a: 'b, 'b> DeviceContext<'a, DeviceLibUSB<'b>> for DeviceContextLibUSB {
+    fn create() -> Result<Self, String> {
+        libusb::Context::new()
+            .or_else(|err| Err(format!("Failed to create LibUSB context {:?}", err)))
+            .map(|context| DeviceContextLibUSB { context })
+    }
+
+    fn open(&'a self) -> Result<DeviceLibUSB<'b>, String> {
+        DeviceLibUSB::open(&self.context)
+    }
+
+    fn close(&'a self, mut device: DeviceLibUSB<'b>) -> Result<(), String> {
+        device.close()
+    }
+}
 
 pub struct DeviceLibUSB<'a> {
     descriptor: libusb::DeviceDescriptor,
@@ -11,7 +33,7 @@ pub struct DeviceLibUSB<'a> {
 }
 
 impl<'a> DeviceLibUSB<'a> {
-    pub fn open(context: &'a libusb::Context) -> Result<DeviceLibUSB<'a>, String> {
+    fn open(context: &'a libusb::Context) -> Result<Self, String> {
         let (device, mut handle, descriptor) = context
             .devices()
             .or_else(|err| Err(format!("Failed to retrieve device list: {:?}", err)))
@@ -83,7 +105,7 @@ impl<'a> DeviceLibUSB<'a> {
             })
     }
 
-    pub fn close(&mut self) -> Result<(), String> {
+    fn close(&mut self) -> Result<(), String> {
         self.handle
             .release_interface(INTERFACE)
             .or_else(|err| {

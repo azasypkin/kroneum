@@ -1,5 +1,27 @@
-use crate::device::{Device, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE};
+use crate::device::{
+    Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE,
+};
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
+
+pub struct DeviceContextHIDAPI {
+    api: HidApi,
+}
+
+impl<'a> DeviceContext<'a, DeviceHIDAPI> for DeviceContextHIDAPI {
+    fn create() -> Result<Self, String> {
+        HidApi::new()
+            .or_else(|err| Err(format!("Failed to create HID API adapter {:?}", err)))
+            .map(|api| DeviceContextHIDAPI { api })
+    }
+
+    fn open(&self) -> Result<DeviceHIDAPI, String> {
+        DeviceHIDAPI::open(&self.api)
+    }
+
+    fn close(&self, _: DeviceHIDAPI) -> Result<(), String> {
+        Ok(())
+    }
+}
 
 pub struct DeviceHIDAPI {
     device: HidDevice,
@@ -7,18 +29,13 @@ pub struct DeviceHIDAPI {
 }
 
 impl DeviceHIDAPI {
-    pub fn open() -> Result<DeviceHIDAPI, String> {
-        HidApi::new()
-            .or_else(|err| Err(format!("Failed to create HID API adapter {:?}", err)))
-            .and_then(|api| {
-                api.devices()
-                    .iter()
-                    .find(|dev| dev.product_id == KRONEUM_PID && dev.vendor_id == KRONEUM_VID)
-                    .cloned()
-                    .ok_or_else(|| "Failed to find HID device.".to_string())
-                    .map(|device_info| (device_info, api))
-            })
-            .and_then(|(device_info, api)| {
+    pub fn open(api: &HidApi) -> Result<Self, String> {
+        api.devices()
+            .iter()
+            .find(|dev| dev.product_id == KRONEUM_PID && dev.vendor_id == KRONEUM_VID)
+            .cloned()
+            .ok_or_else(|| "Failed to find HID device.".to_string())
+            .and_then(|device_info| {
                 api.open(KRONEUM_VID, KRONEUM_PID)
                     .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))
                     .map(|device| DeviceHIDAPI {
