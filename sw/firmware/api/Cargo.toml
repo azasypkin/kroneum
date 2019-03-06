@@ -1,0 +1,5 @@
+[package]
+name = "kroneum-api"
+version = "0.1.0"
+authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
+categories = ["embedded", "no-std"]

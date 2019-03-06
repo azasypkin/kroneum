@@ -1,4 +1,5 @@
-use crate::{config, systick::SysTick, Peripherals};
+use kroneum_api::config;
+use crate::{systick::SysTick, Peripherals};
 
 const EIGHTH_NOTE: u32 = 150;
 const QUARTER_DOT_NOTE: u32 = 450;

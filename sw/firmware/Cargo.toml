@@ -2,6 +2,7 @@ cargo-features = ["profile-overrides"]
 
 [workspace]
 members = [
+    "api",
     "bin",
     "stm32f0x2",
 ]

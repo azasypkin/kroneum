@@ -1,4 +1,4 @@
-use crate::config;
+use kroneum_api::config;
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
 pub struct SysTick;

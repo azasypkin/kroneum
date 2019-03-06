@@ -10,6 +10,7 @@ license = "MIT"
 repository = "https://github.com/azasypkin/kroneum"
 
 [dependencies]
+kroneum-api = { version = "0.1.0", path = "../api" }
 cortex-m = "0.5.8"
 cortex-m-rt = "0.6.7"
 cortex-m-semihosting = "0.3.2"
