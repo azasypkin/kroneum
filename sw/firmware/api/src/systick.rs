@@ -45,7 +45,10 @@ mod tests {
 
     impl MockData {
         pub fn new() -> Self {
-            MockData { reload_value: 0, ticks: 0 }
+            MockData {
+                reload_value: 0,
+                ticks: 0,
+            }
         }
     }
 
@@ -62,8 +65,7 @@ mod tests {
             self.data.ticks = 0;
         }
 
-        fn disable_counter(&mut self) {
-        }
+        fn disable_counter(&mut self) {}
 
         fn has_wrapped(&mut self) -> bool {
             self.data.ticks += 1;

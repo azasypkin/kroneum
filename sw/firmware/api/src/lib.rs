@@ -2,5 +2,6 @@
 #![deny(warnings)]
 #![no_std]
 
+pub mod beeper;
 pub mod config;
 pub mod systick;

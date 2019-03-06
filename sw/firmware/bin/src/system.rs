@@ -1,5 +1,5 @@
 use crate::{
-    beeper::Beeper,
+    beeper,
     buttons::{ButtonPressType, Buttons},
     rtc::{Time, RTC},
     usb::{CommandPacket, UsbState, USB},
@@ -63,11 +63,11 @@ impl<'a> System<'a> {
 
                 // If we are exiting `Config` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    Beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
+                    beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
                 }
             }
             SystemMode::Config => {
-                Beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
+                beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
 
                 self.toggle_standby_mode(false);
 
@@ -75,10 +75,10 @@ impl<'a> System<'a> {
                     usb.setup()
                 });
             }
-            SystemMode::Setup(0) => Beeper::acquire(&mut self.p, |beeper| beeper.play_setup()),
-            SystemMode::Setup(c) if *c > 0 => Beeper::acquire(&mut self.p, |beeper| beeper.beep()),
+            SystemMode::Setup(0) => beeper::acquire(&mut self.p, |beeper| beeper.play_setup()),
+            SystemMode::Setup(c) if *c > 0 => beeper::acquire(&mut self.p, |beeper| beeper.beep()),
             SystemMode::Alarm(time) => {
-                Beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
+                beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
 
                 RTC::acquire(&mut self.p, |mut rtc| {
                     rtc.setup();
@@ -93,7 +93,7 @@ impl<'a> System<'a> {
     }
 
     pub fn on_rtc_alarm(&mut self) {
-        Beeper::acquire(&mut self.p, |beeper| beeper.play_melody());
+        beeper::acquire(&mut self.p, |beeper| beeper.play_melody());
 
         RTC::acquire(&mut self.p, |mut rtc| rtc.teardown());
 
@@ -104,7 +104,7 @@ impl<'a> System<'a> {
         USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
             usb.interrupt(|p, command_packet| {
                 if let CommandPacket::Beep(num) = command_packet {
-                    Beeper::acquire(p, |beeper| beeper.beep_n(num));
+                    beeper::acquire(p, |beeper| beeper.beep_n(num));
                 } else if let CommandPacket::SetAlarm(time) = command_packet {
                     RTC::acquire(p, |mut rtc| {
                         rtc.setup();
@@ -112,7 +112,7 @@ impl<'a> System<'a> {
                         rtc.configure_alarm(&time);
                     });
                 } else if let CommandPacket::GetAlarm = command_packet {
-                    Beeper::acquire(p, |beeper| beeper.beep_n(1));
+                    beeper::acquire(p, |beeper| beeper.beep_n(1));
                     let alarm = RTC::acquire(p, |rtc| rtc.get_alarm());
                     return Some([alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
                 }
