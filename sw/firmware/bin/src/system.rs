@@ -6,6 +6,8 @@ use crate::{
     Peripherals,
 };
 
+use kroneum_api::beeper::Melody;
+
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
     Idle,
@@ -63,11 +65,11 @@ impl<'a> System<'a> {
 
                 // If we are exiting `Config` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
+                    beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
                 }
             }
             SystemMode::Config => {
-                beeper::acquire(&mut self.p, |beeper| beeper.play_reset());
+                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
 
                 self.toggle_standby_mode(false);
 
@@ -75,10 +77,12 @@ impl<'a> System<'a> {
                     usb.setup()
                 });
             }
-            SystemMode::Setup(0) => beeper::acquire(&mut self.p, |beeper| beeper.play_setup()),
+            SystemMode::Setup(0) => {
+                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup))
+            }
             SystemMode::Setup(c) if *c > 0 => beeper::acquire(&mut self.p, |beeper| beeper.beep()),
             SystemMode::Alarm(time) => {
-                beeper::acquire(&mut self.p, |beeper| beeper.play_setup());
+                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup));
 
                 RTC::acquire(&mut self.p, |mut rtc| {
                     rtc.setup();
@@ -93,7 +97,7 @@ impl<'a> System<'a> {
     }
 
     pub fn on_rtc_alarm(&mut self) {
-        beeper::acquire(&mut self.p, |beeper| beeper.play_melody());
+        beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Alarm));
 
         RTC::acquire(&mut self.p, |mut rtc| rtc.teardown());
 
@@ -112,7 +116,7 @@ impl<'a> System<'a> {
                         rtc.configure_alarm(&time);
                     });
                 } else if let CommandPacket::GetAlarm = command_packet {
-                    beeper::acquire(p, |beeper| beeper.beep_n(1));
+                    beeper::acquire(p, |beeper| beeper.beep());
                     let alarm = RTC::acquire(p, |rtc| rtc.get_alarm());
                     return Some([alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
                 }
