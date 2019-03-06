@@ -1,5 +1,5 @@
+use crate::{systick, Peripherals};
 use kroneum_api::config;
-use crate::{systick::SysTick, Peripherals};
 
 const EIGHTH_NOTE: u32 = 150;
 const QUARTER_DOT_NOTE: u32 = 450;
@@ -82,7 +82,7 @@ impl<'a> Beeper<'a> {
             self.toggle_pwm(false);
 
             if i < n {
-                SysTick::delay_ms(&mut self.p.core.SYST, 100);
+                systick::get(&mut self.p.core.SYST).delay_ms(100);
             }
         }
     }
@@ -179,7 +179,7 @@ impl<'a> Beeper<'a> {
             .arr
             .write(|w| unsafe { w.bits((config::CLOCK_SPEED / note) - 1) });
 
-        SysTick::delay_ms(&mut self.p.core.SYST, delay);
+        systick::get(&mut self.p.core.SYST).delay_ms(delay);
     }
 
     fn toggle_pwm(&self, enable: bool) {

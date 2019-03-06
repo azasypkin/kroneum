@@ -1,25 +1,29 @@
-use kroneum_api::config;
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
-pub struct SysTick;
+pub struct SystickHardwareImpl<'a> {
+    syst: &'a mut SYST,
+}
 
-impl SysTick {
-    pub fn delay_us(systick: &mut SYST, us: u32) {
-        let rvr = us * (config::CLOCK_SPEED / 1_000_000);
-
-        assert!(rvr < (1 << 24));
-
-        systick.set_clock_source(SystClkSource::Core);
-        systick.set_reload(rvr);
-        systick.clear_current();
-        systick.enable_counter();
-
-        while !systick.has_wrapped() {}
-
-        systick.disable_counter();
+impl<'a> kroneum_api::systick::SysTickHardware for SystickHardwareImpl<'a> {
+    fn configure(&mut self, reload_value: u32) {
+        self.syst.set_clock_source(SystClkSource::Core);
+        self.syst.set_reload(reload_value);
+        self.syst.clear_current();
     }
 
-    pub fn delay_ms(systick: &mut SYST, ms: u32) {
-        Self::delay_us(systick, ms * 1000);
+    fn enable_counter(&mut self) {
+        self.syst.enable_counter();
     }
+
+    fn disable_counter(&mut self) {
+        self.syst.disable_counter();
+    }
+
+    fn has_wrapped(&mut self) -> bool {
+        self.syst.has_wrapped()
+    }
+}
+
+pub fn get(syst: &mut SYST) -> kroneum_api::systick::SysTick<SystickHardwareImpl> {
+    kroneum_api::systick::SysTick::create(SystickHardwareImpl { syst })
 }

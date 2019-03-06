@@ -1,4 +1,4 @@
-use crate::{systick::SysTick, Peripherals};
+use crate::{systick, Peripherals};
 
 use stm32f0x2::Interrupt;
 
@@ -89,7 +89,7 @@ impl<'a> Buttons<'a> {
         }
 
         for i in 1u8..8u8 {
-            SysTick::delay_ms(&mut self.p.core.SYST, 250);
+            systick::get(&mut self.p.core.SYST).delay_ms(250);
             let reg = self.p.device.GPIOA.idr.read();
             if reg.idr0().bit_is_clear() && reg.idr2().bit_is_clear() {
                 break;
