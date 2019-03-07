@@ -1,12 +1,11 @@
 use crate::{
-    beeper,
-    buttons::{ButtonPressType, Buttons},
+    beeper, buttons,
     rtc::{Time, RTC},
     usb::{CommandPacket, UsbState, USB},
     Peripherals,
 };
 
-use kroneum_api::beeper::Melody;
+use kroneum_api::{beeper::Melody, buttons::ButtonPressType};
 
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
@@ -49,7 +48,7 @@ impl<'a> System<'a> {
     }
 
     pub fn setup(&mut self) {
-        Buttons::acquire(&mut self.p, |mut buttons| buttons.setup());
+        buttons::setup(&mut self.p);
 
         self.set_mode(SystemMode::Idle);
     }
@@ -127,20 +126,18 @@ impl<'a> System<'a> {
     }
 
     pub fn on_button_press(&mut self) -> bool {
-        let has_pending_interrupt =
-            Buttons::acquire(&mut self.p, |buttons| buttons.has_pending_interrupt());
-        if !has_pending_interrupt {
+        if !buttons::has_pending_interrupt(&mut self.p.device) {
             return false;
         }
 
-        let (button_i, button_x) = Buttons::acquire(&mut self.p, |mut buttons| buttons.interrupt());
+        let (button_i, button_x) = buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
 
         match (self.state.mode.clone(), button_i, button_x) {
             (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
                 self.set_mode(SystemMode::Setup(0));
 
                 let (button_i, button_x) =
-                    Buttons::acquire(&mut self.p, |mut buttons| buttons.interrupt());
+                    buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
 
                 match (mode, button_i, button_x) {
                     (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
@@ -179,7 +176,7 @@ impl<'a> System<'a> {
             _ => {}
         }
 
-        Buttons::acquire(&mut self.p, |buttons| buttons.clear_pending_interrupt());
+        buttons::clear_pending_interrupt(&mut self.p.device);
 
         true
     }

@@ -3,5 +3,6 @@
 #![no_std]
 
 pub mod beeper;
+pub mod buttons;
 pub mod config;
 pub mod systick;

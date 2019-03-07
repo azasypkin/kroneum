@@ -6,6 +6,7 @@ const QUARTER_NOTE: u32 = 300;
 /// Note frequencies, see http://pages.mtu.edu/~suits/notefreqs.html.
 const NOTE_FREQUENCIES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988];
 
+/// Defines a predefined melody to play.
 pub enum Melody {
     Alarm,
     Beep,
@@ -13,6 +14,7 @@ pub enum Melody {
     Setup,
 }
 
+/// Melody that is being played when alarm triggers.
 const ALARM_MELODY: [(u32, u32); 15] = [
     (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
     (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
@@ -31,8 +33,10 @@ const ALARM_MELODY: [(u32, u32); 15] = [
     (NOTE_FREQUENCIES[5], QUARTER_DOT_NOTE),
 ];
 
+/// Melody to be used as beep (e.g. when setting alarm).
 const BEEP_MELODY: [(u32, u32); 1] = [(NOTE_FREQUENCIES[7], EIGHTH_NOTE)];
 
+/// Melody that is played when alarm is reset.
 const RESET_MELODY: [(u32, u32); 6] = [
     (NOTE_FREQUENCIES[5], QUARTER_NOTE),     // F
     (NOTE_FREQUENCIES[5], EIGHTH_NOTE),      // F
@@ -42,6 +46,7 @@ const RESET_MELODY: [(u32, u32); 6] = [
     (NOTE_FREQUENCIES[7], QUARTER_DOT_NOTE), // G.
 ];
 
+/// Melody that is played when user enters setup mode.
 const SETUP_MELODY: [(u32, u32); 2] = [
     (NOTE_FREQUENCIES[3], QUARTER_NOTE), // D#
     (NOTE_FREQUENCIES[3], QUARTER_NOTE), // E
