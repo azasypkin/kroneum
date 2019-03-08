@@ -1,15 +1,14 @@
-pub mod command_packet;
-mod descriptors;
 pub mod pma;
-mod setup_packet;
 
 use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
-pub use self::command_packet::CommandPacket;
-use self::descriptors::*;
 use self::pma::PacketMemoryArea;
-use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
+use kroneum_api::usb::{
+    command_packet::CommandPacket,
+    descriptors::*,
+    setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket},
+};
 
 #[derive(Copy, Clone)]
 enum EndpointType {

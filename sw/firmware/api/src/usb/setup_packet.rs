@@ -1,16 +1,16 @@
-pub(super) enum RequestDirection {
+pub enum RequestDirection {
     HostToDevice,
     DeviceToHost,
 }
 
-pub(super) enum RequestKind {
+pub enum RequestKind {
     Standard,
     Class,
     Vendor,
     Reserved,
 }
 
-pub(super) enum RequestRecipient {
+pub enum RequestRecipient {
     Device,
     Interface,
     Endpoint,
@@ -19,9 +19,8 @@ pub(super) enum RequestRecipient {
 }
 
 #[repr(u8)]
-#[non_exhaustive]
 #[derive(Debug, Copy, Clone)]
-pub(super) enum Request {
+pub enum Request {
     GetStatus = 0x00,
     ClearFeature = 0x01,
     Two = 0x02,
@@ -36,7 +35,7 @@ pub(super) enum Request {
     SynchFrame = 0x0C,
 }
 
-pub(super) struct SetupPacket {
+pub struct SetupPacket {
     pub request: Request,
     pub dir: RequestDirection,
     pub kind: RequestKind,

@@ -8,3 +8,4 @@ pub mod config;
 pub mod rtc;
 pub mod systick;
 pub mod time;
+pub mod usb;
