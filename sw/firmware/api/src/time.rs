@@ -1,5 +1,5 @@
 /// Represents Time in hours, minutes and seconds. Max value is 24 hours.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,
@@ -34,19 +34,16 @@ impl Time {
 
         if new_value >= 60 {
             self.minutes = (new_value % 60) as u8;
-            self.add_hours((new_value / 60) as u8);
+            self.add_hours(new_value / 60);
         } else {
             self.minutes = new_value as u8;
         }
     }
 
-    /// Adds specified number of hours to the current time.
-    pub fn add_hours(&mut self, hours: u8) {
-        self.hours += hours;
-
-        if self.hours >= 24 {
-            self.hours -= 24;
-        }
+    /// Adds specified number of hours to the current time. Rolls over after 24h.
+    pub fn add_hours(&mut self, hours: u32) {
+        let hours = self.hours as u32 + hours;
+        self.hours = if hours >= 24 { hours % 24 } else { hours } as u8
     }
 
     /// Creates time from seconds.
@@ -62,8 +59,8 @@ impl Time {
     }
 
     /// Creates time from hours.
-    pub fn from_hours(hours: u8) -> Self {
-        Time::from_minutes((hours * 60) as u32)
+    pub fn from_hours(hours: u32) -> Self {
+        Time::from_minutes(hours * 60)
     }
 }
 
@@ -97,5 +94,151 @@ impl From<&Time> for BCDTime {
             seconds_tens: time.seconds / 10,
             seconds: time.seconds % 10,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_seconds() {
+        let mut time = Time {
+            hours: 0,
+            minutes: 0,
+            seconds: 0,
+        };
+
+        time.add_seconds(10);
+        assert_eq!(time, Time::from_seconds(10));
+
+        time.add_seconds(75);
+        assert_eq!(time, Time::from_seconds(85));
+
+        time.add_seconds(6700);
+        assert_eq!(time, Time::from_seconds(6785));
+    }
+
+    #[test]
+    fn add_minutes() {
+        let mut time = Time {
+            hours: 0,
+            minutes: 0,
+            seconds: 0,
+        };
+
+        time.add_minutes(10);
+        assert_eq!(time, Time::from_minutes(10));
+
+        time.add_minutes(75);
+        assert_eq!(time, Time::from_minutes(85));
+
+        time.add_minutes(125);
+        assert_eq!(time, Time::from_minutes(210));
+    }
+
+    #[test]
+    fn add_hours() {
+        let mut time = Time {
+            hours: 0,
+            minutes: 0,
+            seconds: 0,
+        };
+
+        time.add_hours(2);
+        assert_eq!(time, Time::from_hours(2));
+
+        time.add_hours(26);
+        assert_eq!(time, Time::from_hours(4));
+    }
+
+    #[test]
+    fn from_seconds() {
+        assert_eq!(
+            Time::from_seconds(10),
+            Time {
+                hours: 0,
+                minutes: 0,
+                seconds: 10,
+            }
+        );
+
+        assert_eq!(
+            Time::from_seconds(125),
+            Time {
+                hours: 0,
+                minutes: 2,
+                seconds: 5,
+            }
+        );
+
+        assert_eq!(
+            Time::from_seconds(7403),
+            Time {
+                hours: 2,
+                minutes: 3,
+                seconds: 23,
+            }
+        );
+
+        assert_eq!(
+            Time::from_seconds(94573),
+            Time {
+                hours: 2,
+                minutes: 16,
+                seconds: 13,
+            }
+        );
+    }
+
+    #[test]
+    fn from_minutes() {
+        assert_eq!(
+            Time::from_minutes(10),
+            Time {
+                hours: 0,
+                minutes: 10,
+                seconds: 0,
+            }
+        );
+
+        assert_eq!(
+            Time::from_minutes(125),
+            Time {
+                hours: 2,
+                minutes: 5,
+                seconds: 0,
+            }
+        );
+
+        assert_eq!(
+            Time::from_minutes(7403),
+            Time {
+                hours: 3,
+                minutes: 23,
+                seconds: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn from_hours() {
+        assert_eq!(
+            Time::from_hours(10),
+            Time {
+                hours: 10,
+                minutes: 0,
+                seconds: 0,
+            }
+        );
+
+        assert_eq!(
+            Time::from_hours(125),
+            Time {
+                hours: 5,
+                minutes: 0,
+                seconds: 0,
+            }
+        );
     }
 }

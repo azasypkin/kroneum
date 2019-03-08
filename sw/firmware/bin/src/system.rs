@@ -9,7 +9,7 @@ use kroneum_api::{beeper::Melody, buttons::ButtonPressType, time::Time};
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
     Idle,
-    Setup(u8),
+    Setup(u32),
     Alarm(Time),
     Config,
 }
