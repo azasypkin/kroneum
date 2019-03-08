@@ -5,7 +5,7 @@ pub enum ButtonType {
 }
 
 /// Defines type of the press (short, long, very long).
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ButtonPressType {
     /// Button is not pressed.
     None,
@@ -88,5 +88,225 @@ impl<T: ButtonsHardware> Buttons<T> {
         }
 
         (button_one_state, button_ten_state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::cell::RefCell;
+
+    struct MockData<F: Fn(ButtonType, u32) -> bool> {
+        pub is_button_pressed: F,
+        pub current_delay: u32,
+    }
+
+    struct ButtonsHardwareMock<'a, F: Fn(ButtonType, u32) -> bool> {
+        data: RefCell<&'a mut MockData<F>>,
+    }
+
+    impl<'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware for ButtonsHardwareMock<'a, F> {
+        fn is_button_pressed(&self, button_type: ButtonType) -> bool {
+            let current_delay = self.data.borrow().current_delay;
+            (self.data.borrow().is_button_pressed)(button_type, current_delay)
+        }
+
+        fn delay(&mut self, delay_ms: u32) {
+            self.data.borrow_mut().current_delay += delay_ms;
+        }
+    }
+
+    fn get_buttons<F: Fn(ButtonType, u32) -> bool>(
+        mock_data: &mut MockData<F>,
+    ) -> Buttons<ButtonsHardwareMock<F>> {
+        Buttons {
+            hw: ButtonsHardwareMock {
+                data: RefCell::new(mock_data),
+            },
+        }
+    }
+
+    #[test]
+    fn both_none() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_bt: ButtonType, _current_delay: u32| false,
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::None, ButtonPressType::None)
+        );
+    }
+
+    #[test]
+    fn both_short() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_bt: ButtonType, current_delay: u32| {
+                if current_delay >= 250 {
+                    false
+                } else {
+                    true
+                }
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Short, ButtonPressType::Short)
+        );
+    }
+
+    #[test]
+    fn one_none_ten_short() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
+                ButtonType::One => false,
+                ButtonType::Ten => {
+                    if current_delay >= 250 {
+                        false
+                    } else {
+                        true
+                    }
+                }
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::None, ButtonPressType::Short)
+        );
+    }
+
+    #[test]
+    fn one_short_ten_none() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
+                ButtonType::One => {
+                    if current_delay >= 250 {
+                        false
+                    } else {
+                        true
+                    }
+                }
+                ButtonType::Ten => false,
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Short, ButtonPressType::None)
+        );
+    }
+
+    #[test]
+    fn both_long() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_bt: ButtonType, current_delay: u32| {
+                if current_delay >= 1500 {
+                    false
+                } else {
+                    true
+                }
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Long, ButtonPressType::Long)
+        );
+    }
+
+    #[test]
+    fn both_long_when_infinitely_pressed() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_bt: ButtonType, _current_delay: u32| true,
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Long, ButtonPressType::Long)
+        );
+    }
+
+    #[test]
+    fn one_none_ten_long() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
+                ButtonType::One => false,
+                ButtonType::Ten => true,
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::None, ButtonPressType::Long)
+        );
+    }
+
+    #[test]
+    fn one_short_ten_long() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
+                ButtonType::One => {
+                    if current_delay >= 250 {
+                        false
+                    } else {
+                        true
+                    }
+                }
+                ButtonType::Ten => true,
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Short, ButtonPressType::Long)
+        );
+    }
+
+    #[test]
+    fn one_long_ten_none() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
+                ButtonType::One => true,
+                ButtonType::Ten => false,
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Long, ButtonPressType::None)
+        );
+    }
+
+    #[test]
+    fn one_long_ten_short() {
+        let mut mock_data = MockData {
+            is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
+                ButtonType::One => true,
+                ButtonType::Ten => {
+                    if current_delay >= 250 {
+                        false
+                    } else {
+                        true
+                    }
+                }
+            },
+            current_delay: 0,
+        };
+
+        assert_eq!(
+            get_buttons(&mut mock_data).interrupt(),
+            (ButtonPressType::Long, ButtonPressType::Short)
+        );
     }
 }
