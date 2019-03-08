@@ -1,12 +1,12 @@
 /// Represents Time in hours, minutes and seconds. Max value is 24 hours.
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialOrd, PartialEq)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,
     pub seconds: u8,
 }
 
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, Default, PartialOrd, PartialEq)]
 pub struct BCDTime {
     pub hours: u8,
     pub hours_tens: u8,
@@ -62,29 +62,6 @@ impl Time {
     /// Creates time from hours.
     pub fn from_hours(hours: u32) -> Self {
         Time::from_minutes(hours * 60)
-    }
-}
-
-impl Default for Time {
-    fn default() -> Self {
-        Time {
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-        }
-    }
-}
-
-impl Default for BCDTime {
-    fn default() -> Self {
-        BCDTime {
-            hours_tens: 0,
-            hours: 0,
-            minutes_tens: 0,
-            minutes: 0,
-            seconds_tens: 0,
-            seconds: 0,
-        }
     }
 }
 

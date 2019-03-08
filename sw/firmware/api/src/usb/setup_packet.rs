@@ -1,8 +1,13 @@
+/// Indicates direction of the USB request.
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum RequestDirection {
+    /// Host is requesting device.
     HostToDevice,
+    /// Device is querying host.
     DeviceToHost,
 }
 
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum RequestKind {
     Standard,
     Class,
@@ -10,6 +15,7 @@ pub enum RequestKind {
     Reserved,
 }
 
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum RequestRecipient {
     Device,
     Interface,
@@ -18,8 +24,9 @@ pub enum RequestRecipient {
     Reserved,
 }
 
+/// Description of the request.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum Request {
     GetStatus = 0x00,
     ClearFeature = 0x01,
@@ -35,6 +42,7 @@ pub enum Request {
     SynchFrame = 0x0C,
 }
 
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct SetupPacket {
     pub request: Request,
     pub dir: RequestDirection,
@@ -94,5 +102,58 @@ impl From<(u16, u16, u16, u16)> for SetupPacket {
             index,
             length: data_length,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_to_device_request() {
+        assert_eq!(
+            SetupPacket::from((0x0000, 1, 2, 3)),
+            SetupPacket {
+                request: Request::GetStatus,
+                dir: RequestDirection::HostToDevice,
+                kind: RequestKind::Standard,
+                recipient: RequestRecipient::Device,
+                value: 1,
+                index: 2,
+                length: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn device_to_host_request() {
+        assert_eq!(
+            SetupPacket::from((0x0082, 1, 2, 3)),
+            SetupPacket {
+                request: Request::GetStatus,
+                dir: RequestDirection::DeviceToHost,
+                kind: RequestKind::Standard,
+                recipient: RequestRecipient::Endpoint,
+                value: 1,
+                index: 2,
+                length: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn get_descriptor_request() {
+        assert_eq!(
+            SetupPacket::from((0x0600, 1, 2, 3)),
+            SetupPacket {
+                request: Request::GetDescriptor,
+                dir: RequestDirection::HostToDevice,
+                kind: RequestKind::Standard,
+                recipient: RequestRecipient::Device,
+                value: 1,
+                index: 2,
+                length: 3,
+            }
+        );
     }
 }
