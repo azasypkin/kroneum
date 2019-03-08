@@ -6,10 +6,10 @@ mod setup_packet;
 use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
-pub use command_packet::CommandPacket;
-use descriptors::*;
-use pma::PacketMemoryArea;
-use setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
+pub use self::command_packet::CommandPacket;
+use self::descriptors::*;
+use self::pma::PacketMemoryArea;
+use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
 
 #[derive(Copy, Clone)]
 enum EndpointType {
