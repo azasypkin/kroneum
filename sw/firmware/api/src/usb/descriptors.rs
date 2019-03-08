@@ -154,11 +154,7 @@ mod tests {
 
     #[test]
     fn descriptors_with_correct_length() {
-        let descriptors: [&[u8]; 3] = [
-            &LANG_ID_DESCRIPTOR,
-            &DEV_DESC,
-            &HID_DESC,
-        ];
+        let descriptors: [&[u8]; 3] = [&LANG_ID_DESCRIPTOR, &DEV_DESC, &HID_DESC];
 
         for descriptor in descriptors.iter() {
             assert_eq!(descriptor[0], descriptor.len() as u8);

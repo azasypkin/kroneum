@@ -27,7 +27,7 @@ impl<'a> USB<'a> {
     pub fn new(p: &'a mut Peripherals, state: &'a mut UsbState) -> Self {
         USB {
             p,
-            pma: PacketMemoryArea {},
+            pma: PacketMemoryArea::default(),
             state,
         }
     }

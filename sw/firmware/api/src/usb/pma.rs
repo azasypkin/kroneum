@@ -105,18 +105,139 @@ impl PacketMemoryAreaAccessor {
 }
 
 #[repr(C)]
-pub struct PacketMemoryArea {}
+pub struct PacketMemoryArea {
+    pub base_address: usize,
+}
 
 impl PacketMemoryArea {
     #[doc = r" Returns a pointer to the register block"]
-    pub fn ptr() -> *const PacketMemoryAreaAccessor {
-        BTABLE_ADDRESS as *const _
+    pub fn ptr(base_address: usize) -> *const PacketMemoryAreaAccessor {
+        base_address as *const _
+    }
+}
+
+impl Default for PacketMemoryArea {
+    fn default() -> Self {
+        PacketMemoryArea {
+            base_address: BTABLE_ADDRESS,
+        }
     }
 }
 
 impl Deref for PacketMemoryArea {
     type Target = PacketMemoryAreaAccessor;
     fn deref(&self) -> &PacketMemoryAreaAccessor {
-        unsafe { &*PacketMemoryArea::ptr() }
+        unsafe { &*PacketMemoryArea::ptr(self.base_address) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn correctly_initializes() {
+        let sandbox: [u16; 256] = [555; 256];
+        let sandbox_address: usize = &sandbox as *const _ as usize;
+        let pma = PacketMemoryArea {
+            base_address: sandbox_address,
+        };
+
+        pma.init();
+
+        assert_eq!(sandbox[0], CONTROL_IN_PMA_ADDRESS);
+        assert_eq!(sandbox[2], CONTROL_OUT_PMA_ADDRESS);
+        assert_eq!(pma.get_rx_count(EndpointType::Control), 0);
+        assert_eq!(pma.get_tx_count(EndpointType::Control), 0);
+
+        assert_eq!(sandbox[4], DEVICE_IN_PMA_ADDRESS);
+        assert_eq!(sandbox[6], DEVICE_OUT_PMA_ADDRESS);
+        assert_eq!(pma.get_rx_count(EndpointType::Device), 0);
+        assert_eq!(pma.get_tx_count(EndpointType::Device), 0);
+    }
+
+    #[test]
+    fn correctly_sets_count() {
+        let sandbox: [u16; 256] = [555; 256];
+        let sandbox_address: usize = &sandbox as *const _ as usize;
+        let pma = PacketMemoryArea {
+            base_address: sandbox_address,
+        };
+
+        pma.init();
+
+        pma.set_tx_count(EndpointType::Control, 1);
+        pma.set_rx_count(EndpointType::Control, 2);
+        pma.set_tx_count(EndpointType::Device, 3);
+        pma.set_rx_count(EndpointType::Device, 4);
+
+        assert_eq!(1, pma.get_tx_count(EndpointType::Control));
+        assert_eq!(1, sandbox[1]);
+        assert_eq!(2, pma.get_rx_count(EndpointType::Control));
+        assert_eq!(2, sandbox[3] & 0x00ff);
+
+        assert_eq!(3, pma.get_tx_count(EndpointType::Device));
+        assert_eq!(3, sandbox[5]);
+        assert_eq!(4, pma.get_rx_count(EndpointType::Device));
+        assert_eq!(4, sandbox[7] & 0x00ff);
+    }
+
+    #[test]
+    fn correctly_reads_data() {
+        let mut sandbox: [u16; 256] = [555; 256];
+        let sandbox_address: usize = &sandbox as *const _ as usize;
+        let pma = PacketMemoryArea {
+            base_address: sandbox_address,
+        };
+
+        pma.init();
+
+        sandbox[(CONTROL_OUT_PMA_ADDRESS >> 1) as usize] = 1;
+        sandbox[(CONTROL_OUT_PMA_ADDRESS >> 1) as usize + 1] = 2;
+        sandbox[(CONTROL_OUT_PMA_ADDRESS >> 1) as usize + 2] = 3;
+        sandbox[(CONTROL_OUT_PMA_ADDRESS >> 1) as usize + 3] = 4;
+
+        sandbox[(DEVICE_OUT_PMA_ADDRESS >> 1) as usize] = 5;
+        sandbox[(DEVICE_OUT_PMA_ADDRESS >> 1) as usize + 1] = 6;
+        sandbox[(DEVICE_OUT_PMA_ADDRESS >> 1) as usize + 2] = 7;
+        sandbox[(DEVICE_OUT_PMA_ADDRESS >> 1) as usize + 3] = 8;
+
+        assert_eq!(
+            [1, 2, 3, 4, 5, 6, 7, 8],
+            [
+                pma.read(EndpointType::Control, 0),
+                pma.read(EndpointType::Control, 2),
+                pma.read(EndpointType::Control, 4),
+                pma.read(EndpointType::Control, 6),
+                pma.read(EndpointType::Device, 0),
+                pma.read(EndpointType::Device, 2),
+                pma.read(EndpointType::Device, 4),
+                pma.read(EndpointType::Device, 6),
+            ]
+        );
+    }
+
+    #[test]
+    fn correctly_writes_data() {
+        let sandbox: [u16; 256] = [555; 256];
+        let sandbox_address: usize = &sandbox as *const _ as usize;
+        let pma = PacketMemoryArea {
+            base_address: sandbox_address,
+        };
+
+        pma.init();
+
+        pma.write(EndpointType::Control, &[1, 2, 3, 4]);
+        pma.write(EndpointType::Device, &[5, 6, 7, 8]);
+
+        assert_eq!(
+            [1 | (2 << 8), 3 | (4 << 8), 5 | (6 << 8), 7 | (8 << 8)],
+            [
+                sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize],
+                sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize + 1],
+                sandbox[(DEVICE_IN_PMA_ADDRESS >> 1) as usize],
+                sandbox[(DEVICE_IN_PMA_ADDRESS >> 1) as usize + 1]
+            ]
+        );
     }
 }
