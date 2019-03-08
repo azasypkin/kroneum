@@ -1,11 +1,10 @@
-use crate::{
-    beeper, buttons, rtc,
-    usb::{UsbState, USB},
-    Peripherals,
-};
+use crate::{beeper, buttons, rtc, usb::USB, Peripherals};
 
 use kroneum_api::{
-    beeper::Melody, buttons::ButtonPressType, time::Time, usb::command_packet::CommandPacket,
+    beeper::Melody,
+    buttons::ButtonPressType,
+    time::Time,
+    usb::{command_packet::CommandPacket, UsbState},
 };
 
 #[derive(Debug, Copy, Clone)]

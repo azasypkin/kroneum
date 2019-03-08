@@ -1,85 +1,13 @@
-pub mod pma;
-
 use crate::Peripherals;
 use stm32f0x2::Interrupt;
 
-use self::pma::PacketMemoryArea;
 use kroneum_api::usb::{
     command_packet::CommandPacket,
     descriptors::*,
+    pma::PacketMemoryArea,
     setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket},
+    ControlEndpointStatus, DeviceStatus, EndpointStatus, EndpointType, UsbState,
 };
-
-#[derive(Copy, Clone)]
-enum EndpointType {
-    Control = 0b0,
-    Device = 0b1,
-}
-
-#[derive(Copy, Clone)]
-enum EndpointStatus {
-    Disabled = 0b0,
-    Stall = 0b01,
-    Nak = 0b10,
-    Valid = 0b11,
-}
-
-#[derive(Copy, Clone)]
-enum DeviceStatus {
-    // USB isn't started.
-    None,
-    // Device is starting, or has disconnected.
-    Default,
-    // We've received an address from the host.
-    Addressed,
-    // Enumeration is complete, we can talk to the host.
-    Configured,
-    // Device is suspended.
-    Suspended,
-    // Synthetic status for the woken up device,
-    WokenUp,
-}
-
-// The possible statuses for the control endpoint.
-#[derive(Copy, Clone)]
-enum ControlEndpointStatus {
-    Idle,
-    Setup(u16),
-    DataIn,
-    DataOut,
-    StatusIn,
-    StatusOut,
-    Stall,
-}
-
-#[derive(Copy, Clone)]
-pub struct UsbState {
-    device_status: DeviceStatus,
-    suspended_device_status: Option<DeviceStatus>,
-    control_endpoint_status: ControlEndpointStatus,
-    setup_data_length: u16,
-    address: u8,
-    configuration_index: u8,
-    protocol: u8,
-    idle_state: u8,
-    alt_setting: u8,
-}
-
-impl Default for UsbState {
-    fn default() -> Self {
-        UsbState {
-            device_status: DeviceStatus::None,
-            suspended_device_status: None,
-            control_endpoint_status: ControlEndpointStatus::Idle,
-            setup_data_length: 0,
-            address: 0,
-            configuration_index: 0,
-            protocol: 0,
-            idle_state: 0,
-            alt_setting: 0,
-        }
-    }
-}
 
 /*
  * These are the USB device strings in the format required for a USB string descriptor.
