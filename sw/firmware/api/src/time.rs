@@ -6,6 +6,15 @@ pub struct Time {
     pub seconds: u8,
 }
 
+pub struct BCDTime {
+    pub hours: u8,
+    pub hours_tens: u8,
+    pub minutes: u8,
+    pub minutes_tens: u8,
+    pub seconds: u8,
+    pub seconds_tens: u8,
+}
+
 impl Time {
     /// Adds specified number of seconds to the current time, updates minutes and hours if needed.
     pub fn add_seconds(&mut self, seconds: u32) {
@@ -64,6 +73,29 @@ impl Default for Time {
             seconds: 0,
             minutes: 0,
             hours: 0,
+        }
+    }
+}
+
+impl From<&BCDTime> for Time {
+    fn from(bcd_time: &BCDTime) -> Self {
+        Time {
+            hours: bcd_time.hours_tens * 10 + bcd_time.hours,
+            minutes: bcd_time.minutes_tens * 10 + bcd_time.minutes,
+            seconds: bcd_time.seconds_tens * 10 + bcd_time.seconds,
+        }
+    }
+}
+
+impl From<&Time> for BCDTime {
+    fn from(time: &Time) -> Self {
+        BCDTime {
+            hours_tens: time.hours / 10,
+            hours: time.hours % 10,
+            minutes_tens: time.minutes / 10,
+            minutes: time.minutes % 10,
+            seconds_tens: time.seconds / 10,
+            seconds: time.seconds % 10,
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::Peripherals;
-use kroneum_api::time::Time;
+use kroneum_api::time::{BCDTime, Time};
 use stm32f0x2::Interrupt;
 
 pub struct RTC<'a> {
@@ -83,13 +83,15 @@ impl<'a> RTC<'a> {
         while self.p.device.RTC.isr.read().alrawf().bit_is_clear() {}
 
         self.p.device.RTC.alrmar.modify(|_, w| {
+            let bcd_time: BCDTime = time.into();
+
             unsafe {
-                w.ht().bits(time.hours / 10);
-                w.hu().bits(time.hours % 10);
-                w.mnt().bits(time.minutes / 10);
-                w.mnu().bits(time.minutes % 10);
-                w.st().bits(time.seconds / 10);
-                w.su().bits(time.seconds % 10);
+                w.ht().bits(bcd_time.hours_tens);
+                w.hu().bits(bcd_time.hours);
+                w.mnt().bits(bcd_time.minutes_tens);
+                w.mnu().bits(bcd_time.minutes);
+                w.st().bits(bcd_time.seconds_tens);
+                w.su().bits(bcd_time.seconds);
             }
 
             // Seconds, minutes and hours matter, but not day.
@@ -156,13 +158,15 @@ impl<'a> RTC<'a> {
 
         // Configure Time register.
         self.p.device.RTC.tr.modify(|_, w| {
+            let bcd_time: BCDTime = time.into();
+
             unsafe {
-                w.ht().bits(time.hours / 10);
-                w.hu().bits(time.hours % 10);
-                w.mnt().bits(time.minutes / 10);
-                w.mnu().bits(time.minutes % 10);
-                w.st().bits(time.seconds / 10);
-                w.su().bits(time.seconds % 10);
+                w.ht().bits(bcd_time.hours_tens);
+                w.hu().bits(bcd_time.hours);
+                w.mnt().bits(bcd_time.minutes_tens);
+                w.mnu().bits(bcd_time.minutes);
+                w.st().bits(bcd_time.seconds_tens);
+                w.su().bits(bcd_time.seconds);
             }
 
             w
@@ -179,20 +183,26 @@ impl<'a> RTC<'a> {
     pub fn get_alarm(&self) -> Time {
         let reg = self.p.device.RTC.alrmar.read();
 
-        Time {
-            hours: reg.ht().bits() * 10 + reg.hu().bits(),
-            minutes: reg.mnt().bits() * 10 + reg.mnu().bits(),
-            seconds: reg.st().bits() * 10 + reg.su().bits(),
-        }
+        Time::from(&BCDTime {
+            hours_tens: reg.ht().bits(),
+            hours: reg.hu().bits(),
+            minutes_tens: reg.mnt().bits(),
+            minutes: reg.mnu().bits(),
+            seconds_tens: reg.st().bits(),
+            seconds: reg.su().bits(),
+        })
     }
 
     pub fn get_time(&self) -> Time {
         let reg = self.p.device.RTC.tr.read();
 
-        Time {
-            hours: reg.ht().bits() * 10 + reg.hu().bits(),
-            minutes: reg.mnt().bits() * 10 + reg.mnu().bits(),
-            seconds: reg.st().bits() * 10 + reg.su().bits(),
-        }
+        Time::from(&BCDTime {
+            hours_tens: reg.ht().bits(),
+            hours: reg.hu().bits(),
+            minutes_tens: reg.mnt().bits(),
+            minutes: reg.mnu().bits(),
+            seconds_tens: reg.st().bits(),
+            seconds: reg.su().bits(),
+        })
     }
 }
