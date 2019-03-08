@@ -1,68 +1,6 @@
 use crate::Peripherals;
+use kroneum_api::time::Time;
 use stm32f0x2::Interrupt;
-
-#[derive(Debug, Copy, Clone)]
-pub struct Time {
-    pub hours: u8,
-    pub minutes: u8,
-    pub seconds: u8,
-}
-
-impl Time {
-    pub fn add_seconds(&mut self, seconds: u32) {
-        let new_value = seconds + self.seconds as u32;
-
-        if new_value >= 60 {
-            self.seconds = (new_value % 60) as u8;
-            self.add_minutes(new_value / 60);
-        } else {
-            self.seconds = new_value as u8;
-        }
-    }
-
-    pub fn add_minutes(&mut self, minutes: u32) {
-        let new_value = minutes + self.minutes as u32;
-
-        if new_value >= 60 {
-            self.minutes = (new_value % 60) as u8;
-            self.add_hours((new_value / 60) as u8);
-        } else {
-            self.minutes = new_value as u8;
-        }
-    }
-
-    pub fn add_hours(&mut self, hours: u8) {
-        self.hours += hours;
-
-        if self.hours >= 24 {
-            self.hours -= 24;
-        }
-    }
-
-    pub fn from_seconds(seconds: u32) -> Self {
-        let mut time = Time::default();
-        time.add_seconds(seconds);
-        time
-    }
-
-    pub fn from_minutes(minutes: u32) -> Self {
-        Time::from_seconds(minutes * 60)
-    }
-
-    pub fn from_hours(hours: u8) -> Self {
-        Time::from_minutes((hours * 60) as u32)
-    }
-}
-
-impl Default for Time {
-    fn default() -> Self {
-        Time {
-            seconds: 0,
-            minutes: 0,
-            hours: 0,
-        }
-    }
-}
 
 pub struct RTC<'a> {
     p: &'a mut Peripherals,

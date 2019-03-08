@@ -1,4 +1,4 @@
-use crate::rtc::Time;
+use kroneum_api::time::Time;
 
 pub enum CommandPacket {
     Unknown,

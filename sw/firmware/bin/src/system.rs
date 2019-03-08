@@ -1,11 +1,11 @@
 use crate::{
     beeper, buttons,
-    rtc::{Time, RTC},
+    rtc::RTC,
     usb::{CommandPacket, UsbState, USB},
     Peripherals,
 };
 
-use kroneum_api::{beeper::Melody, buttons::ButtonPressType};
+use kroneum_api::{beeper::Melody, buttons::ButtonPressType, time::Time};
 
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
