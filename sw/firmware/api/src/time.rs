@@ -1,11 +1,12 @@
 /// Represents Time in hours, minutes and seconds. Max value is 24 hours.
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub struct Time {
     pub hours: u8,
     pub minutes: u8,
     pub seconds: u8,
 }
 
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct BCDTime {
     pub hours: u8,
     pub hours_tens: u8,
@@ -239,6 +240,44 @@ mod tests {
                 minutes: 0,
                 seconds: 0,
             }
+        );
+    }
+
+    #[test]
+    fn from_bcd() {
+        assert_eq!(
+            Time::from(&BCDTime {
+                hours_tens: 1,
+                hours: 3,
+                minutes_tens: 3,
+                minutes: 4,
+                seconds_tens: 5,
+                seconds: 1,
+            }),
+            Time {
+                hours: 13,
+                minutes: 34,
+                seconds: 51,
+            },
+        );
+    }
+
+    #[test]
+    fn to_bcd() {
+        assert_eq!(
+            BCDTime::from(&Time {
+                hours: 13,
+                minutes: 34,
+                seconds: 51,
+            }),
+            BCDTime {
+                hours_tens: 1,
+                hours: 3,
+                minutes_tens: 3,
+                minutes: 4,
+                seconds_tens: 5,
+                seconds: 1,
+            },
         );
     }
 }
