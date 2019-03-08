@@ -122,3 +122,48 @@ pub const REPORT_DESC: [u8; 32] = [
     0x91, 0x82, //   OUTPUT (Data,Var,Abs,Vol)
     0xc0, // END_COLLECTION
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_descriptors_well_formed() {
+        let strings: [&[u8]; 5] = [
+            &MANUFACTURER_STR,
+            &PRODUCT_STR,
+            &SERIAL_NUMBER_STR,
+            &CONF_STR,
+            &INTERFACE_STR,
+        ];
+
+        for string in strings.iter() {
+            assert_eq!(string[0], string.len() as u8);
+            assert_eq!(string[1], 0x3);
+            // Chars should be NULL terminated.
+            assert_eq!(
+                // Skip first two control bytes, the rest is the string content itself.
+                string[2..]
+                    .iter()
+                    .enumerate()
+                    .any(|(index, val)| { index % 2 != 0 && *val != 0 }),
+                false
+            )
+        }
+    }
+
+    #[test]
+    fn descriptors_with_correct_length() {
+        let descriptors: [&[u8]; 3] = [
+            &LANG_ID_DESCRIPTOR,
+            &DEV_DESC,
+            &HID_DESC,
+        ];
+
+        for descriptor in descriptors.iter() {
+            assert_eq!(descriptor[0], descriptor.len() as u8);
+        }
+
+        assert_eq!(CONF_DESC[2], CONF_DESC.len() as u8);
+    }
+}
