@@ -68,9 +68,22 @@ impl Time {
 impl Default for Time {
     fn default() -> Self {
         Time {
-            seconds: 0,
-            minutes: 0,
             hours: 0,
+            minutes: 0,
+            seconds: 0,
+        }
+    }
+}
+
+impl Default for BCDTime {
+    fn default() -> Self {
+        BCDTime {
+            hours_tens: 0,
+            hours: 0,
+            minutes_tens: 0,
+            minutes: 0,
+            seconds_tens: 0,
+            seconds: 0,
         }
     }
 }
@@ -104,11 +117,7 @@ mod tests {
 
     #[test]
     fn add_seconds() {
-        let mut time = Time {
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-        };
+        let mut time = Time::default();
 
         time.add_seconds(10);
         assert_eq!(time, Time::from_seconds(10));
@@ -122,11 +131,7 @@ mod tests {
 
     #[test]
     fn add_minutes() {
-        let mut time = Time {
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-        };
+        let mut time = Time::default();
 
         time.add_minutes(10);
         assert_eq!(time, Time::from_minutes(10));
@@ -140,11 +145,7 @@ mod tests {
 
     #[test]
     fn add_hours() {
-        let mut time = Time {
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-        };
+        let mut time = Time::default();
 
         time.add_hours(2);
         assert_eq!(time, Time::from_hours(2));
