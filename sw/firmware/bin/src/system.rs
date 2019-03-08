@@ -1,6 +1,5 @@
 use crate::{
-    beeper, buttons,
-    rtc::RTC,
+    beeper, buttons, rtc,
     usb::{CommandPacket, UsbState, USB},
     Peripherals,
 };
@@ -83,10 +82,10 @@ impl<'a> System<'a> {
             SystemMode::Alarm(time) => {
                 beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup));
 
-                RTC::acquire(&mut self.p, |mut rtc| {
-                    rtc.setup();
-                    rtc.configure_time(&Time::default());
-                    rtc.configure_alarm(&time);
+                rtc::setup(&mut self.p);
+                rtc::acquire(&mut self.p, |rtc| {
+                    rtc.set_time(&Time::default());
+                    rtc.set_alarm(&time);
                 });
             }
             _ => {}
@@ -98,7 +97,7 @@ impl<'a> System<'a> {
     pub fn on_rtc_alarm(&mut self) {
         beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Alarm));
 
-        RTC::acquire(&mut self.p, |mut rtc| rtc.teardown());
+        rtc::teardown(&mut self.p);
 
         self.set_mode(SystemMode::Idle);
     }
@@ -109,14 +108,14 @@ impl<'a> System<'a> {
                 if let CommandPacket::Beep(num) = command_packet {
                     beeper::acquire(p, |beeper| beeper.beep_n(num));
                 } else if let CommandPacket::SetAlarm(time) = command_packet {
-                    RTC::acquire(p, |mut rtc| {
-                        rtc.setup();
-                        rtc.configure_time(&Time::default());
-                        rtc.configure_alarm(&time);
+                    rtc::setup(p);
+                    rtc::acquire(p, |rtc| {
+                        rtc.set_time(&Time::default());
+                        rtc.set_alarm(&time);
                     });
                 } else if let CommandPacket::GetAlarm = command_packet {
                     beeper::acquire(p, |beeper| beeper.beep());
-                    let alarm = RTC::acquire(p, |rtc| rtc.get_alarm());
+                    let alarm = rtc::acquire(p, |rtc| rtc.get_alarm());
                     return Some([alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
                 }
 
