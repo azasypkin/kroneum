@@ -148,12 +148,12 @@ mod tests {
         assert_eq!(sandbox[0], CONTROL_IN_PMA_ADDRESS);
         assert_eq!(sandbox[2], CONTROL_OUT_PMA_ADDRESS);
         assert_eq!(pma.get_rx_count(EndpointType::Control), 0);
-        assert_eq!(pma.get_tx_count(EndpointType::Control), 0);
+        assert_eq!(pma._get_tx_count(EndpointType::Control), 0);
 
         assert_eq!(sandbox[4], DEVICE_IN_PMA_ADDRESS);
         assert_eq!(sandbox[6], DEVICE_OUT_PMA_ADDRESS);
         assert_eq!(pma.get_rx_count(EndpointType::Device), 0);
-        assert_eq!(pma.get_tx_count(EndpointType::Device), 0);
+        assert_eq!(pma._get_tx_count(EndpointType::Device), 0);
     }
 
     #[test]
@@ -171,12 +171,12 @@ mod tests {
         pma.set_tx_count(EndpointType::Device, 3);
         pma.set_rx_count(EndpointType::Device, 4);
 
-        assert_eq!(1, pma.get_tx_count(EndpointType::Control));
+        assert_eq!(1, pma._get_tx_count(EndpointType::Control));
         assert_eq!(1, sandbox[1]);
         assert_eq!(2, pma.get_rx_count(EndpointType::Control));
         assert_eq!(2, sandbox[3] & 0x00ff);
 
-        assert_eq!(3, pma.get_tx_count(EndpointType::Device));
+        assert_eq!(3, pma._get_tx_count(EndpointType::Device));
         assert_eq!(3, sandbox[5]);
         assert_eq!(4, pma.get_rx_count(EndpointType::Device));
         assert_eq!(4, sandbox[7] & 0x00ff);

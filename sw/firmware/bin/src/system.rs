@@ -60,9 +60,12 @@ impl<'a> System<'a> {
 
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.stop());
                 usb::teardown(&mut self.p);
+                rtc::teardown(&mut self.p);
 
-                // If we are exiting `Config` mode let's play special signal.
+                // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
+                    beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
+                } else if let SystemMode::Alarm(_) = self.state.mode {
                     beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
                 }
             }
@@ -98,7 +101,8 @@ impl<'a> System<'a> {
 
         rtc::teardown(&mut self.p);
 
-        self.set_mode(SystemMode::Idle);
+        // Snooze alarm for 10 seconds.
+        self.set_mode(SystemMode::Alarm(Time::from_seconds(10)));
     }
 
     pub fn on_usb_packet(&mut self) {
@@ -137,13 +141,12 @@ impl<'a> System<'a> {
 
         match (self.state.mode.clone(), button_i, button_x) {
             (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
-                self.set_mode(SystemMode::Setup(0));
-
                 let (button_i, button_x) =
                     buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
 
                 match (mode, button_i, button_x) {
-                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long) => {
+                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
+                    | (SystemMode::Alarm(_), ButtonPressType::Long, ButtonPressType::Long) => {
                         self.set_mode(SystemMode::Idle)
                     }
                     (_, ButtonPressType::Long, ButtonPressType::Long) => {
