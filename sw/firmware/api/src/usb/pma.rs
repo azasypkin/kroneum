@@ -36,7 +36,7 @@ impl PacketMemoryAreaAccessor {
         return self.set_u16((endpoint as usize) * 8, address);
     }
 
-    pub fn get_tx_count(&self, endpoint: EndpointType) -> u16 {
+    pub fn _get_tx_count(&self, endpoint: EndpointType) -> u16 {
         return self.get_u16((endpoint as usize) * 8 + 2);
     }
 

@@ -1,7 +1,7 @@
 pub mod command_packet;
-pub mod descriptors;
-pub mod pma;
-pub mod setup_packet;
+mod descriptors;
+mod pma;
+mod setup_packet;
 
 use self::command_packet::CommandPacket;
 use self::descriptors::*;
@@ -389,19 +389,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
                 _ => panic!("Unknown endpoint"),
             };
 
-            if endpoint_address & 0x80 == 0x80 {
-                self.hw.set_endpoint_status(
-                    endpoint,
-                    EndpointDirection::Transmit,
-                    EndpointStatus::Stall,
-                );
+            let direction = if endpoint_address & 0x80 == 0x80 {
+                EndpointDirection::Transmit
             } else {
-                self.hw.set_endpoint_status(
-                    endpoint,
-                    EndpointDirection::Receive,
-                    EndpointStatus::Stall,
-                );
-            }
+                EndpointDirection::Receive
+            };
+
+            self.hw
+                .set_endpoint_status(endpoint, direction, EndpointStatus::Stall);
         }
     }
 
@@ -413,19 +408,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
             _ => panic!("Unknown endpoint"),
         };
 
-        if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {
-            self.hw.set_endpoint_status(
-                endpoint,
-                EndpointDirection::Transmit,
-                EndpointStatus::Stall,
-            );
-        } else if endpoint_address & 0x80 == 0x0 {
-            self.hw.set_endpoint_status(
-                endpoint,
-                EndpointDirection::Receive,
-                EndpointStatus::Stall,
-            );
-        }
+        let direction = if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {
+            EndpointDirection::Transmit
+        } else {
+            EndpointDirection::Receive
+        };
+
+        self.hw
+            .set_endpoint_status(endpoint, direction, EndpointStatus::Stall);
     }
 
     fn handle_endpoint_request(&mut self, request_header: SetupPacket) {

@@ -38,7 +38,7 @@ pub fn setup(p: &mut Peripherals) {
         .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
 }
 
-/*pub fn teardown(p: &mut Peripherals) {
+pub fn _teardown(p: &mut Peripherals) {
     p.core.NVIC.disable(Interrupt::EXTI0_1);
     p.core.NVIC.disable(Interrupt::EXTI2_3);
 
@@ -47,7 +47,7 @@ pub fn setup(p: &mut Peripherals) {
         .PWR
         .csr
         .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
-}*/
+}
 
 pub fn has_pending_interrupt(p: &DevicePeripherals) -> bool {
     let reg = p.EXTI.pr.read();
