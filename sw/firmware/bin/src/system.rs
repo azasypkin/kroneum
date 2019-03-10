@@ -1,4 +1,4 @@
-use crate::{beeper, buttons, rtc, usb::USB, Peripherals};
+use crate::{beeper, buttons, rtc, usb, Peripherals};
 
 use kroneum_api::{
     beeper::Melody,
@@ -58,9 +58,8 @@ impl<'a> System<'a> {
             SystemMode::Idle => {
                 self.toggle_standby_mode(true);
 
-                USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
-                    usb.teardown()
-                });
+                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.stop());
+                usb::teardown(&mut self.p);
 
                 // If we are exiting `Config` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
@@ -72,9 +71,8 @@ impl<'a> System<'a> {
 
                 self.toggle_standby_mode(false);
 
-                USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
-                    usb.setup()
-                });
+                usb::setup(&mut self.p);
+                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.start());
             }
             SystemMode::Setup(0) => {
                 beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup))
@@ -104,25 +102,30 @@ impl<'a> System<'a> {
     }
 
     pub fn on_usb_packet(&mut self) {
-        USB::acquire(&mut self.p, &mut self.state.usb_state, |mut usb| {
-            usb.interrupt(|p, command_packet| {
-                if let CommandPacket::Beep(num) = command_packet {
-                    beeper::acquire(p, |beeper| beeper.beep_n(num));
-                } else if let CommandPacket::SetAlarm(time) = command_packet {
-                    rtc::setup(p);
-                    rtc::acquire(p, |rtc| {
-                        rtc.set_time(&Time::default());
-                        rtc.set_alarm(&time);
-                    });
-                } else if let CommandPacket::GetAlarm = command_packet {
-                    beeper::acquire(p, |beeper| beeper.beep());
-                    let alarm = rtc::acquire(p, |rtc| rtc.get_alarm());
-                    return Some([alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
-                }
-
-                None
-            });
+        usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
+            usb.interrupt()
         });
+
+        if let Some(command_packet) = self.state.usb_state.command {
+            if let CommandPacket::Beep(num) = command_packet {
+                beeper::acquire(self.p, |beeper| beeper.beep_n(num));
+            } else if let CommandPacket::SetAlarm(time) = command_packet {
+                rtc::setup(self.p);
+                rtc::acquire(self.p, |rtc| {
+                    rtc.set_time(&Time::default());
+                    rtc.set_alarm(&time);
+                });
+            } else if let CommandPacket::GetAlarm = command_packet {
+                beeper::acquire(self.p, |beeper| beeper.beep());
+                let alarm = rtc::acquire(self.p, |rtc| rtc.get_alarm());
+
+                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
+                    usb.send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0])
+                });
+            }
+        }
+
+        self.state.usb_state.command = None;
     }
 
     pub fn on_button_press(&mut self) -> bool {

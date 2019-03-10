@@ -1,3 +1,11 @@
+/*
+ * These are the USB device strings in the format required for a USB string descriptor.
+ * To change these to suit your device you need only change the unicode string in the
+ * last line of each definition to suit your device. Then count up the bytes required for
+ * the complete descriptor and go back and insert that byte count in the array declaration
+ * in the configuration class.
+ */
+
 pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
     0x04, 0x03, // 4 (length)
     0x09, 0x04, // English - US

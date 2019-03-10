@@ -1,6 +1,6 @@
 use crate::time::Time;
 
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub enum CommandPacket {
     Unknown,
     Beep(u8),
