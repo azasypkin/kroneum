@@ -7,6 +7,7 @@ const QUARTER_NOTE: u32 = 300;
 const NOTE_FREQUENCIES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988];
 
 /// Defines a predefined melody to play.
+#[derive(Debug, Copy, Clone)]
 pub enum Melody {
     Alarm,
     Beep,

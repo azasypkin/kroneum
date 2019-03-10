@@ -11,7 +11,7 @@ use kroneum_api::{
 pub enum SystemMode {
     Idle,
     Setup(u32),
-    Alarm(Time),
+    Alarm(Time, Melody),
     Config,
 }
 
@@ -65,7 +65,7 @@ impl<'a> System<'a> {
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
                     beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
-                } else if let SystemMode::Alarm(_) = self.state.mode {
+                } else if let SystemMode::Alarm(_, _) = self.state.mode {
                     beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
                 }
             }
@@ -81,7 +81,7 @@ impl<'a> System<'a> {
                 beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup))
             }
             SystemMode::Setup(c) if *c > 0 => beeper::acquire(&mut self.p, |beeper| beeper.beep()),
-            SystemMode::Alarm(time) => {
+            SystemMode::Alarm(time, _) => {
                 beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup));
 
                 rtc::setup(&mut self.p);
@@ -97,12 +97,14 @@ impl<'a> System<'a> {
     }
 
     pub fn on_rtc_alarm(&mut self) {
-        beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Alarm));
+        if let SystemMode::Alarm(_, melody) = &self.state.mode {
+            beeper::acquire(&mut self.p, |beeper| beeper.play(*melody));
 
-        rtc::teardown(&mut self.p);
+            rtc::teardown(&mut self.p);
 
-        // Snooze alarm for 10 seconds.
-        self.set_mode(SystemMode::Alarm(Time::from_seconds(10)));
+            // Snooze alarm for 10 seconds.
+            self.set_mode(SystemMode::Alarm(Time::from_seconds(10), Melody::Beep));
+        }
     }
 
     pub fn on_usb_packet(&mut self) {
@@ -146,22 +148,22 @@ impl<'a> System<'a> {
 
                 match (mode, button_i, button_x) {
                     (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
-                    | (SystemMode::Alarm(_), ButtonPressType::Long, ButtonPressType::Long) => {
+                    | (SystemMode::Alarm(_, _), ButtonPressType::Long, ButtonPressType::Long) => {
                         self.set_mode(SystemMode::Idle)
                     }
                     (_, ButtonPressType::Long, ButtonPressType::Long) => {
                         self.set_mode(SystemMode::Config)
                     }
                     (SystemMode::Setup(counter), _, _) => {
-                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter)))
+                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
                     }
                     _ => {}
                 }
             }
             (SystemMode::Idle, ButtonPressType::Long, _)
             | (SystemMode::Idle, _, ButtonPressType::Long)
-            | (SystemMode::Alarm(_), ButtonPressType::Long, _)
-            | (SystemMode::Alarm(_), _, ButtonPressType::Long) => {
+            | (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
+            | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
                 self.set_mode(SystemMode::Setup(0))
             }
             (SystemMode::Setup(counter), ButtonPressType::Long, _)
@@ -171,7 +173,7 @@ impl<'a> System<'a> {
                     _ => Time::from_minutes(counter as u32),
                 };
 
-                self.set_mode(SystemMode::Alarm(time));
+                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             }
             (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
                 self.set_mode(SystemMode::Setup(counter + 1))
