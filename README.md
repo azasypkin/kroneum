@@ -1,9 +1,13 @@
 # 🕐 Kroneum
 
-**Kroneum** is an experimental, accessible (no GUI) and fully open source (both in code and hardware) time tracker device.
+------------------------
 
 **Disclaimer:** I needed a dumb, autonomous, configurable and GUI-less physical timer to better manage my own time during the day and that is how Kroneum was born. 
-Another goal was to see how well Rust fits into embedded development (basic interactions with MCU, USB HID and I2C drivers etc.).
+Another goal was to see how well Rust fits into embedded development (basic interactions with MCU, USB stack and I2C driver).
+
+------------------------
+
+**Kroneum** is an experimental, accessible (no GUI) and fully open source (both in code and hardware) time tracker device.
 
 There is neither GUI/LCD nor Wi-Fi/Bluetooth interface available, just two buttons one can use to configure the timer. More advanced users can use built-in USB functionality
 to configure device (via dedicated [CLI tool](./sw/cli)), upgrade firmware (via [DFU interface](./sw/firmware/README.md)) or upload various Krouneum "recipes" (e.g. to repurpose device completely).
