@@ -50,11 +50,9 @@ oversized because of that, but on the bright side hand soldering and [CNC engrav
 
 Enclosure was machined from 7mm Plexiglas, G-Code can be found [here](./hw/pcb/Rev_0.3/cnc).
 
-Rendered [PCB](./hw/pcb/Rev_0.3/demo/rendered.jpg) and [enclosure](./hw/enclosure/Rev_0.3/demo/rendered.png):
+#### Rendered vs machined [PCB](./hw/pcb/Rev_0.3/demo) and [enclosure](./hw/enclosure/Rev_0.3/demo):
 
-
-Machined [PCB](./hw/pcb/Rev_0.3/demo/cnc-manufactured.jpg) and [enclosure](./hw/enclosure/Rev_0.3/demo/cnc-manufactured.jpg):
-
+![enclosure](./hw/enclosure/Rev_0.3/demo/full.png)
 
 -.- .-. --- -. . ..- --
 
