@@ -8,6 +8,9 @@ cache:
   - "$HOME/.cargo"
   - "$TRAVIS_BUILD_DIR/target"
 
+before_install:
+  - sudo apt-get install -y libusb-dev libhidapi-dev
+
 before_script:
   - rustup target add thumbv6m-none-eabi
 
@@ -15,8 +18,8 @@ script:
 - cd sw/cli
 - cargo build
 - cd ../firmware
-- cargo build --release
-- cargo test --target x86_64-unknown-linux-gnu
+- cargo build --target thumbv6m-none-eabi --release
+- cargo test
 
 os:
 - linux
