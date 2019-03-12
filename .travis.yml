@@ -25,6 +25,7 @@ before_install:
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig pkg-config --list-all; fi
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig pkg-config --libs libusb-1.0; fi
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig pkg-config --modversion libusb-1.0; fi
+  - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then cd ..; fi
 
 before_script:
   - rustup target add thumbv6m-none-eabi
