@@ -35,7 +35,7 @@ script:
 - if [[ $TRAVIS_OS_NAME == 'osx' ]]; then cargo build; fi
 - cd ../firmware
 - cargo build --target thumbv6m-none-eabi --release
-- cargo test
+- cargo test --package kroneum-api
 
 notifications:
   email:
