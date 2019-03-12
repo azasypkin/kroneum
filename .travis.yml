@@ -9,7 +9,8 @@ cache:
   - "$TRAVIS_BUILD_DIR/target"
 
 before_install:
-  - sudo apt-get install -y libusb-dev libhidapi-dev
+  - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then sudo apt-get update -qq; fi
+  - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then sudo apt-get install -y libusb-1.0-0 libusb-dev libhidapi-dev; fi
 
 before_script:
   - rustup target add thumbv6m-none-eabi
