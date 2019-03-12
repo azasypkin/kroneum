@@ -1,5 +1,7 @@
 # 🕐 Kroneum
 
+[![Build Status](https://travis-ci.org/azasypkin/kroneum.svg?branch=master)](https://travis-ci.org/azasypkin/kroneum)
+
 **Disclaimer:** I needed a dumb, autonomous, configurable and GUI-less physical timer to better manage my own time during the day and that is how Kroneum was born. 
 Another goal was to see how well Rust fits into embedded development (basic interactions with MCU, USB stack and I2C driver).
 

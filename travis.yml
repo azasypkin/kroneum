@@ -1,0 +1,31 @@
+language: rust
+
+rust:
+- nightly
+
+cache:
+  directories:
+  - "$HOME/.cargo"
+  - "$TRAVIS_BUILD_DIR/target"
+
+before_script:
+  - rustup target add thumbv6m-none-eabi
+
+script:
+- cd sw/cli
+- cargo build
+- cd ../firmware
+- cargo build --release
+- cargo test --target x86_64-unknown-linux-gnu
+
+os:
+- linux
+- osx
+
+notifications:
+  email:
+    on_success: never
+
+branches:
+  only:
+  - master
