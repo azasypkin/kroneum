@@ -10,4 +10,4 @@ cortex-m-rt = { version = "0.6.7", optional = true }
 vcell = "0.1.0"
 
 [features]
-rt = ["cortex-m-rt/device", "cortex-m/inline-asm", "cortex-m/const-fn"]
+rt = ["cortex-m-rt/device"]
