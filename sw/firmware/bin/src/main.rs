@@ -124,7 +124,7 @@ fn init(p: &Peripherals) {
     p.device
         .SYSCFG
         .cfgr1
-        .modify(|_, w| w.pa11_pa12_rmp().set_bit().mem_mode().bits(0));
+        .modify(|_, w| w.pa11_pa12_rmp().set_bit().mem_mode().main_flash());
 
     // -----------Buttons----------------
 
@@ -132,7 +132,7 @@ fn init(p: &Peripherals) {
     p.device
         .SYSCFG
         .exticr1
-        .modify(|_, w| unsafe { w.exti0().bits(0).exti2().bits(0) });
+        .modify(|_, w| w.exti0().pa0().exti2().pa2());
 
     // Configure PA0/PA2 to trigger an interrupt event on the EXTI0/EXTI2 line on a rising edge.
     p.device
@@ -157,40 +157,38 @@ fn init(p: &Peripherals) {
 
     // Switch PA0 (button), PA2 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function
     // mode and PA1, PA3-6 to AIN to reduce power consumption.
-    let moder_af = 0b10;
-    let moder_ain = 0b11;
     p.device.GPIOA.moder.modify(|_, w| {
         w.moder0()
-            .bits(moder_af)
+            .alternate()
             .moder1()
-            .bits(moder_ain)
+            .analog()
             .moder2()
-            .bits(moder_af)
+            .alternate()
             .moder3()
-            .bits(moder_ain)
+            .analog()
             .moder4()
-            .bits(moder_ain)
+            .analog()
             .moder5()
-            .bits(moder_ain)
+            .analog()
             .moder6()
-            .bits(moder_ain)
+            .analog()
             .moder7()
-            .bits(moder_af)
+            .alternate()
             .moder11()
-            .bits(moder_af)
+            .alternate()
             .moder12()
-            .bits(moder_af)
+            .alternate()
     });
 
     // Enable AIN for GPIO B and F to reduce power consumption.
     p.device
         .GPIOB
         .moder
-        .modify(|_, w| w.moder1().bits(moder_ain).moder8().bits(moder_ain));
+        .modify(|_, w| w.moder1().analog().moder8().analog());
     p.device
         .GPIOF
         .moder
-        .modify(|_, w| w.moder0().bits(moder_ain).moder1().bits(moder_ain));
+        .modify(|_, w| w.moder0().analog().moder1().analog());
 
     p.device
         .RCC
@@ -198,41 +196,30 @@ fn init(p: &Peripherals) {
         .modify(|_, w| w.iopben().clear_bit().iopfen().clear_bit());
 
     // Enable pull-down for PA0 and PA2.
-    let enable_pull_down = 0b10;
-    p.device.GPIOA.pupdr.modify(|_, w| unsafe {
-        w.pupdr0()
-            .bits(enable_pull_down)
-            .pupdr2()
-            .bits(enable_pull_down)
-    });
+    p.device
+        .GPIOA
+        .pupdr
+        .modify(|_, w| w.pupdr0().pull_down().pupdr2().pull_down());
 
     // Set "high" output speed for PA7, PA11 and PA12.
-    let speed_high = 0b11;
     p.device.GPIOA.ospeedr.modify(|_, w| {
         w.ospeedr7()
-            .bits(speed_high)
+            .very_high_speed()
             .ospeedr11()
-            .bits(speed_high)
+            .very_high_speed()
             .ospeedr12()
-            .bits(speed_high)
+            .very_high_speed()
     });
 
     // Set alternative function #2 for PA0 (WKUP1), PA2 (WKUP4) and PA7 (TIM1_CH1N).
-    let af2_wkup = 0b0010;
-    let af2_tim1 = 0b0010;
-    p.device.GPIOA.afrl.modify(|_, w| {
-        w.afrl0()
-            .bits(af2_wkup)
-            .afrl2()
-            .bits(af2_wkup)
-            .afrl7()
-            .bits(af2_tim1)
-    });
+    p.device
+        .GPIOA
+        .afrl
+        .modify(|_, w| w.afrl0().af2().afrl2().af2().afrl7().af2());
 
     // Set alternative function #2 (USB) for PA11 and PA12.
-    let af2_usb = 0b0010;
     p.device
         .GPIOA
         .afrh
-        .modify(|_, w| w.afrh11().bits(af2_usb).afrh12().bits(af2_usb));
+        .modify(|_, w| w.afrh11().af2().afrh12().af2());
 }
