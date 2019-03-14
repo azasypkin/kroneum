@@ -69,16 +69,13 @@ $ dfu-util -U fw-from-device.bin -a 0 -d 0483:df11
 
 ## Notes
 
-1. Steps 1-2 above can be replaces with just `$ ./scripts/flash.sh`.
+1. Steps 1-2 above can be replaced with just `$ ./scripts/flash.sh`.
 
-2. SVD file can be downloaded from http://www.st.com/en/microcontrollers/stm32f051r8.html. Make sure that SVD
-does not contain any `bitWidth` that equals to `0` and generate Rust lib with `svd2rust`.
+2. If binary is too large GDB may fail so try to use `--release` flag with `cargo build`.
 
-3. If binary is too large GDB may fail so try to use `--release` flag with `cargo build`.
+3. To reload program on the MCU use `monitor reset halt`
 
-4. To reload program on the MCU use `monitor reset halt`
-
-5. RTC & Low Power modes: https://github.com/mattico/stm32f0-Discovery_Tools/blob/master/ST_Example_Projects/Projects/Peripheral_Examples/PWR_CurrentConsumption/stm32f0xx_lp_modes.c
+4. RTC & Low Power modes: https://github.com/mattico/stm32f0-Discovery_Tools/blob/master/ST_Example_Projects/Projects/Peripheral_Examples/PWR_CurrentConsumption/stm32f0xx_lp_modes.c
 
 
 ## Useful links
