@@ -116,11 +116,7 @@ impl<'a> System<'a> {
             if let CommandPacket::Beep(num) = command_packet {
                 beeper::acquire(self.p, |beeper| beeper.beep_n(num));
             } else if let CommandPacket::SetAlarm(time) = command_packet {
-                rtc::setup(self.p);
-                rtc::acquire(self.p, |rtc| {
-                    rtc.set_time(&Time::default());
-                    rtc.set_alarm(&time);
-                });
+                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::GetAlarm = command_packet {
                 beeper::acquire(self.p, |beeper| beeper.beep());
                 let alarm = rtc::acquire(self.p, |rtc| rtc.get_alarm());
