@@ -6,6 +6,25 @@ pub struct RTCHardwareImpl<'a> {
     p: &'a mut Peripherals,
 }
 
+impl<'a> RTCHardwareImpl<'a> {
+    /// Disables or enables write protection for RTC registers.
+    fn toggle_write_protection(&self, enable_write_protection: bool) {
+        let protection_keys: [u8; 2] = if enable_write_protection {
+            [0xFE, 0x64]
+        } else {
+            [0xCA, 0x53]
+        };
+
+        for key in &protection_keys {
+            self.p
+                .device
+                .RTC
+                .wpr
+                .write(|w| unsafe { w.key().bits(*key) });
+        }
+    }
+}
+
 impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     fn get_time(&self) -> BCDTime {
         let reg = self.p.device.RTC.tr.read();
@@ -32,9 +51,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     }
 
     fn set_time(&self, bcd_time: BCDTime) {
-        // Disable the write protection for RTC registers.
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0xCA) });
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0x53) });
+        self.toggle_write_protection(false);
 
         // Enable init phase and wait until it is allowed to modify RTC register values.
         self.p.device.RTC.isr.modify(|_, w| w.init().set_bit());
@@ -72,15 +89,11 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         // Disable init phase.
         self.p.device.RTC.isr.modify(|_, w| w.init().clear_bit());
 
-        // Enable the write protection for RTC registers.
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0xFE) });
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0x64) });
+        self.toggle_write_protection(true);
     }
 
     fn set_alarm(&mut self, bcd_time: BCDTime) {
-        // Disable the write protection for RTC registers.
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0xCA) });
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0x53) });
+        self.toggle_write_protection(false);
 
         // Disable alarm A to modify it.
         toggle_alarm(self.p, false);
@@ -118,9 +131,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         // Enable alarm A and alarm A interrupt.
         toggle_alarm(self.p, true);
 
-        // Enable the write protection for RTC registers.
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0xFE) });
-        self.p.device.RTC.wpr.write(|w| unsafe { w.bits(0x64) });
+        self.toggle_write_protection(true);
     }
 }
 
