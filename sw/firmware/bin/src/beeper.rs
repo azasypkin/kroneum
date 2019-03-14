@@ -33,19 +33,17 @@ fn setup(p: &DevicePeripherals) {
     p.RCC.apb2enr.modify(|_, w| w.tim1en().set_bit());
 
     // Set prescaler, the counter clock frequency (CK_CNT) is equal to f(CK_PSC) / (PSC[15:0] + 1).
-    p.TIM1.psc.modify(|_, w| unsafe { w.bits(0b0) });
+    p.TIM1.psc.reset();
 
     // Set direction: counter used as up-counter and clock division to t(DTS) = t(CK_INT).
-    p.TIM1
-        .cr1
-        .modify(|_, w| unsafe { w.dir().clear_bit().ckd().bits(0b00) });
+    p.TIM1.cr1.reset();
 
     // Compute the value to be set in ARR (auto-reload) register to generate signal frequency at 17.57 Khz.
     let timer_period: u32 = (kroneum_api::config::CLOCK_SPEED / 17_570) - 1;
     p.TIM1.arr.write(|w| unsafe { w.bits(timer_period) });
 
     // Set repetition counter.
-    p.TIM1.rcr.write(|w| unsafe { w.bits(0b0) });
+    p.TIM1.rcr.reset();
 
     // Enable PWM mode 2 - In up-counting, channel 1 is inactive as long as TIMx_CNT<TIMx_CCR1
     // else active. In down-counting, channel 1 is active as long as TIMx_CNT>TIMx_CCR1 else
