@@ -1,6 +1,6 @@
 use crate::{systick, DevicePeripherals, Peripherals};
 use kroneum_api::buttons;
-use stm32f0x2::Interrupt;
+use stm32f0::stm32f0x2::Interrupt;
 
 pub struct ButtonsHardwareImpl<'a> {
     p: &'a mut Peripherals,

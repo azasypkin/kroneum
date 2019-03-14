@@ -15,8 +15,11 @@ cortex-m-rt = "0.6.7"
 cortex-m-semihosting = "0.3.2"
 kroneum-api = { version = "0.1.0", path = "../api" }
 panic-semihosting = "0.5.1"
-stm32f0x2 = { version = "0.1.0", path = "../stm32f0x2" }
 vcell = "0.1.0"
+
+[dependencies.stm32f0]
+version = "0.6.0"
+features = ["stm32f0x2", "rt"]
 
 # this lets you use `cargo fix`!
 [[bin]]
@@ -25,5 +28,5 @@ test = false
 bench = false
 
 [features]
-default = ["stm32f0x2/rt", "nightly"]
+default = ["nightly"]
 nightly = ["cortex-m/inline-asm", "cortex-m/const-fn"]

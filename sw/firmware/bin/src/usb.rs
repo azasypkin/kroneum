@@ -1,5 +1,5 @@
 use crate::{DevicePeripherals, Peripherals};
-use stm32f0x2::Interrupt;
+use stm32f0::stm32f0x2::Interrupt;
 
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,

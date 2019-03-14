@@ -4,7 +4,6 @@ cargo-features = ["profile-overrides"]
 members = [
     "api",
     "bin",
-    "stm32f0x2",
 ]
 
 [profile.release]
@@ -13,7 +12,7 @@ debug = true # symbols are nice and they don't increase the size on Flash
 lto = true # better optimizations
 opt-level = "z"
 
-# [profile.release.overrides.stm32f0x2]
+# [profile.release.overrides.stm32f0]
 # opt-level = "z"
 
 [profile.dev]

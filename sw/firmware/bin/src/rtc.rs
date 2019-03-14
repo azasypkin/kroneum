@@ -1,6 +1,6 @@
 use crate::{DevicePeripherals, Peripherals};
 use kroneum_api::{rtc, time::BCDTime};
-use stm32f0x2::Interrupt;
+use stm32f0::stm32f0x2::Interrupt;
 
 pub struct RTCHardwareImpl<'a> {
     p: &'a mut Peripherals,
@@ -139,7 +139,7 @@ pub fn setup(p: &mut Peripherals) {
     p.device
         .RCC
         .bdcr
-        .modify(|_, w| unsafe { w.rtcen().set_bit().rtcsel().bits(0b10) });
+        .modify(|_, w| w.rtcen().set_bit().rtcsel().bits(0b10));
 
     // Disable PWR clock.
     p.device.RCC.apb1enr.modify(|_, w| w.pwren().clear_bit());

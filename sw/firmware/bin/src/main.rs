@@ -1,4 +1,3 @@
-// #![deny(unsafe_code)]
 #![deny(warnings)]
 #![no_main]
 #![no_std]
@@ -18,7 +17,7 @@ use cortex_m::{
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
-use stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
+use stm32f0::stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
 use system::{System, SystemState};
 
@@ -123,16 +122,16 @@ fn init(p: &Peripherals) {
     // Remap PA9-10 to PA11-12 for USB.
     p.device.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
     p.device
-        .SYSCFG_COMP
-        .syscfg_cfgr1
-        .modify(|_, w| unsafe { w.pa11_pa12_rmp().set_bit().mem_mode().bits(0) });
+        .SYSCFG
+        .cfgr1
+        .modify(|_, w| w.pa11_pa12_rmp().set_bit().mem_mode().bits(0));
 
     // -----------Buttons----------------
 
     // Enable EXTI0 interrupt line for PA0 and EXTI2 for PA2.
     p.device
-        .SYSCFG_COMP
-        .syscfg_exticr1
+        .SYSCFG
+        .exticr1
         .modify(|_, w| unsafe { w.exti0().bits(0).exti2().bits(0) });
 
     // Configure PA0/PA2 to trigger an interrupt event on the EXTI0/EXTI2 line on a rising edge.
@@ -160,7 +159,7 @@ fn init(p: &Peripherals) {
     // mode and PA1, PA3-6 to AIN to reduce power consumption.
     let moder_af = 0b10;
     let moder_ain = 0b11;
-    p.device.GPIOA.moder.modify(|_, w| unsafe {
+    p.device.GPIOA.moder.modify(|_, w| {
         w.moder0()
             .bits(moder_af)
             .moder1()
@@ -187,11 +186,11 @@ fn init(p: &Peripherals) {
     p.device
         .GPIOB
         .moder
-        .modify(|_, w| unsafe { w.moder1().bits(moder_ain).moder8().bits(moder_ain) });
+        .modify(|_, w| w.moder1().bits(moder_ain).moder8().bits(moder_ain));
     p.device
         .GPIOF
         .moder
-        .modify(|_, w| unsafe { w.moder0().bits(moder_ain).moder1().bits(moder_ain) });
+        .modify(|_, w| w.moder0().bits(moder_ain).moder1().bits(moder_ain));
 
     p.device
         .RCC
@@ -209,7 +208,7 @@ fn init(p: &Peripherals) {
 
     // Set "high" output speed for PA7, PA11 and PA12.
     let speed_high = 0b11;
-    p.device.GPIOA.ospeedr.modify(|_, w| unsafe {
+    p.device.GPIOA.ospeedr.modify(|_, w| {
         w.ospeedr7()
             .bits(speed_high)
             .ospeedr11()
@@ -221,7 +220,7 @@ fn init(p: &Peripherals) {
     // Set alternative function #2 for PA0 (WKUP1), PA2 (WKUP4) and PA7 (TIM1_CH1N).
     let af2_wkup = 0b0010;
     let af2_tim1 = 0b0010;
-    p.device.GPIOA.afrl.modify(|_, w| unsafe {
+    p.device.GPIOA.afrl.modify(|_, w| {
         w.afrl0()
             .bits(af2_wkup)
             .afrl2()
@@ -235,5 +234,5 @@ fn init(p: &Peripherals) {
     p.device
         .GPIOA
         .afrh
-        .modify(|_, w| unsafe { w.afrh11().bits(af2_usb).afrh12().bits(af2_usb) });
+        .modify(|_, w| w.afrh11().bits(af2_usb).afrh12().bits(af2_usb));
 }
