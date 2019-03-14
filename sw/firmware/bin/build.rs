@@ -5,11 +5,12 @@ use std::path::PathBuf;
 
 fn main() {
     // Put the linker script somewhere the linker can find it
-    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let out =
+        &PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR env variable should be defined!"));
     File::create(out.join("memory.x"))
-        .unwrap()
-        .write_all(include_bytes!("memory.x"))
+        .and_then(|mut file| file.write_all(include_bytes!("memory.x")))
         .unwrap();
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // Only re-run the build script when memory.x is changed,

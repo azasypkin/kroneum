@@ -1,3 +1,5 @@
+// #![deny(unsafe_code)]
+#![deny(warnings)]
 #![no_main]
 #![no_std]
 
@@ -39,8 +41,8 @@ fn main() -> ! {
     free(|cs| {
         *STATE.borrow(cs).borrow_mut() = Some(State {
             p: Peripherals {
-                core: CorePeripherals::take().unwrap(),
-                device: DevicePeripherals::take().unwrap(),
+                core: CorePeripherals::take().expect("Can not take core peripherals"),
+                device: DevicePeripherals::take().expect("Can not take device peripherals"),
             },
             system: SystemState::default(),
         });
