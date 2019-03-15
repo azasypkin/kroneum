@@ -25,18 +25,18 @@ impl<T: RTCHardware> RTC<T> {
     }
 
     pub fn get_alarm(&self) -> Time {
-        Time::from(&self.hw.get_alarm())
+        Time::from(self.hw.get_alarm())
     }
 
     pub fn get_time(&self) -> Time {
-        Time::from(&self.hw.get_time())
+        Time::from(self.hw.get_time())
     }
 
-    pub fn set_alarm(&mut self, time: &Time) {
+    pub fn set_alarm(&mut self, time: Time) {
         self.hw.set_alarm(time.into());
     }
 
-    pub fn set_time(&self, time: &Time) {
+    pub fn set_time(&self, time: Time) {
         self.hw.set_time(time.into());
     }
 }
@@ -136,7 +136,7 @@ mod tests {
             alarm: BCDTime::default(),
         };
 
-        get_rtc(&mut mock_data).set_time(&Time {
+        get_rtc(&mut mock_data).set_time(Time {
             hours: 13,
             minutes: 34,
             seconds: 51,
@@ -162,7 +162,7 @@ mod tests {
             alarm: BCDTime::default(),
         };
 
-        get_rtc(&mut mock_data).set_alarm(&Time {
+        get_rtc(&mut mock_data).set_alarm(Time {
             hours: 13,
             minutes: 35,
             seconds: 55,

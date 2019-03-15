@@ -104,7 +104,7 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
     loop {}
 }
 
-fn interrupt_free<F>(f: F) -> ()
+fn interrupt_free<F>(f: F)
 where
     F: FnOnce(&mut State),
 {

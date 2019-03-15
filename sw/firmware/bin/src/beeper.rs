@@ -91,7 +91,7 @@ fn teardown(p: &DevicePeripherals) {
     p.RCC.apb2enr.modify(|_, w| w.tim1en().clear_bit());
 }
 
-pub fn acquire<F>(p: &mut Peripherals, f: F) -> ()
+pub fn acquire<F>(p: &mut Peripherals, f: F)
 where
     F: FnOnce(&mut kroneum_api::beeper::PWMBeeper<BeeperHardwareImpl>),
 {

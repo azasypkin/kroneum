@@ -86,8 +86,8 @@ impl<'a> System<'a> {
 
                 rtc::setup(&mut self.p);
                 rtc::acquire(&mut self.p, |rtc| {
-                    rtc.set_time(&Time::default());
-                    rtc.set_alarm(&time);
+                    rtc.set_time(Time::default());
+                    rtc.set_alarm(*time);
                 });
             }
             _ => {}

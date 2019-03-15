@@ -65,8 +65,8 @@ impl Time {
     }
 }
 
-impl From<&BCDTime> for Time {
-    fn from(bcd_time: &BCDTime) -> Self {
+impl From<BCDTime> for Time {
+    fn from(bcd_time: BCDTime) -> Self {
         Time {
             hours: bcd_time.hours_tens * 10 + bcd_time.hours,
             minutes: bcd_time.minutes_tens * 10 + bcd_time.minutes,
@@ -75,8 +75,8 @@ impl From<&BCDTime> for Time {
     }
 }
 
-impl From<&Time> for BCDTime {
-    fn from(time: &Time) -> Self {
+impl From<Time> for BCDTime {
+    fn from(time: Time) -> Self {
         BCDTime {
             hours_tens: time.hours / 10,
             hours: time.hours % 10,
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn from_bcd() {
         assert_eq!(
-            Time::from(&BCDTime {
+            Time::from(BCDTime {
                 hours_tens: 1,
                 hours: 3,
                 minutes_tens: 3,
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn to_bcd() {
         assert_eq!(
-            BCDTime::from(&Time {
+            BCDTime::from(Time {
                 hours: 13,
                 minutes: 34,
                 seconds: 51,
