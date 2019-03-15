@@ -134,7 +134,7 @@ impl<'a> USBHardwareImpl<'a> {
     }
 
     fn get_status_bits(&self, current_bits: u8, status: EndpointStatus) -> u8 {
-        return current_bits ^ status as u8;
+        current_bits ^ status as u8
     }
 }
 
@@ -160,9 +160,10 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         // If DIR bit=1, CTR_RX bit or both CTR_TX/CTR_RX are set in the USB_EPnR register related to
         // the interrupting endpoint. The interrupting transaction is of OUT type (data received by the
         // USB peripheral from the host PC) or two pending transactions are waiting to be processed.
-        let direction = match istr_reg.dir().bit_is_set() {
-            true => EndpointDirection::Receive,
-            false => EndpointDirection::Transmit,
+        let direction = if istr_reg.dir().bit_is_set() {
+            EndpointDirection::Receive
+        } else {
+            EndpointDirection::Transmit
         };
 
         let flags = match endpoint {

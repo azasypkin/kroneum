@@ -131,14 +131,14 @@ impl<'a> System<'a> {
     }
 
     pub fn on_button_press(&mut self) -> bool {
-        if !buttons::has_pending_interrupt(&mut self.p.device) {
+        if !buttons::has_pending_interrupt(&self.p.device) {
             return false;
         }
 
         let (button_i, button_x) = buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
 
-        match (self.state.mode.clone(), button_i, button_x) {
-            (mode @ _, ButtonPressType::Long, ButtonPressType::Long) => {
+        match (self.state.mode, button_i, button_x) {
+            (mode, ButtonPressType::Long, ButtonPressType::Long) => {
                 let (button_i, button_x) =
                     buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
 
@@ -180,7 +180,7 @@ impl<'a> System<'a> {
             _ => {}
         }
 
-        buttons::clear_pending_interrupt(&mut self.p.device);
+        buttons::clear_pending_interrupt(&self.p.device);
 
         true
     }

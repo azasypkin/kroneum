@@ -101,7 +101,7 @@ fn DefaultHandler(irqn: i16) {
 
 #[exception]
 fn HardFault(_ef: &ExceptionFrame) -> ! {
-    loop {}
+    panic!("hard fault (PC={})", _ef.pc);
 }
 
 fn interrupt_free<F>(f: F)
