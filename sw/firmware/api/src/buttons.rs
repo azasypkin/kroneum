@@ -16,8 +16,8 @@ pub enum ButtonPressType {
 }
 
 impl ButtonPressType {
-    pub fn is_none(&self) -> bool {
-        match *self {
+    pub fn is_none(self) -> bool {
+        match self {
             ButtonPressType::None => true,
             _ => false,
         }

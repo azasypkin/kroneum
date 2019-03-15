@@ -497,7 +497,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
             }
             // CUSTOM_HID_REQ_GET_PROTOCOL
             Request::SetFeature => {
-                let protocol = [self.state.protocol.clone()];
+                let protocol = [self.state.protocol];
                 self.send_control_data(Some(protocol.as_ref()))
             }
             // CUSTOM_HID_REQ_SET_IDLE
@@ -507,7 +507,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
             }
             // CUSTOM_HID_REQ_GET_IDLE
             Request::Two => {
-                let idle_state = [self.state.idle_state.clone()];
+                let idle_state = [self.state.idle_state];
                 self.send_control_data(Some(idle_state.as_ref()))
             }
             // CUSTOM_HID_REQ_SET_REPORT
@@ -552,7 +552,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
                 self.send_control_zero_length_packet();
             }
             Request::GetInterface => {
-                let alt_setting = [self.state.alt_setting.clone()];
+                let alt_setting = [self.state.alt_setting];
                 self.send_control_data(Some(alt_setting.as_ref()))
             }
             _ => self.control_endpoint_error(),
@@ -669,7 +669,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
                     self.send_control_data(Some([0].as_ref()));
                 }
                 DeviceStatus::Configured => {
-                    let configuration_index = [self.state.configuration_index.clone()];
+                    let configuration_index = [self.state.configuration_index];
                     self.send_control_data(Some(configuration_index.as_ref()));
                 }
                 _ => self.control_endpoint_error(),

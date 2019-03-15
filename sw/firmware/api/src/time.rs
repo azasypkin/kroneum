@@ -19,7 +19,7 @@ pub struct BCDTime {
 impl Time {
     /// Adds specified number of seconds to the current time, updates minutes and hours if needed.
     pub fn add_seconds(&mut self, seconds: u32) {
-        let new_value = seconds + self.seconds as u32;
+        let new_value = seconds + u32::from(self.seconds);
 
         if new_value >= 60 {
             self.seconds = (new_value % 60) as u8;
@@ -31,7 +31,7 @@ impl Time {
 
     /// Adds specified number of minutes to the current time, updates hours if needed.
     pub fn add_minutes(&mut self, minutes: u32) {
-        let new_value = minutes + self.minutes as u32;
+        let new_value = minutes + u32::from(self.minutes);
 
         if new_value >= 60 {
             self.minutes = (new_value % 60) as u8;
@@ -43,7 +43,7 @@ impl Time {
 
     /// Adds specified number of hours to the current time. Rolls over after 24h.
     pub fn add_hours(&mut self, hours: u32) {
-        let hours = self.hours as u32 + hours;
+        let hours = u32::from(self.hours) + hours;
         self.hours = if hours >= 24 { hours % 24 } else { hours } as u8
     }
 

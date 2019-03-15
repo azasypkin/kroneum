@@ -33,28 +33,28 @@ impl PacketMemoryAreaAccessor {
     }
 
     pub fn set_tx_addr(&self, endpoint: EndpointType, address: u16) {
-        return self.set_u16((endpoint as usize) * 8, address);
+        self.set_u16((endpoint as usize) * 8, address)
     }
 
     pub fn _get_tx_count(&self, endpoint: EndpointType) -> u16 {
-        return self.get_u16((endpoint as usize) * 8 + 2);
+        self.get_u16((endpoint as usize) * 8 + 2)
     }
 
     pub fn set_tx_count(&self, endpoint: EndpointType, count: u16) {
-        return self.set_u16((endpoint as usize) * 8 + 2, count);
+        self.set_u16((endpoint as usize) * 8 + 2, count)
     }
 
     pub fn set_rx_addr(&self, endpoint: EndpointType, address: u16) {
-        return self.set_u16((endpoint as usize) * 8 + 4, address);
+        self.set_u16((endpoint as usize) * 8 + 4, address)
     }
 
     pub fn get_rx_count(&self, endpoint: EndpointType) -> u16 {
-        return self.get_u16((endpoint as usize) * 8 + 6) & 0x3ff;
+        self.get_u16((endpoint as usize) * 8 + 6) & 0x3ff
     }
 
     pub fn set_rx_count(&self, endpoint: EndpointType, count: u16) {
         // 32 byte size, 1 block = 64 bytes
-        return self.set_u16((endpoint as usize) * 8 + 6, 0x8400 | count);
+        self.set_u16((endpoint as usize) * 8 + 6, 0x8400 | count)
     }
 
     pub fn read(&self, endpoint: EndpointType, offset: u16) -> u16 {

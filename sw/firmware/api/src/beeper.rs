@@ -98,9 +98,8 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
     }
 
     /// Produces `n` audible beeps with `100ms` delay.
-    ///
     pub fn beep_n(&mut self, n: u8) {
-        for i in 1..n + 1 {
+        for i in 1..=n {
             self.play(Melody::Beep);
 
             if i < n {
