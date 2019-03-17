@@ -73,13 +73,13 @@ impl From<(u16, u16, u16, u16)> for SetupPacket {
                 0x0A => Request::GetInterface,
                 0x0B => Request::SetInterface,
                 0x0C => Request::SynchFrame,
-                _ => panic!("Unreachable"),
+                _ => unreachable!(),
             },
             // Bit 7
             dir: match request_type & 0x80 {
                 0x00 => RequestDirection::HostToDevice,
                 0x80 => RequestDirection::DeviceToHost,
-                _ => panic!("Unreachable"),
+                _ => unreachable!(),
             },
             // Bits 6:5
             kind: match request_type & 0x60 {
@@ -87,7 +87,7 @@ impl From<(u16, u16, u16, u16)> for SetupPacket {
                 0x20 => RequestKind::Class,
                 0x40 => RequestKind::Vendor,
                 0x60 => RequestKind::Reserved,
-                _ => panic!("Unreachable"),
+                _ => unreachable!(),
             },
             // Bits 4:0
             recipient: match request_type & 0x1f {
@@ -96,7 +96,7 @@ impl From<(u16, u16, u16, u16)> for SetupPacket {
                 0x02 => RequestRecipient::Endpoint,
                 0x03 => RequestRecipient::Other,
                 0x04...0x1f => RequestRecipient::Reserved,
-                _ => panic!("Unreachable"),
+                _ => unreachable!(),
             },
             value,
             index,

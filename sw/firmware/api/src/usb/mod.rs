@@ -386,7 +386,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
             let endpoint = match endpoint_index {
                 0 => EndpointType::Control,
                 1 => EndpointType::Device,
-                _ => panic!("Unknown endpoint"),
+                _ => return,
             };
 
             let direction = if endpoint_address & 0x80 == 0x80 {
@@ -405,7 +405,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
         let endpoint = match endpoint_index {
             0 => EndpointType::Control,
             1 => EndpointType::Device,
-            _ => panic!("Unknown endpoint"),
+            _ => return,
         };
 
         let direction = if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {

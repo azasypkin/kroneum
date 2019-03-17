@@ -1,6 +1,5 @@
 use crate::{DevicePeripherals, Peripherals};
 use kroneum_api::{rtc, time::BCDTime};
-use stm32f0::stm32f0x2::Interrupt;
 
 pub struct RTCHardwareImpl<'a> {
     p: &'a mut Peripherals,
@@ -159,10 +158,6 @@ pub fn setup(p: &mut Peripherals) {
     p.device.EXTI.imr.modify(|_, w| w.mr17().set_bit());
     // Rising edge for line 17.
     p.device.EXTI.rtsr.modify(|_, w| w.tr17().set_bit());
-    // Set priority.
-    unsafe {
-        p.core.NVIC.set_priority(Interrupt::RTC, 2);
-    }
 }
 
 pub fn teardown(p: &mut Peripherals) {
@@ -193,13 +188,6 @@ fn toggle_alarm(p: &mut Peripherals, enable: bool) {
             w.alrae().clear_bit()
         }
     });
-
-    // Enable/disable RTC_IRQn in the NVIC.
-    if enable {
-        p.core.NVIC.enable(Interrupt::RTC);
-    } else {
-        p.core.NVIC.disable(Interrupt::RTC);
-    }
 }
 
 pub fn acquire<F, R>(p: &mut Peripherals, f: F) -> R
