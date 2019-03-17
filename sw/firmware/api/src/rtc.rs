@@ -24,11 +24,11 @@ impl<T: RTCHardware> RTC<T> {
         RTC { hw }
     }
 
-    pub fn get_alarm(&self) -> Time {
+    pub fn alarm(&self) -> Time {
         Time::from(self.hw.get_alarm())
     }
 
-    pub fn get_time(&self) -> Time {
+    pub fn time(&self) -> Time {
         Time::from(self.hw.get_time())
     }
 
@@ -87,7 +87,7 @@ mod tests {
         }
     }
 
-    fn get_rtc(mock_data: &mut MockData) -> RTC<RTCHardwareMock> {
+    fn create_rtc(mock_data: &mut MockData) -> RTC<RTCHardwareMock> {
         RTC {
             hw: RTCHardwareMock {
                 data: RefCell::new(mock_data),
@@ -103,7 +103,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_rtc(&mut mock_data).get_time(),
+            create_rtc(&mut mock_data).time(),
             Time {
                 hours: 13,
                 minutes: 34,
@@ -120,7 +120,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_rtc(&mut mock_data).get_alarm(),
+            create_rtc(&mut mock_data).alarm(),
             Time {
                 hours: 13,
                 minutes: 35,
@@ -136,7 +136,7 @@ mod tests {
             alarm: BCDTime::default(),
         };
 
-        get_rtc(&mut mock_data).set_time(Time {
+        create_rtc(&mut mock_data).set_time(Time {
             hours: 13,
             minutes: 34,
             seconds: 51,
@@ -162,7 +162,7 @@ mod tests {
             alarm: BCDTime::default(),
         };
 
-        get_rtc(&mut mock_data).set_alarm(Time {
+        create_rtc(&mut mock_data).set_alarm(Time {
             hours: 13,
             minutes: 35,
             seconds: 55,

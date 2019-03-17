@@ -116,7 +116,7 @@ mod tests {
         }
     }
 
-    fn get_buttons<F: Fn(ButtonType, u32) -> bool>(
+    fn create_buttons<F: Fn(ButtonType, u32) -> bool>(
         mock_data: &mut MockData<F>,
     ) -> Buttons<ButtonsHardwareMock<F>> {
         Buttons {
@@ -134,7 +134,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::None, ButtonPressType::None)
         );
     }
@@ -153,7 +153,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Short, ButtonPressType::Short)
         );
     }
@@ -175,7 +175,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::None, ButtonPressType::Short)
         );
     }
@@ -197,7 +197,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Short, ButtonPressType::None)
         );
     }
@@ -216,7 +216,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Long)
         );
     }
@@ -229,7 +229,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Long)
         );
     }
@@ -245,7 +245,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::None, ButtonPressType::Long)
         );
     }
@@ -267,7 +267,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Short, ButtonPressType::Long)
         );
     }
@@ -283,7 +283,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Long, ButtonPressType::None)
         );
     }
@@ -305,7 +305,7 @@ mod tests {
         };
 
         assert_eq!(
-            get_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Short)
         );
     }

@@ -173,7 +173,7 @@ mod tests {
         }
     }
 
-    fn get_beeper(mock_data: &mut MockData) -> PWMBeeper<PWMBeeperHardwareMock> {
+    fn create_beeper(mock_data: &mut MockData) -> PWMBeeper<PWMBeeperHardwareMock> {
         PWMBeeper {
             hw: PWMBeeperHardwareMock {
                 data: RefCell::new(mock_data),
@@ -185,7 +185,7 @@ mod tests {
     fn handles_beep() {
         let mut mock_data = MockData::new();
 
-        get_beeper(&mut mock_data).beep();
+        create_beeper(&mut mock_data).beep();
         assert_eq!(mock_data.pointer, 4);
         assert_eq!(
             mock_data.calls[..mock_data.pointer],
@@ -202,7 +202,7 @@ mod tests {
     fn handles_beep_n() {
         let mut mock_data = MockData::new();
 
-        get_beeper(&mut mock_data).beep_n(3);
+        create_beeper(&mut mock_data).beep_n(3);
         assert_eq!(mock_data.pointer, 14);
         assert_eq!(
             mock_data.calls[..mock_data.pointer],
@@ -229,7 +229,7 @@ mod tests {
     fn handles_play() {
         let mut mock_data = MockData::new();
 
-        get_beeper(&mut mock_data).play(Melody::Setup);
+        create_beeper(&mut mock_data).play(Melody::Setup);
         assert_eq!(mock_data.pointer, 6);
         assert_eq!(
             mock_data.calls[..mock_data.pointer],

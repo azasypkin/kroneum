@@ -111,7 +111,7 @@ pub trait USBHardware {
     fn enable(&mut self);
 
     /// Used to retrieve transaction that has been completed and caused `Correct Transfer` interrupt.
-    fn get_transaction(&self) -> Transaction;
+    fn transaction(&self) -> Transaction;
 
     /// Sets status for the specified endpoint.
     fn set_endpoint_status(
@@ -198,7 +198,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
         // USB_ISTR_CTR is read only and will be automatically cleared by
         // hardware when we've processed all endpoint results.
         while self.hw.is_interrupt_active(UsbInterrupt::CorrectTransfer) {
-            let transaction = self.hw.get_transaction();
+            let transaction = self.hw.transaction();
             match &transaction.endpoint {
                 EndpointType::Control => match &transaction.direction {
                     EndpointDirection::Receive => self.handle_control_out_transfer(&transaction),
@@ -226,7 +226,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
     }
 
     fn handle_control_setup_out_transfer(&mut self, transaction: &Transaction) {
-        let setup_packet_length = self.pma.get_rx_count(transaction.endpoint);
+        let setup_packet_length = self.pma.rx_count(transaction.endpoint);
         let setup_packet = SetupPacket::from((
             self.pma.read(transaction.endpoint, 0),
             self.pma.read(transaction.endpoint, 2),
@@ -291,7 +291,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
         self.hw
             .mark_transaction_as_handled(transaction.endpoint, transaction.direction);
 
-        let _command_packet_length = self.pma.get_rx_count(transaction.endpoint);
+        let _command_packet_length = self.pma.rx_count(transaction.endpoint);
         let command_packet = CommandPacket::from((
             self.pma.read(transaction.endpoint, 0),
             self.pma.read(transaction.endpoint, 2),
@@ -576,7 +576,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
         let data_to_send: Option<&[u8]> = match (&request_header.value >> 8) as u16 {
             1 => Some(&DEV_DESC),
             2 => Some(&CONF_DESC),
-            3 => self.get_descriptor_string(&request_header),
+            3 => self.descriptor_string(&request_header),
             _ => None,
         };
 
@@ -596,7 +596,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
         }
     }
 
-    fn get_descriptor_string(&self, request_header: &SetupPacket) -> Option<&'static [u8]> {
+    fn descriptor_string(&self, request_header: &SetupPacket) -> Option<&'static [u8]> {
         match request_header.value & 0xff {
             0x00 => Some(&LANG_ID_DESCRIPTOR),
             0x01 => Some(&MANUFACTURER_STR),

@@ -20,9 +20,9 @@ impl<'a> USBHardwareImpl<'a> {
                 .ctr_tx()
                 .set_bit()
                 .stat_tx()
-                .bits(self.get_status_bits(0, EndpointStatus::Nak))
+                .bits(self.status_bits(0, EndpointStatus::Nak))
                 .stat_rx()
-                .bits(self.get_status_bits(0, EndpointStatus::Valid))
+                .bits(self.status_bits(0, EndpointStatus::Valid))
         });
     }
 
@@ -37,27 +37,27 @@ impl<'a> USBHardwareImpl<'a> {
                 .ctr_tx()
                 .set_bit()
                 .stat_tx()
-                .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
+                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
                 .stat_rx()
-                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
+                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
         });
     }
 
     fn close_control_endpoints(&self) {
         self.p.device.USB.ep0r.modify(|r, w| unsafe {
             w.stat_tx()
-                .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
+                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
-                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
+                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
         });
     }
 
     fn close_device_endpoints(&self) {
         self.p.device.USB.ep1r.modify(|r, w| unsafe {
             w.stat_tx()
-                .bits(self.get_status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
+                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
-                .bits(self.get_status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
+                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
         });
     }
 
@@ -67,7 +67,7 @@ impl<'a> USBHardwareImpl<'a> {
             EndpointType::Control => {
                 self.p.device.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_rx()
-                        .bits(self.get_status_bits(r.stat_rx().bits(), status))
+                        .bits(self.status_bits(r.stat_rx().bits(), status))
                         .ctr_tx()
                         .set_bit()
                         .ctr_rx()
@@ -82,7 +82,7 @@ impl<'a> USBHardwareImpl<'a> {
             }
             EndpointType::Device => self.p.device.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_rx()
-                    .bits(self.get_status_bits(r.stat_rx().bits(), status))
+                    .bits(self.status_bits(r.stat_rx().bits(), status))
                     .ctr_tx()
                     .set_bit()
                     .ctr_rx()
@@ -103,7 +103,7 @@ impl<'a> USBHardwareImpl<'a> {
             EndpointType::Control => {
                 self.p.device.USB.ep0r.modify(|r, w| unsafe {
                     w.stat_tx()
-                        .bits(self.get_status_bits(r.stat_tx().bits(), status))
+                        .bits(self.status_bits(r.stat_tx().bits(), status))
                         .ctr_tx()
                         .set_bit()
                         .ctr_rx()
@@ -118,7 +118,7 @@ impl<'a> USBHardwareImpl<'a> {
             }
             EndpointType::Device => self.p.device.USB.ep1r.modify(|r, w| unsafe {
                 w.stat_tx()
-                    .bits(self.get_status_bits(r.stat_tx().bits(), status))
+                    .bits(self.status_bits(r.stat_tx().bits(), status))
                     .ctr_tx()
                     .set_bit()
                     .ctr_rx()
@@ -133,7 +133,7 @@ impl<'a> USBHardwareImpl<'a> {
         }
     }
 
-    fn get_status_bits(&self, current_bits: u8, status: EndpointStatus) -> u8 {
+    fn status_bits(&self, current_bits: u8, status: EndpointStatus) -> u8 {
         current_bits ^ status as u8
     }
 }
@@ -143,7 +143,7 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         self.p.device.USB.daddr.write(|w| w.ef().set_bit());
     }
 
-    fn get_transaction(&self) -> Transaction {
+    fn transaction(&self) -> Transaction {
         let istr_reg = self.p.device.USB.istr.read();
 
         let endpoint = match istr_reg.ep_id().bits() {

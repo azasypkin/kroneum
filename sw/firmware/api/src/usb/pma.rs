@@ -36,8 +36,8 @@ impl PacketMemoryAreaAccessor {
         self.set_u16((endpoint as usize) * 8, address)
     }
 
-    pub fn _get_tx_count(&self, endpoint: EndpointType) -> u16 {
-        self.get_u16((endpoint as usize) * 8 + 2)
+    pub fn _tx_count(&self, endpoint: EndpointType) -> u16 {
+        self.u16((endpoint as usize) * 8 + 2)
     }
 
     pub fn set_tx_count(&self, endpoint: EndpointType, count: u16) {
@@ -48,8 +48,8 @@ impl PacketMemoryAreaAccessor {
         self.set_u16((endpoint as usize) * 8 + 4, address)
     }
 
-    pub fn get_rx_count(&self, endpoint: EndpointType) -> u16 {
-        self.get_u16((endpoint as usize) * 8 + 6) & 0x3ff
+    pub fn rx_count(&self, endpoint: EndpointType) -> u16 {
+        self.u16((endpoint as usize) * 8 + 6) & 0x3ff
     }
 
     pub fn set_rx_count(&self, endpoint: EndpointType, count: u16) {
@@ -60,8 +60,8 @@ impl PacketMemoryAreaAccessor {
     pub fn read(&self, endpoint: EndpointType, offset: u16) -> u16 {
         assert_eq!((offset & 0x01), 0);
         match endpoint {
-            EndpointType::Control => self.get_u16((CONTROL_OUT_PMA_ADDRESS + offset) as usize),
-            EndpointType::Device => self.get_u16((DEVICE_OUT_PMA_ADDRESS + offset) as usize),
+            EndpointType::Control => self.u16((CONTROL_OUT_PMA_ADDRESS + offset) as usize),
+            EndpointType::Device => self.u16((DEVICE_OUT_PMA_ADDRESS + offset) as usize),
         }
     }
 
@@ -72,7 +72,7 @@ impl PacketMemoryAreaAccessor {
         }
     }
 
-    fn get_u16(&self, offset: usize) -> u16 {
+    fn u16(&self, offset: usize) -> u16 {
         assert_eq!((offset & 0x01), 0);
         self.cells[offset >> 1].get()
     }
@@ -147,13 +147,13 @@ mod tests {
 
         assert_eq!(sandbox[0], CONTROL_IN_PMA_ADDRESS);
         assert_eq!(sandbox[2], CONTROL_OUT_PMA_ADDRESS);
-        assert_eq!(pma.get_rx_count(EndpointType::Control), 0);
-        assert_eq!(pma._get_tx_count(EndpointType::Control), 0);
+        assert_eq!(pma.rx_count(EndpointType::Control), 0);
+        assert_eq!(pma._tx_count(EndpointType::Control), 0);
 
         assert_eq!(sandbox[4], DEVICE_IN_PMA_ADDRESS);
         assert_eq!(sandbox[6], DEVICE_OUT_PMA_ADDRESS);
-        assert_eq!(pma.get_rx_count(EndpointType::Device), 0);
-        assert_eq!(pma._get_tx_count(EndpointType::Device), 0);
+        assert_eq!(pma.rx_count(EndpointType::Device), 0);
+        assert_eq!(pma._tx_count(EndpointType::Device), 0);
     }
 
     #[test]
@@ -171,14 +171,14 @@ mod tests {
         pma.set_tx_count(EndpointType::Device, 3);
         pma.set_rx_count(EndpointType::Device, 4);
 
-        assert_eq!(1, pma._get_tx_count(EndpointType::Control));
+        assert_eq!(1, pma._tx_count(EndpointType::Control));
         assert_eq!(1, sandbox[1]);
-        assert_eq!(2, pma.get_rx_count(EndpointType::Control));
+        assert_eq!(2, pma.rx_count(EndpointType::Control));
         assert_eq!(2, sandbox[3] & 0x00ff);
 
-        assert_eq!(3, pma._get_tx_count(EndpointType::Device));
+        assert_eq!(3, pma._tx_count(EndpointType::Device));
         assert_eq!(3, sandbox[5]);
-        assert_eq!(4, pma.get_rx_count(EndpointType::Device));
+        assert_eq!(4, pma.rx_count(EndpointType::Device));
         assert_eq!(4, sandbox[7] & 0x00ff);
     }
 

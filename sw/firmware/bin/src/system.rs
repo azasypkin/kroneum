@@ -119,7 +119,7 @@ impl<'a> System<'a> {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::GetAlarm = command_packet {
                 beeper::acquire(self.p, |beeper| beeper.beep());
-                let alarm = rtc::acquire(self.p, |rtc| rtc.get_alarm());
+                let alarm = rtc::acquire(self.p, |rtc| rtc.alarm());
 
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
                     usb.send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0])

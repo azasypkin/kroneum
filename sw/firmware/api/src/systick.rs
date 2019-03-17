@@ -73,7 +73,7 @@ mod tests {
         }
     }
 
-    fn get_systick(mock_data: &mut MockData) -> SysTick<SystickHardwareMock> {
+    fn create_systick(mock_data: &mut MockData) -> SysTick<SystickHardwareMock> {
         SysTick {
             hw: SystickHardwareMock { data: mock_data },
         }
@@ -83,18 +83,18 @@ mod tests {
     #[should_panic(expected = "timeout is too large")]
     fn fails_for_large_timeout() {
         let mut mock_data = MockData::new();
-        get_systick(&mut mock_data).delay_ms(5000);
+        create_systick(&mut mock_data).delay_ms(5000);
     }
 
     #[test]
     fn handles_timeout() {
         let mut mock_data = MockData::new();
 
-        get_systick(&mut mock_data).delay_ms(1234);
+        create_systick(&mut mock_data).delay_ms(1234);
         assert_eq!(mock_data.reload_value, 9872000);
         assert_eq!(mock_data.ticks, 5);
 
-        get_systick(&mut mock_data).delay_us(1234);
+        create_systick(&mut mock_data).delay_us(1234);
         assert_eq!(mock_data.reload_value, 9872);
         assert_eq!(mock_data.ticks, 5);
     }
