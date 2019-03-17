@@ -1,5 +1,6 @@
 use crate::{systick, DevicePeripherals, Peripherals};
 use kroneum_api::buttons;
+use stm32f0::stm32f0x2::Interrupt;
 
 pub struct ButtonsHardwareImpl<'a> {
     p: &'a mut Peripherals,
@@ -15,11 +16,21 @@ impl<'a> buttons::ButtonsHardware for ButtonsHardwareImpl<'a> {
     }
 
     fn delay(&mut self, delay_ms: u32) {
-        systick::get(&mut self.p.systick).delay_ms(delay_ms);
+        systick::get(&mut self.p.core.SYST).delay_ms(delay_ms);
     }
 }
 
 pub fn setup(p: &mut Peripherals) {
+    // Set priority for the `EXTI0` and `EXTI2` line to `1`.
+    unsafe {
+        p.core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
+        p.core.NVIC.set_priority(Interrupt::EXTI2_3, 1);
+    }
+
+    // Enable the interrupt in the NVIC.
+    p.core.NVIC.enable(Interrupt::EXTI0_1);
+    p.core.NVIC.enable(Interrupt::EXTI2_3);
+
     // Enable wakers.
     p.device
         .PWR
@@ -28,6 +39,9 @@ pub fn setup(p: &mut Peripherals) {
 }
 
 pub fn _teardown(p: &mut Peripherals) {
+    p.core.NVIC.disable(Interrupt::EXTI0_1);
+    p.core.NVIC.disable(Interrupt::EXTI2_3);
+
     // Disable waker.
     p.device
         .PWR

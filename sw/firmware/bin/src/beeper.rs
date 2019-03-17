@@ -24,7 +24,7 @@ impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
     }
 
     fn delay(&mut self, delay_ms: u32) {
-        systick::get(&mut self.p.systick).delay_ms(delay_ms);
+        systick::get(&mut self.p.core.SYST).delay_ms(delay_ms);
     }
 }
 

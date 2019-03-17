@@ -1,4 +1,5 @@
 use crate::{DevicePeripherals, Peripherals};
+use stm32f0::stm32f0x2::Interrupt;
 
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
@@ -306,6 +307,7 @@ pub fn setup(p: &mut Peripherals) {
     start_clock(&p.device);
 
     p.device.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
+    p.core.NVIC.enable(Interrupt::USB);
 
     // Reset the peripheral.
     p.device
@@ -327,6 +329,8 @@ pub fn setup(p: &mut Peripherals) {
 }
 
 pub fn teardown(p: &mut Peripherals) {
+    p.core.NVIC.disable(Interrupt::USB);
+
     // Tell the host that we're gone by disabling pull-up on DP.
     p.device.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
 

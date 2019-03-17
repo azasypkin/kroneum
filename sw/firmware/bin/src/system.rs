@@ -190,5 +190,12 @@ impl<'a> System<'a> {
         self.p.device.PWR.cr.modify(|_, w| w.pdds().bit(on));
 
         self.p.device.PWR.cr.modify(|_, w| w.cwuf().set_bit());
+
+        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
+        if on {
+            self.p.core.SCB.set_sleepdeep();
+        } else {
+            self.p.core.SCB.clear_sleepdeep();
+        }
     }
 }
