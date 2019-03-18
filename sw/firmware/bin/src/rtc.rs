@@ -85,7 +85,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         self.toggle_write_protection(true);
     }
 
-    fn set_alarm(&mut self, bcd_time: BCDTime) {
+    fn set_alarm(&self, bcd_time: BCDTime) {
         self.toggle_write_protection(false);
 
         // Disable alarm A to modify it.
@@ -180,7 +180,7 @@ fn toggle_alarm(p: &Peripherals, enable: bool) {
 
 pub fn acquire<F, R>(p: &Peripherals, f: F) -> R
 where
-    F: FnOnce(&mut rtc::RTC<RTCHardwareImpl>) -> R,
+    F: FnOnce(&rtc::RTC<RTCHardwareImpl>) -> R,
 {
-    f(&mut rtc::RTC::create(RTCHardwareImpl { p }))
+    f(&rtc::RTC::create(RTCHardwareImpl { p }))
 }

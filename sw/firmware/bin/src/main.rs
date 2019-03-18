@@ -26,11 +26,10 @@ static SYSTEM: Mutex<RefCell<Option<system::System>>> = Mutex::new(RefCell::new(
 #[entry]
 fn main() -> ! {
     let mut core_peripherals = CorePeripherals::take().expect("Can not take core peripherals");
-    let mut device_peripherals =
-        DevicePeripherals::take().expect("Can not take device peripherals");
+    let device_peripherals = DevicePeripherals::take().expect("Can not take device peripherals");
 
     free(|cs| {
-        configure(&mut device_peripherals, &mut core_peripherals);
+        configure(&device_peripherals, &mut core_peripherals);
 
         let mut system = system::System::new(
             device_peripherals,
@@ -92,7 +91,7 @@ where
 }
 
 /// Initialize the system, configure clock, GPIOs and interrupts.
-fn configure(device: &mut DevicePeripherals, core: &mut CorePeripherals) {
+fn configure(device: &DevicePeripherals, core: &mut CorePeripherals) {
     // Remap PA9-10 to PA11-12 for USB.
     device.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
     device

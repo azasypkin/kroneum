@@ -108,7 +108,7 @@ impl Default for UsbState {
 // Describes USB hardware management interface.
 pub trait USBHardware {
     /// Enables USB device.
-    fn enable(&mut self);
+    fn enable(&self);
 
     /// Used to retrieve transaction that has been completed and caused `Correct Transfer` interrupt.
     fn transaction(&self) -> Transaction;

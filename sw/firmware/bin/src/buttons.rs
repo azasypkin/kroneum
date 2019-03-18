@@ -2,7 +2,7 @@ use crate::systick::SysTick;
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct ButtonsHardwareImpl<'a> {
-    p: &'a mut Peripherals,
+    p: &'a Peripherals,
     systick: &'a mut SysTick,
 }
 
@@ -20,18 +20,18 @@ impl<'a> kroneum_api::buttons::ButtonsHardware for ButtonsHardwareImpl<'a> {
     }
 }
 
-fn toggle_wakers(p: &mut Peripherals, toggle: bool) {
+fn toggle_wakers(p: &Peripherals, toggle: bool) {
     p.PWR
         .csr
         .modify(|_, w| w.ewup1().bit(toggle).ewup4().bit(toggle));
 }
 
-pub fn setup(p: &mut Peripherals) {
+pub fn setup(p: &Peripherals) {
     // Enable wakers.
     toggle_wakers(p, true);
 }
 
-pub fn _teardown(p: &mut Peripherals) {
+pub fn _teardown(p: &Peripherals) {
     // Disable waker.
     toggle_wakers(p, false);
 }
@@ -46,7 +46,7 @@ pub fn clear_pending_interrupt(p: &Peripherals) {
     p.EXTI.pr.modify(|_, w| w.pif0().set_bit().pif2().set_bit());
 }
 
-pub fn acquire<F, R>(p: &mut Peripherals, systick: &mut SysTick, f: F) -> R
+pub fn acquire<F, R>(p: &Peripherals, systick: &mut SysTick, f: F) -> R
 where
     F: FnOnce(&mut kroneum_api::buttons::Buttons<ButtonsHardwareImpl>) -> R,
 {

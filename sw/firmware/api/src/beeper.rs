@@ -59,7 +59,7 @@ pub trait PWMBeeperHardware {
     fn toggle_pwm(&self, enable: bool);
 
     /// Forces PWM to pulse of the specified frequency.
-    fn pulse(&mut self, note_frequency: u32);
+    fn pulse(&self, note_frequency: u32);
 
     /// Blocks the thread for the specified number of milliseconds.
     fn delay(&mut self, delay_ms: u32);
@@ -164,7 +164,7 @@ mod tests {
             }
         }
 
-        fn pulse(&mut self, note_frequency: u32) {
+        fn pulse(&self, note_frequency: u32) {
             self.register_call(Call::Pulse(note_frequency));
         }
 

@@ -63,21 +63,21 @@ impl System {
 
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.stop());
                 usb::teardown(&mut self.p);
-                rtc::teardown(&mut self.p);
+                rtc::teardown(&self.p);
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                    beeper::acquire(&self.p, &mut self.systick, |beeper| {
                         beeper.play(Melody::Reset)
                     });
                 } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                    beeper::acquire(&self.p, &mut self.systick, |beeper| {
                         beeper.play(Melody::Reset)
                     });
                 }
             }
             SystemMode::Config => {
-                beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                beeper::acquire(&self.p, &mut self.systick, |beeper| {
                     beeper.play(Melody::Reset)
                 });
 
@@ -86,19 +86,19 @@ impl System {
                 usb::setup(&mut self.p);
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.start());
             }
-            SystemMode::Setup(0) => beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+            SystemMode::Setup(0) => beeper::acquire(&self.p, &mut self.systick, |beeper| {
                 beeper.play(Melody::Setup)
             }),
             SystemMode::Setup(c) if *c > 0 => {
-                beeper::acquire(&mut self.p, &mut self.systick, |beeper| beeper.beep())
+                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep())
             }
             SystemMode::Alarm(time, _) => {
-                beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                beeper::acquire(&self.p, &mut self.systick, |beeper| {
                     beeper.play(Melody::Setup)
                 });
 
-                rtc::setup(&mut self.p);
-                rtc::acquire(&mut self.p, |rtc| {
+                rtc::setup(&self.p);
+                rtc::acquire(&self.p, |rtc| {
                     rtc.set_time(Time::default());
                     rtc.set_alarm(*time);
                 });
@@ -111,11 +111,9 @@ impl System {
 
     pub fn on_rtc_alarm(&mut self) {
         if let SystemMode::Alarm(_, melody) = &self.state.mode {
-            beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
-                beeper.play(*melody)
-            });
+            beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.play(*melody));
 
-            rtc::teardown(&mut self.p);
+            rtc::teardown(&self.p);
 
             // Snooze alarm for 10 seconds.
             self.set_mode(SystemMode::Alarm(Time::from_seconds(10), Melody::Beep));

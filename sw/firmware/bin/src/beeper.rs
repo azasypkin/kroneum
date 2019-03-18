@@ -17,7 +17,7 @@ impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
         });
     }
 
-    fn pulse(&mut self, note_frequency: u32) {
+    fn pulse(&self, note_frequency: u32) {
         self.p
             .TIM1
             .arr

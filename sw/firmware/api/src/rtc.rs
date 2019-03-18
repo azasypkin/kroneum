@@ -12,7 +12,7 @@ pub trait RTCHardware {
     fn set_time(&self, bcd_time: BCDTime);
 
     /// Sets RTC Alarm in BCD format.
-    fn set_alarm(&mut self, bcd_time: BCDTime);
+    fn set_alarm(&self, bcd_time: BCDTime);
 }
 
 pub struct RTC<T: RTCHardware> {
@@ -32,7 +32,7 @@ impl<T: RTCHardware> RTC<T> {
         Time::from(self.hw.get_time())
     }
 
-    pub fn set_alarm(&mut self, time: Time) {
+    pub fn set_alarm(&self, time: Time) {
         self.hw.set_alarm(time.into());
     }
 
@@ -82,7 +82,7 @@ mod tests {
             self.data.borrow_mut().time = bcd_time;
         }
 
-        fn set_alarm(&mut self, bcd_time: BCDTime) {
+        fn set_alarm(&self, bcd_time: BCDTime) {
             self.data.borrow_mut().alarm = bcd_time;
         }
     }

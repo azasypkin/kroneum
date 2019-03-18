@@ -6,7 +6,7 @@ use kroneum_api::usb::{
 };
 
 pub struct USBHardwareImpl<'a> {
-    p: &'a mut Peripherals,
+    p: &'a Peripherals,
 }
 
 impl<'a> USBHardwareImpl<'a> {
@@ -138,7 +138,7 @@ impl<'a> USBHardwareImpl<'a> {
 }
 
 impl<'a> USBHardware for USBHardwareImpl<'a> {
-    fn enable(&mut self) {
+    fn enable(&self) {
         self.p.USB.daddr.write(|w| w.ef().set_bit());
     }
 
@@ -299,7 +299,7 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 }
 
-pub fn setup(p: &mut Peripherals) {
+pub fn setup(p: &Peripherals) {
     start_clock(&p);
 
     p.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
@@ -321,7 +321,7 @@ pub fn setup(p: &mut Peripherals) {
     p.USB.bcdr.modify(|_, w| w.dppu().set_bit());
 }
 
-pub fn teardown(p: &mut Peripherals) {
+pub fn teardown(p: &Peripherals) {
     // Tell the host that we're gone by disabling pull-up on DP.
     p.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
 
@@ -367,7 +367,7 @@ fn stop_clock(p: &Peripherals) {
     while p.RCC.cr2.read().hsi48rdy().bit_is_set() {}
 }
 
-pub fn acquire<F, R>(p: &mut Peripherals, state: &mut UsbState, f: F) -> R
+pub fn acquire<F, R>(p: &Peripherals, state: &mut UsbState, f: F) -> R
 where
     F: FnOnce(&mut USB<USBHardwareImpl>) -> R,
 {
