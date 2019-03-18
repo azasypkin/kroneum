@@ -1,4 +1,7 @@
-use crate::{beeper, buttons, rtc, usb, Peripherals};
+use crate::{beeper, buttons, rtc, systick, usb};
+
+use cortex_m::peripheral::SCB;
+use stm32f0::stm32f0x2::Peripherals;
 
 use kroneum_api::{
     beeper::Melody,
@@ -16,8 +19,8 @@ pub enum SystemMode {
 }
 
 #[derive(Copy, Clone)]
-pub struct SystemState {
-    pub mode: SystemMode,
+struct SystemState {
+    mode: SystemMode,
     usb_state: UsbState,
 }
 
@@ -30,21 +33,21 @@ impl Default for SystemState {
     }
 }
 
-pub struct System<'a> {
-    p: &'a mut Peripherals,
-    state: &'a mut SystemState,
+pub struct System {
+    p: Peripherals,
+    systick: systick::SysTick,
+    scb: SCB,
+    state: SystemState,
 }
 
-impl<'a> System<'a> {
-    pub fn new(p: &'a mut Peripherals, state: &'a mut SystemState) -> Self {
-        System { p, state }
-    }
-
-    pub fn acquire<'b, F, R>(p: &'b mut Peripherals, state: &'b mut SystemState, f: F) -> R
-    where
-        F: FnOnce(System) -> R,
-    {
-        f(System::new(p, state))
+impl System {
+    pub fn new(p: Peripherals, systick: systick::SysTick, scb: SCB) -> Self {
+        System {
+            p,
+            state: SystemState::default(),
+            systick,
+            scb,
+        }
     }
 
     pub fn setup(&mut self) {
@@ -64,25 +67,35 @@ impl<'a> System<'a> {
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
+                    beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                        beeper.play(Melody::Reset)
+                    });
                 } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
+                    beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                        beeper.play(Melody::Reset)
+                    });
                 }
             }
             SystemMode::Config => {
-                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Reset));
+                beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                    beeper.play(Melody::Reset)
+                });
 
                 self.toggle_standby_mode(false);
 
                 usb::setup(&mut self.p);
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.start());
             }
-            SystemMode::Setup(0) => {
-                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup))
+            SystemMode::Setup(0) => beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                beeper.play(Melody::Setup)
+            }),
+            SystemMode::Setup(c) if *c > 0 => {
+                beeper::acquire(&mut self.p, &mut self.systick, |beeper| beeper.beep())
             }
-            SystemMode::Setup(c) if *c > 0 => beeper::acquire(&mut self.p, |beeper| beeper.beep()),
             SystemMode::Alarm(time, _) => {
-                beeper::acquire(&mut self.p, |beeper| beeper.play(Melody::Setup));
+                beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                    beeper.play(Melody::Setup)
+                });
 
                 rtc::setup(&mut self.p);
                 rtc::acquire(&mut self.p, |rtc| {
@@ -98,7 +111,9 @@ impl<'a> System<'a> {
 
     pub fn on_rtc_alarm(&mut self) {
         if let SystemMode::Alarm(_, melody) = &self.state.mode {
-            beeper::acquire(&mut self.p, |beeper| beeper.play(*melody));
+            beeper::acquire(&mut self.p, &mut self.systick, |beeper| {
+                beeper.play(*melody)
+            });
 
             rtc::teardown(&mut self.p);
 
@@ -114,12 +129,12 @@ impl<'a> System<'a> {
 
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
-                beeper::acquire(self.p, |beeper| beeper.beep_n(num));
+                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep_n(num));
             } else if let CommandPacket::SetAlarm(time) = command_packet {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::GetAlarm = command_packet {
-                beeper::acquire(self.p, |beeper| beeper.beep());
-                let alarm = rtc::acquire(self.p, |rtc| rtc.alarm());
+                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep());
+                let alarm = rtc::acquire(&self.p, |rtc| rtc.alarm());
 
                 usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
                     usb.send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0])
@@ -130,17 +145,21 @@ impl<'a> System<'a> {
         self.state.usb_state.command = None;
     }
 
-    pub fn on_button_press(&mut self) -> bool {
-        if !buttons::has_pending_interrupt(&self.p.device) {
-            return false;
+    pub fn on_button_press(&mut self) {
+        if !buttons::has_pending_interrupt(&self.p) {
+            return;
         }
 
-        let (button_i, button_x) = buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
+        let (button_i, button_x) = buttons::acquire(&mut self.p, &mut self.systick, |buttons| {
+            buttons.interrupt()
+        });
 
         match (self.state.mode, button_i, button_x) {
             (mode, ButtonPressType::Long, ButtonPressType::Long) => {
                 let (button_i, button_x) =
-                    buttons::acquire(&mut self.p, |buttons| buttons.interrupt());
+                    buttons::acquire(&mut self.p, &mut self.systick, |buttons| {
+                        buttons.interrupt()
+                    });
 
                 match (mode, button_i, button_x) {
                     (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
@@ -180,22 +199,20 @@ impl<'a> System<'a> {
             _ => {}
         }
 
-        buttons::clear_pending_interrupt(&self.p.device);
-
-        true
+        buttons::clear_pending_interrupt(&self.p);
     }
 
     fn toggle_standby_mode(&mut self, on: bool) {
         // Toggle STANDBY mode.
-        self.p.device.PWR.cr.modify(|_, w| w.pdds().bit(on));
+        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
 
-        self.p.device.PWR.cr.modify(|_, w| w.cwuf().set_bit());
+        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
 
         // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
         if on {
-            self.p.core.SCB.set_sleepdeep();
+            self.scb.set_sleepdeep();
         } else {
-            self.p.core.SCB.clear_sleepdeep();
+            self.scb.clear_sleepdeep();
         }
     }
 }

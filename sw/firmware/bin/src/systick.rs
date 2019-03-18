@@ -1,10 +1,12 @@
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
-pub struct SystickHardwareImpl<'a> {
-    syst: &'a mut SYST,
+pub type SysTick = kroneum_api::systick::SysTick<SystickHardwareImpl>;
+
+pub struct SystickHardwareImpl {
+    syst: SYST,
 }
 
-impl<'a> kroneum_api::systick::SysTickHardware for SystickHardwareImpl<'a> {
+impl kroneum_api::systick::SysTickHardware for SystickHardwareImpl {
     fn configure(&mut self, reload_value: u32) {
         self.syst.set_clock_source(SystClkSource::Core);
         self.syst.set_reload(reload_value);
@@ -24,6 +26,6 @@ impl<'a> kroneum_api::systick::SysTickHardware for SystickHardwareImpl<'a> {
     }
 }
 
-pub fn get(syst: &mut SYST) -> kroneum_api::systick::SysTick<SystickHardwareImpl> {
+pub fn get(syst: SYST) -> kroneum_api::systick::SysTick<SystickHardwareImpl> {
     kroneum_api::systick::SysTick::create(SystickHardwareImpl { syst })
 }

@@ -1,12 +1,14 @@
-use crate::{systick, DevicePeripherals, Peripherals};
+use crate::systick::SysTick;
+use stm32f0::stm32f0x2::Peripherals;
 
 pub struct BeeperHardwareImpl<'a> {
-    p: &'a mut Peripherals,
+    p: &'a Peripherals,
+    systick: &'a mut SysTick,
 }
 
 impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
     fn toggle_pwm(&self, enable: bool) {
-        self.p.device.TIM1.bdtr.modify(|_, w| {
+        self.p.TIM1.bdtr.modify(|_, w| {
             if enable {
                 w.moe().set_bit()
             } else {
@@ -17,18 +19,17 @@ impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
 
     fn pulse(&mut self, note_frequency: u32) {
         self.p
-            .device
             .TIM1
             .arr
             .write(|w| unsafe { w.bits((kroneum_api::config::CLOCK_SPEED / note_frequency) - 1) });
     }
 
     fn delay(&mut self, delay_ms: u32) {
-        systick::get(&mut self.p.core.SYST).delay_ms(delay_ms);
+        self.systick.delay_ms(delay_ms);
     }
 }
 
-fn setup(p: &DevicePeripherals) {
+fn setup(p: &Peripherals) {
     // Enable TIM1 clock.
     p.RCC.apb2enr.modify(|_, w| w.tim1en().set_bit());
 
@@ -83,7 +84,7 @@ fn setup(p: &DevicePeripherals) {
     p.TIM1.cr1.modify(|_, w| w.cen().set_bit());
 }
 
-fn teardown(p: &DevicePeripherals) {
+fn teardown(p: &Peripherals) {
     // Disable counter.
     p.TIM1.cr1.modify(|_, w| w.cen().clear_bit());
 
@@ -91,15 +92,15 @@ fn teardown(p: &DevicePeripherals) {
     p.RCC.apb2enr.modify(|_, w| w.tim1en().clear_bit());
 }
 
-pub fn acquire<F>(p: &mut Peripherals, f: F)
+pub fn acquire<F>(p: &Peripherals, systick: &mut SysTick, f: F)
 where
     F: FnOnce(&mut kroneum_api::beeper::PWMBeeper<BeeperHardwareImpl>),
 {
-    setup(&p.device);
+    setup(&p);
 
     f(&mut kroneum_api::beeper::PWMBeeper::create(
-        BeeperHardwareImpl { p },
+        BeeperHardwareImpl { p, systick },
     ));
 
-    teardown(&p.device);
+    teardown(&p);
 }

@@ -1,9 +1,8 @@
-use crate::{DevicePeripherals, Peripherals};
 use kroneum_api::{rtc, time::BCDTime};
-use stm32f0::stm32f0x2::Interrupt;
+use stm32f0::stm32f0x2::Peripherals;
 
 pub struct RTCHardwareImpl<'a> {
-    p: &'a mut Peripherals,
+    p: &'a Peripherals,
 }
 
 impl<'a> RTCHardwareImpl<'a> {
@@ -16,18 +15,14 @@ impl<'a> RTCHardwareImpl<'a> {
         };
 
         for key in &protection_keys {
-            self.p
-                .device
-                .RTC
-                .wpr
-                .write(|w| unsafe { w.key().bits(*key) });
+            self.p.RTC.wpr.write(|w| unsafe { w.key().bits(*key) });
         }
     }
 }
 
 impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     fn get_time(&self) -> BCDTime {
-        let reg = self.p.device.RTC.tr.read();
+        let reg = self.p.RTC.tr.read();
         BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
@@ -39,7 +34,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     }
 
     fn get_alarm(&self) -> BCDTime {
-        let reg = self.p.device.RTC.alrmar.read();
+        let reg = self.p.RTC.alrmar.read();
         BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
@@ -54,24 +49,22 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         self.toggle_write_protection(false);
 
         // Enable init phase and wait until it is allowed to modify RTC register values.
-        self.p.device.RTC.isr.modify(|_, w| w.init().set_bit());
-        while self.p.device.RTC.isr.read().initf().bit_is_clear() {}
+        self.p.RTC.isr.modify(|_, w| w.init().set_bit());
+        while self.p.RTC.isr.read().initf().bit_is_clear() {}
 
         // Set prescaler, 40kHz/128 (0x7F + 1) => 312 Hz, 312Hz/312 (0x137 + 1) => 1Hz.
         self.p
-            .device
             .RTC
             .prer
             .modify(|_, w| unsafe { w.prediv_s().bits(0x137) });
 
         self.p
-            .device
             .RTC
             .prer
             .modify(|_, w| unsafe { w.prediv_a().bits(0x7F) });
 
         // Configure Time register.
-        self.p.device.RTC.tr.modify(|_, w| unsafe {
+        self.p.RTC.tr.modify(|_, w| unsafe {
             w.ht()
                 .bits(bcd_time.hours_tens)
                 .hu()
@@ -87,7 +80,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         });
 
         // Disable init phase.
-        self.p.device.RTC.isr.modify(|_, w| w.init().clear_bit());
+        self.p.RTC.isr.modify(|_, w| w.init().clear_bit());
 
         self.toggle_write_protection(true);
     }
@@ -99,9 +92,9 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         toggle_alarm(self.p, false);
 
         // Wait until it is allowed to modify alarm A value.
-        while self.p.device.RTC.isr.read().alrawf().bit_is_clear() {}
+        while self.p.RTC.isr.read().alrawf().bit_is_clear() {}
 
-        self.p.device.RTC.alrmar.modify(|_, w| {
+        self.p.RTC.alrmar.modify(|_, w| {
             unsafe {
                 w.ht()
                     .bits(bcd_time.hours_tens)
@@ -135,47 +128,42 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     }
 }
 
-pub fn setup(p: &mut Peripherals) {
+pub fn setup(p: &Peripherals) {
     // Enable the LSI.
-    p.device.RCC.csr.modify(|_, w| w.lsion().set_bit());
-    while p.device.RCC.csr.read().lsirdy().bit_is_clear() {}
+    p.RCC.csr.modify(|_, w| w.lsion().set_bit());
+    while p.RCC.csr.read().lsirdy().bit_is_clear() {}
 
     // Enable PWR clock.
-    p.device.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
+    p.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
 
     // Enable write in RTC domain control register.
-    p.device.PWR.cr.modify(|_, w| w.dbp().set_bit());
+    p.PWR.cr.modify(|_, w| w.dbp().set_bit());
 
     // LSI for RTC clock.
-    p.device
-        .RCC
+    p.RCC
         .bdcr
         .modify(|_, w| w.rtcen().set_bit().rtcsel().bits(0b10));
 
     // Disable PWR clock.
-    p.device.RCC.apb1enr.modify(|_, w| w.pwren().clear_bit());
+    p.RCC.apb1enr.modify(|_, w| w.pwren().clear_bit());
 
     // Unmask line 17, EXTI line 17 is connected to the RTC Alarm event.
-    p.device.EXTI.imr.modify(|_, w| w.mr17().set_bit());
+    p.EXTI.imr.modify(|_, w| w.mr17().set_bit());
     // Rising edge for line 17.
-    p.device.EXTI.rtsr.modify(|_, w| w.tr17().set_bit());
-    // Set priority.
-    unsafe {
-        p.core.NVIC.set_priority(Interrupt::RTC, 2);
-    }
+    p.EXTI.rtsr.modify(|_, w| w.tr17().set_bit());
 }
 
-pub fn teardown(p: &mut Peripherals) {
+pub fn teardown(p: &Peripherals) {
     toggle_alarm(p, false);
 
     // Disable the LSI.
-    p.device.RCC.csr.modify(|_, w| w.lsion().clear_bit());
-    while p.device.RCC.csr.read().lsirdy().bit_is_set() {}
+    p.RCC.csr.modify(|_, w| w.lsion().clear_bit());
+    while p.RCC.csr.read().lsirdy().bit_is_set() {}
 
-    clear_pending_interrupt(&p.device);
+    clear_pending_interrupt(&p);
 }
 
-fn clear_pending_interrupt(p: &DevicePeripherals) {
+fn clear_pending_interrupt(p: &Peripherals) {
     // Clear Alarm A flag.
     p.RTC.isr.modify(|_, w| w.alraf().clear_bit());
 
@@ -183,26 +171,14 @@ fn clear_pending_interrupt(p: &DevicePeripherals) {
     p.EXTI.pr.modify(|_, w| w.pif17().set_bit());
 }
 
-fn toggle_alarm(p: &mut Peripherals, enable: bool) {
-    p.device.RTC.cr.modify(|_, w| {
-        if enable {
-            w.alraie().set_bit();
-            w.alrae().set_bit()
-        } else {
-            w.alraie().clear_bit();
-            w.alrae().clear_bit()
-        }
+fn toggle_alarm(p: &Peripherals, enable: bool) {
+    p.RTC.cr.modify(|_, w| {
+        w.alraie().bit(enable);
+        w.alrae().bit(enable)
     });
-
-    // Enable/disable RTC_IRQn in the NVIC.
-    if enable {
-        p.core.NVIC.enable(Interrupt::RTC);
-    } else {
-        p.core.NVIC.disable(Interrupt::RTC);
-    }
 }
 
-pub fn acquire<F, R>(p: &mut Peripherals, f: F) -> R
+pub fn acquire<F, R>(p: &Peripherals, f: F) -> R
 where
     F: FnOnce(&mut rtc::RTC<RTCHardwareImpl>) -> R,
 {

@@ -1,67 +1,56 @@
-use crate::{systick, DevicePeripherals, Peripherals};
-use kroneum_api::buttons;
-use stm32f0::stm32f0x2::Interrupt;
+use crate::systick::SysTick;
+use stm32f0::stm32f0x2::Peripherals;
 
 pub struct ButtonsHardwareImpl<'a> {
     p: &'a mut Peripherals,
+    systick: &'a mut SysTick,
 }
 
-impl<'a> buttons::ButtonsHardware for ButtonsHardwareImpl<'a> {
-    fn is_button_pressed(&self, button_type: buttons::ButtonType) -> bool {
-        let reg = &self.p.device.GPIOA.idr.read();
+impl<'a> kroneum_api::buttons::ButtonsHardware for ButtonsHardwareImpl<'a> {
+    fn is_button_pressed(&self, button_type: kroneum_api::buttons::ButtonType) -> bool {
+        let reg = &self.p.GPIOA.idr.read();
         match button_type {
-            buttons::ButtonType::One => reg.idr0().bit_is_set(),
-            buttons::ButtonType::Ten => reg.idr2().bit_is_set(),
+            kroneum_api::buttons::ButtonType::One => reg.idr0().bit_is_set(),
+            kroneum_api::buttons::ButtonType::Ten => reg.idr2().bit_is_set(),
         }
     }
 
     fn delay(&mut self, delay_ms: u32) {
-        systick::get(&mut self.p.core.SYST).delay_ms(delay_ms);
+        self.systick.delay_ms(delay_ms);
     }
+}
+
+fn toggle_wakers(p: &mut Peripherals, toggle: bool) {
+    p.PWR
+        .csr
+        .modify(|_, w| w.ewup1().bit(toggle).ewup4().bit(toggle));
 }
 
 pub fn setup(p: &mut Peripherals) {
-    // Set priority for the `EXTI0` and `EXTI2` line to `1`.
-    unsafe {
-        p.core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
-        p.core.NVIC.set_priority(Interrupt::EXTI2_3, 1);
-    }
-
-    // Enable the interrupt in the NVIC.
-    p.core.NVIC.enable(Interrupt::EXTI0_1);
-    p.core.NVIC.enable(Interrupt::EXTI2_3);
-
     // Enable wakers.
-    p.device
-        .PWR
-        .csr
-        .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
+    toggle_wakers(p, true);
 }
 
 pub fn _teardown(p: &mut Peripherals) {
-    p.core.NVIC.disable(Interrupt::EXTI0_1);
-    p.core.NVIC.disable(Interrupt::EXTI2_3);
-
     // Disable waker.
-    p.device
-        .PWR
-        .csr
-        .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
+    toggle_wakers(p, false);
 }
 
-pub fn has_pending_interrupt(p: &DevicePeripherals) -> bool {
+pub fn has_pending_interrupt(p: &Peripherals) -> bool {
     let reg = p.EXTI.pr.read();
     reg.pif0().bit_is_set() || reg.pif2().bit_is_set()
 }
 
-pub fn clear_pending_interrupt(p: &DevicePeripherals) {
+pub fn clear_pending_interrupt(p: &Peripherals) {
     // Clear exti line 0 and 2 flags.
     p.EXTI.pr.modify(|_, w| w.pif0().set_bit().pif2().set_bit());
 }
 
-pub fn acquire<F, R>(p: &mut Peripherals, f: F) -> R
+pub fn acquire<F, R>(p: &mut Peripherals, systick: &mut SysTick, f: F) -> R
 where
-    F: FnOnce(&mut buttons::Buttons<ButtonsHardwareImpl>) -> R,
+    F: FnOnce(&mut kroneum_api::buttons::Buttons<ButtonsHardwareImpl>) -> R,
 {
-    f(&mut buttons::Buttons::create(ButtonsHardwareImpl { p }))
+    f(&mut kroneum_api::buttons::Buttons::create(
+        ButtonsHardwareImpl { p, systick },
+    ))
 }
