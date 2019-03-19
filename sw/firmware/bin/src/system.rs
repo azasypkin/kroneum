@@ -51,7 +51,7 @@ impl System {
     }
 
     pub fn setup(&mut self) {
-        buttons::setup(&mut self.p);
+        buttons::setup(&self.p);
 
         self.set_mode(SystemMode::Idle);
     }
@@ -61,8 +61,8 @@ impl System {
             SystemMode::Idle => {
                 self.toggle_standby_mode(true);
 
-                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.stop());
-                usb::teardown(&mut self.p);
+                usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.stop());
+                usb::teardown(&self.p);
                 rtc::teardown(&self.p);
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
@@ -83,8 +83,8 @@ impl System {
 
                 self.toggle_standby_mode(false);
 
-                usb::setup(&mut self.p);
-                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| usb.start());
+                usb::setup(&self.p);
+                usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.start());
             }
             SystemMode::Setup(0) => beeper::acquire(&self.p, &mut self.systick, |beeper| {
                 beeper.play(Melody::Setup)
@@ -121,9 +121,7 @@ impl System {
     }
 
     pub fn on_usb_packet(&mut self) {
-        usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
-            usb.interrupt()
-        });
+        usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.interrupt());
 
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
@@ -134,7 +132,7 @@ impl System {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep());
                 let alarm = rtc::acquire(&self.p, |rtc| rtc.alarm());
 
-                usb::acquire(&mut self.p, &mut self.state.usb_state, |usb| {
+                usb::acquire(&self.p, &mut self.state.usb_state, |usb| {
                     usb.send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0])
                 });
             }
@@ -148,16 +146,13 @@ impl System {
             return;
         }
 
-        let (button_i, button_x) = buttons::acquire(&mut self.p, &mut self.systick, |buttons| {
-            buttons.interrupt()
-        });
+        let (button_i, button_x) =
+            buttons::acquire(&self.p, &mut self.systick, |buttons| buttons.interrupt());
 
         match (self.state.mode, button_i, button_x) {
             (mode, ButtonPressType::Long, ButtonPressType::Long) => {
                 let (button_i, button_x) =
-                    buttons::acquire(&mut self.p, &mut self.systick, |buttons| {
-                        buttons.interrupt()
-                    });
+                    buttons::acquire(&self.p, &mut self.systick, |buttons| buttons.interrupt());
 
                 match (mode, button_i, button_x) {
                     (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
