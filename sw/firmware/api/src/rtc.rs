@@ -60,11 +60,20 @@ impl<T: RTCHardware> RTC<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::MockCalls;
     use core::cell::RefCell;
 
+    #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+    enum Call {
+        Setup,
+        Teardown,
+    }
+
+    #[derive(Default)]
     struct MockData {
         pub time: BCDTime,
         pub alarm: BCDTime,
+        pub calls: MockCalls<Call>,
     }
 
     struct RTCHardwareMock<'a> {
@@ -72,6 +81,14 @@ mod tests {
     }
 
     impl<'a> RTCHardware for RTCHardwareMock<'a> {
+        fn setup(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Setup);
+        }
+
+        fn teardown(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Teardown);
+        }
+
         fn get_time(&self) -> BCDTime {
             BCDTime {
                 hours_tens: 1,
@@ -112,11 +129,26 @@ mod tests {
     }
 
     #[test]
+    fn setup() {
+        let mut mock_data = MockData::default();
+
+        create_rtc(&mut mock_data).setup();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
+    }
+
+    #[test]
+    fn teardown() {
+        let mut mock_data = MockData::default();
+
+        create_rtc(&mut mock_data).teardown();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
+    }
+
+    #[test]
     fn get_time() {
-        let mut mock_data = MockData {
-            time: BCDTime::default(),
-            alarm: BCDTime::default(),
-        };
+        let mut mock_data = MockData::default();
 
         assert_eq!(
             create_rtc(&mut mock_data).time(),
@@ -130,10 +162,7 @@ mod tests {
 
     #[test]
     fn get_alarm() {
-        let mut mock_data = MockData {
-            time: BCDTime::default(),
-            alarm: BCDTime::default(),
-        };
+        let mut mock_data = MockData::default();
 
         assert_eq!(
             create_rtc(&mut mock_data).alarm(),
@@ -147,10 +176,7 @@ mod tests {
 
     #[test]
     fn set_time() {
-        let mut mock_data = MockData {
-            time: BCDTime::default(),
-            alarm: BCDTime::default(),
-        };
+        let mut mock_data = MockData::default();
 
         create_rtc(&mut mock_data).set_time(Time {
             hours: 13,
@@ -173,10 +199,7 @@ mod tests {
 
     #[test]
     fn set_alarm() {
-        let mut mock_data = MockData {
-            time: BCDTime::default(),
-            alarm: BCDTime::default(),
-        };
+        let mut mock_data = MockData::default();
 
         create_rtc(&mut mock_data).set_alarm(Time {
             hours: 13,

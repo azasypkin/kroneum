@@ -117,6 +117,7 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::MockCalls;
     use core::cell::RefCell;
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -125,19 +126,16 @@ mod tests {
         DisablePWM,
         Delay(u32),
         Pulse(u32),
-        Unknown,
     }
 
     struct MockData {
-        pub calls: [Call; 15],
-        pub pointer: usize,
+        pub calls: MockCalls<Call>,
     }
 
     impl MockData {
         pub fn new() -> Self {
             MockData {
-                calls: [Call::Unknown; 15],
-                pointer: 0,
+                calls: MockCalls::default(),
             }
         }
     }
@@ -146,30 +144,24 @@ mod tests {
         data: RefCell<&'a mut MockData>,
     }
 
-    impl<'a> PWMBeeperHardwareMock<'a> {
-        pub fn register_call(&self, call: Call) {
-            let mut data = self.data.borrow_mut();
-            let pointer = data.pointer;
-            data.calls[pointer] = call;
-            data.pointer += 1;
-        }
-    }
-
     impl<'a> PWMBeeperHardware for PWMBeeperHardwareMock<'a> {
         fn toggle_pwm(&self, enable: bool) {
-            if enable {
-                self.register_call(Call::EnablePWM);
+            self.data.borrow_mut().calls.log_call(if enable {
+                Call::EnablePWM
             } else {
-                self.register_call(Call::DisablePWM);
-            }
+                Call::DisablePWM
+            });
         }
 
         fn pulse(&self, note_frequency: u32) {
-            self.register_call(Call::Pulse(note_frequency));
+            self.data
+                .borrow_mut()
+                .calls
+                .log_call(Call::Pulse(note_frequency));
         }
 
         fn delay(&mut self, delay_ms: u32) {
-            self.register_call(Call::Delay(delay_ms));
+            self.data.borrow_mut().calls.log_call(Call::Delay(delay_ms));
         }
     }
 
@@ -186,14 +178,13 @@ mod tests {
         let mut mock_data = MockData::new();
 
         create_beeper(&mut mock_data).beep();
-        assert_eq!(mock_data.pointer, 4);
         assert_eq!(
-            mock_data.calls[..mock_data.pointer],
+            mock_data.calls.logs(),
             [
-                Call::EnablePWM,
-                Call::Pulse(BEEP_MELODY[0].0),
-                Call::Delay(BEEP_MELODY[0].1),
-                Call::DisablePWM
+                Some(Call::EnablePWM),
+                Some(Call::Pulse(BEEP_MELODY[0].0)),
+                Some(Call::Delay(BEEP_MELODY[0].1)),
+                Some(Call::DisablePWM)
             ]
         );
     }
@@ -203,24 +194,23 @@ mod tests {
         let mut mock_data = MockData::new();
 
         create_beeper(&mut mock_data).beep_n(3);
-        assert_eq!(mock_data.pointer, 14);
         assert_eq!(
-            mock_data.calls[..mock_data.pointer],
+            mock_data.calls.logs(),
             [
-                Call::EnablePWM,
-                Call::Pulse(BEEP_MELODY[0].0),
-                Call::Delay(BEEP_MELODY[0].1),
-                Call::DisablePWM,
-                Call::Delay(100),
-                Call::EnablePWM,
-                Call::Pulse(BEEP_MELODY[0].0),
-                Call::Delay(BEEP_MELODY[0].1),
-                Call::DisablePWM,
-                Call::Delay(100),
-                Call::EnablePWM,
-                Call::Pulse(BEEP_MELODY[0].0),
-                Call::Delay(BEEP_MELODY[0].1),
-                Call::DisablePWM
+                Some(Call::EnablePWM),
+                Some(Call::Pulse(BEEP_MELODY[0].0)),
+                Some(Call::Delay(BEEP_MELODY[0].1)),
+                Some(Call::DisablePWM),
+                Some(Call::Delay(100)),
+                Some(Call::EnablePWM),
+                Some(Call::Pulse(BEEP_MELODY[0].0)),
+                Some(Call::Delay(BEEP_MELODY[0].1)),
+                Some(Call::DisablePWM),
+                Some(Call::Delay(100)),
+                Some(Call::EnablePWM),
+                Some(Call::Pulse(BEEP_MELODY[0].0)),
+                Some(Call::Delay(BEEP_MELODY[0].1)),
+                Some(Call::DisablePWM)
             ]
         );
     }
@@ -230,16 +220,15 @@ mod tests {
         let mut mock_data = MockData::new();
 
         create_beeper(&mut mock_data).play(Melody::Setup);
-        assert_eq!(mock_data.pointer, 6);
         assert_eq!(
-            mock_data.calls[..mock_data.pointer],
+            mock_data.calls.logs(),
             [
-                Call::EnablePWM,
-                Call::Pulse(SETUP_MELODY[0].0),
-                Call::Delay(SETUP_MELODY[0].1),
-                Call::Pulse(SETUP_MELODY[1].0),
-                Call::Delay(SETUP_MELODY[1].1),
-                Call::DisablePWM
+                Some(Call::EnablePWM),
+                Some(Call::Pulse(SETUP_MELODY[0].0)),
+                Some(Call::Delay(SETUP_MELODY[0].1)),
+                Some(Call::Pulse(SETUP_MELODY[1].0)),
+                Some(Call::Delay(SETUP_MELODY[1].1)),
+                Some(Call::DisablePWM)
             ]
         );
     }
