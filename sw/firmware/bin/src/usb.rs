@@ -2,10 +2,8 @@ use stm32f0::stm32f0x2::Peripherals;
 
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
-    UsbInterrupt, UsbState,
+    UsbInterrupt, UsbState, USB,
 };
-
-pub type USB<'a> = kroneum_api::usb::USB<'a, USBHardwareImpl<'a>>;
 
 pub struct USBHardwareImpl<'a> {
     p: &'a Peripherals,
@@ -373,6 +371,6 @@ fn stop_clock(p: &Peripherals) {
     while p.RCC.cr2.read().hsi48rdy().bit_is_set() {}
 }
 
-pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a> {
-    USB::create(USBHardwareImpl { p }, state)
+pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a, USBHardwareImpl<'a>> {
+    USB::new(USBHardwareImpl { p }, state)
 }

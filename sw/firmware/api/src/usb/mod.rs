@@ -153,7 +153,7 @@ pub struct USB<'a, T: USBHardware> {
 }
 
 impl<'a, T: USBHardware> USB<'a, T> {
-    pub fn create(hw: T, state: &'a mut UsbState) -> Self {
+    pub fn new(hw: T, state: &'a mut UsbState) -> Self {
         USB {
             hw,
             pma: PacketMemoryArea::default(),
@@ -161,29 +161,23 @@ impl<'a, T: USBHardware> USB<'a, T> {
         }
     }
 
-    /// Prepares USB hardware (setup clocks, SOF etc.).
-    pub fn setup(&self) {
-        self.hw.setup()
-    }
-
-    /// Releases USB hardware (stops clocks, disables interrupts etc.).
-    pub fn teardown(&self) {
-        self.hw.teardown()
-    }
-
-    pub fn start(&mut self) {
+    /// Prepares and starts USB hardware (setup clocks, SOF etc.).
+    pub fn setup(&mut self) {
+        self.hw.setup();
         self.pma.init();
 
         self.state.address = 0;
         self.update_device_status(DeviceStatus::Default);
     }
 
-    pub fn stop(&mut self) {
+    /// Stops and releases USB hardware (stops clocks, disables interrupts etc.).
+    pub fn teardown(&mut self) {
         self.hw.close_endpoint(EndpointType::Device);
         self.hw.close_endpoint(EndpointType::Control);
 
         self.state.address = 0;
         self.update_device_status(DeviceStatus::Default);
+        self.hw.teardown();
     }
 
     pub fn interrupt(&mut self) {

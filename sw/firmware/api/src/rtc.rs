@@ -26,7 +26,7 @@ pub struct RTC<T: RTCHardware> {
 }
 
 impl<T: RTCHardware> RTC<T> {
-    pub fn create(hw: T) -> Self {
+    pub fn new(hw: T) -> Self {
         RTC { hw }
     }
 

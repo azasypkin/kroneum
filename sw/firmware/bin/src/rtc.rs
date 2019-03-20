@@ -1,4 +1,7 @@
-use kroneum_api as api;
+use kroneum_api::{
+    rtc::{RTCHardware, RTC},
+    time::BCDTime,
+};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct RTCHardwareImpl<'a> {
@@ -20,7 +23,7 @@ impl<'a> RTCHardwareImpl<'a> {
     }
 }
 
-impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
+impl<'a> RTCHardware for RTCHardwareImpl<'a> {
     fn setup(&self) {
         // Enable the LSI.
         self.p.RCC.csr.modify(|_, w| w.lsion().set_bit());
@@ -57,9 +60,9 @@ impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
         clear_pending_interrupt(self.p);
     }
 
-    fn get_time(&self) -> api::time::BCDTime {
+    fn get_time(&self) -> BCDTime {
         let reg = self.p.RTC.tr.read();
-        api::time::BCDTime {
+        BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
             minutes_tens: reg.mnt().bits(),
@@ -69,9 +72,9 @@ impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
         }
     }
 
-    fn get_alarm(&self) -> api::time::BCDTime {
+    fn get_alarm(&self) -> BCDTime {
         let reg = self.p.RTC.alrmar.read();
-        api::time::BCDTime {
+        BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
             minutes_tens: reg.mnt().bits(),
@@ -81,7 +84,7 @@ impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
         }
     }
 
-    fn set_time(&self, bcd_time: api::time::BCDTime) {
+    fn set_time(&self, bcd_time: BCDTime) {
         self.toggle_write_protection(false);
 
         // Enable init phase and wait until it is allowed to modify RTC register values.
@@ -121,7 +124,7 @@ impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
         self.toggle_write_protection(true);
     }
 
-    fn set_alarm(&self, bcd_time: api::time::BCDTime) {
+    fn set_alarm(&self, bcd_time: BCDTime) {
         self.toggle_write_protection(false);
 
         // Disable alarm A to modify it.
@@ -179,6 +182,6 @@ fn toggle_alarm(p: &Peripherals, enable: bool) {
     });
 }
 
-pub fn create(p: &Peripherals) -> api::rtc::RTC<RTCHardwareImpl> {
-    api::rtc::RTC::create(RTCHardwareImpl { p })
+pub fn create(p: &Peripherals) -> RTC<RTCHardwareImpl> {
+    RTC::new(RTCHardwareImpl { p })
 }

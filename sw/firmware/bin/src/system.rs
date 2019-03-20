@@ -62,10 +62,7 @@ impl System {
             SystemMode::Idle => {
                 self.toggle_standby_mode(true);
 
-                let mut usb = self.usb();
-                usb.stop();
-                usb.teardown();
-
+                self.usb().teardown();
                 self.rtc().teardown();
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
@@ -86,9 +83,7 @@ impl System {
 
                 self.toggle_standby_mode(false);
 
-                let mut usb = self.usb();
-                usb.setup();
-                usb.start();
+                self.usb().setup();
             }
             SystemMode::Setup(0) => beeper::acquire(&self.p, &mut self.systick, |beeper| {
                 beeper.play(api::beeper::Melody::Setup)
@@ -207,7 +202,7 @@ impl System {
     }
 
     /// Creates an instance of `USB` controller.
-    fn usb(&mut self) -> usb::USB {
+    fn usb<'a>(&'a mut self) -> api::usb::USB<impl api::usb::USBHardware + 'a> {
         usb::create(&self.p, &mut self.state.usb_state)
     }
 
