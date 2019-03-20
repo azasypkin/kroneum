@@ -1,4 +1,4 @@
-use kroneum_api::{rtc, time::BCDTime};
+use kroneum_api as api;
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct RTCHardwareImpl<'a> {
@@ -20,10 +20,46 @@ impl<'a> RTCHardwareImpl<'a> {
     }
 }
 
-impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
-    fn get_time(&self) -> BCDTime {
+impl<'a> api::rtc::RTCHardware for RTCHardwareImpl<'a> {
+    fn setup(&self) {
+        // Enable the LSI.
+        self.p.RCC.csr.modify(|_, w| w.lsion().set_bit());
+        while self.p.RCC.csr.read().lsirdy().bit_is_clear() {}
+
+        // Enable PWR clock.
+        self.p.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
+
+        // Enable write in RTC domain control register.
+        self.p.PWR.cr.modify(|_, w| w.dbp().set_bit());
+
+        // LSI for RTC clock.
+        self.p
+            .RCC
+            .bdcr
+            .modify(|_, w| w.rtcen().set_bit().rtcsel().bits(0b10));
+
+        // Disable PWR clock.
+        self.p.RCC.apb1enr.modify(|_, w| w.pwren().clear_bit());
+
+        // Unmask line 17, EXTI line 17 is connected to the RTC Alarm event.
+        self.p.EXTI.imr.modify(|_, w| w.mr17().set_bit());
+        // Rising edge for line 17.
+        self.p.EXTI.rtsr.modify(|_, w| w.tr17().set_bit());
+    }
+
+    fn teardown(&self) {
+        toggle_alarm(self.p, false);
+
+        // Disable the LSI.
+        self.p.RCC.csr.modify(|_, w| w.lsion().clear_bit());
+        while self.p.RCC.csr.read().lsirdy().bit_is_set() {}
+
+        clear_pending_interrupt(self.p);
+    }
+
+    fn get_time(&self) -> api::time::BCDTime {
         let reg = self.p.RTC.tr.read();
-        BCDTime {
+        api::time::BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
             minutes_tens: reg.mnt().bits(),
@@ -33,9 +69,9 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         }
     }
 
-    fn get_alarm(&self) -> BCDTime {
+    fn get_alarm(&self) -> api::time::BCDTime {
         let reg = self.p.RTC.alrmar.read();
-        BCDTime {
+        api::time::BCDTime {
             hours_tens: reg.ht().bits(),
             hours: reg.hu().bits(),
             minutes_tens: reg.mnt().bits(),
@@ -45,7 +81,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         }
     }
 
-    fn set_time(&self, bcd_time: BCDTime) {
+    fn set_time(&self, bcd_time: api::time::BCDTime) {
         self.toggle_write_protection(false);
 
         // Enable init phase and wait until it is allowed to modify RTC register values.
@@ -85,7 +121,7 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
         self.toggle_write_protection(true);
     }
 
-    fn set_alarm(&self, bcd_time: BCDTime) {
+    fn set_alarm(&self, bcd_time: api::time::BCDTime) {
         self.toggle_write_protection(false);
 
         // Disable alarm A to modify it.
@@ -128,41 +164,6 @@ impl<'a> rtc::RTCHardware for RTCHardwareImpl<'a> {
     }
 }
 
-pub fn setup(p: &Peripherals) {
-    // Enable the LSI.
-    p.RCC.csr.modify(|_, w| w.lsion().set_bit());
-    while p.RCC.csr.read().lsirdy().bit_is_clear() {}
-
-    // Enable PWR clock.
-    p.RCC.apb1enr.modify(|_, w| w.pwren().set_bit());
-
-    // Enable write in RTC domain control register.
-    p.PWR.cr.modify(|_, w| w.dbp().set_bit());
-
-    // LSI for RTC clock.
-    p.RCC
-        .bdcr
-        .modify(|_, w| w.rtcen().set_bit().rtcsel().bits(0b10));
-
-    // Disable PWR clock.
-    p.RCC.apb1enr.modify(|_, w| w.pwren().clear_bit());
-
-    // Unmask line 17, EXTI line 17 is connected to the RTC Alarm event.
-    p.EXTI.imr.modify(|_, w| w.mr17().set_bit());
-    // Rising edge for line 17.
-    p.EXTI.rtsr.modify(|_, w| w.tr17().set_bit());
-}
-
-pub fn teardown(p: &Peripherals) {
-    toggle_alarm(p, false);
-
-    // Disable the LSI.
-    p.RCC.csr.modify(|_, w| w.lsion().clear_bit());
-    while p.RCC.csr.read().lsirdy().bit_is_set() {}
-
-    clear_pending_interrupt(&p);
-}
-
 fn clear_pending_interrupt(p: &Peripherals) {
     // Clear Alarm A flag.
     p.RTC.isr.modify(|_, w| w.alraf().clear_bit());
@@ -178,9 +179,6 @@ fn toggle_alarm(p: &Peripherals, enable: bool) {
     });
 }
 
-pub fn acquire<F, R>(p: &Peripherals, f: F) -> R
-where
-    F: FnOnce(&rtc::RTC<RTCHardwareImpl>) -> R,
-{
-    f(&rtc::RTC::create(RTCHardwareImpl { p }))
+pub fn create(p: &Peripherals) -> api::rtc::RTC<RTCHardwareImpl> {
+    api::rtc::RTC::create(RTCHardwareImpl { p })
 }

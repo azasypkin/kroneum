@@ -2,8 +2,10 @@ use stm32f0::stm32f0x2::Peripherals;
 
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
-    UsbInterrupt, UsbState, USB,
+    UsbInterrupt, UsbState,
 };
+
+pub type USB<'a> = kroneum_api::usb::USB<'a, USBHardwareImpl<'a>>;
 
 pub struct USBHardwareImpl<'a> {
     p: &'a Peripherals,
@@ -138,6 +140,42 @@ impl<'a> USBHardwareImpl<'a> {
 }
 
 impl<'a> USBHardware for USBHardwareImpl<'a> {
+    /// Setups USB hardware, but doesn't activate it.
+    fn setup(&self) {
+        start_clock(self.p);
+
+        self.p.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
+
+        // Reset the peripheral.
+        self.p
+            .USB
+            .cntr
+            .modify(|_, w| w.pdwn().clear_bit().fres().set_bit());
+        self.p.USB.cntr.modify(|_, w| w.fres().clear_bit());
+
+        // Reset any pending interrupts.
+        self.p.USB.istr.reset();
+
+        // Set interrupt mask.
+        self.p
+            .USB
+            .cntr
+            .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
+
+        self.p.USB.bcdr.modify(|_, w| w.dppu().set_bit());
+    }
+
+    /// Tears down USB hardware.
+    fn teardown(&self) {
+        // Tell the host that we're gone by disabling pull-up on DP.
+        self.p.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
+
+        // USB clock off.
+        self.p.RCC.apb1enr.modify(|_, w| w.usben().clear_bit());
+
+        stop_clock(self.p);
+    }
+
     fn enable(&self) {
         self.p.USB.daddr.write(|w| w.ef().set_bit());
     }
@@ -299,38 +337,6 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 }
 
-pub fn setup(p: &Peripherals) {
-    start_clock(&p);
-
-    p.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
-
-    // Reset the peripheral.
-    p.USB
-        .cntr
-        .modify(|_, w| w.pdwn().clear_bit().fres().set_bit());
-    p.USB.cntr.modify(|_, w| w.fres().clear_bit());
-
-    // Reset any pending interrupts.
-    p.USB.istr.reset();
-
-    // Set interrupt mask.
-    p.USB
-        .cntr
-        .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
-
-    p.USB.bcdr.modify(|_, w| w.dppu().set_bit());
-}
-
-pub fn teardown(p: &Peripherals) {
-    // Tell the host that we're gone by disabling pull-up on DP.
-    p.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
-
-    // USB clock off.
-    p.RCC.apb1enr.modify(|_, w| w.usben().clear_bit());
-
-    stop_clock(&p);
-}
-
 fn start_clock(p: &Peripherals) {
     // Enable HSI48.
     p.RCC.cr2.modify(|_, w| w.hsi48on().set_bit());
@@ -367,9 +373,6 @@ fn stop_clock(p: &Peripherals) {
     while p.RCC.cr2.read().hsi48rdy().bit_is_set() {}
 }
 
-pub fn acquire<F, R>(p: &Peripherals, state: &mut UsbState, f: F) -> R
-where
-    F: FnOnce(&mut USB<USBHardwareImpl>) -> R,
-{
-    f(&mut USB::create(USBHardwareImpl { p }, state))
+pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a> {
+    USB::create(USBHardwareImpl { p }, state)
 }

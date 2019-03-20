@@ -3,8 +3,9 @@ use crate::{beeper, buttons, rtc, systick, usb};
 use cortex_m::peripheral::SCB;
 use stm32f0::stm32f0x2::Peripherals;
 
+use kroneum_api as api;
+
 use kroneum_api::{
-    beeper::Melody,
     buttons::ButtonPressType,
     time::Time,
     usb::{command_packet::CommandPacket, UsbState},
@@ -14,7 +15,7 @@ use kroneum_api::{
 pub enum SystemMode {
     Idle,
     Setup(u32),
-    Alarm(Time, Melody),
+    Alarm(Time, api::beeper::Melody),
     Config,
 }
 
@@ -61,47 +62,49 @@ impl System {
             SystemMode::Idle => {
                 self.toggle_standby_mode(true);
 
-                usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.stop());
-                usb::teardown(&self.p);
-                rtc::teardown(&self.p);
+                let mut usb = self.usb();
+                usb.stop();
+                usb.teardown();
+
+                self.rtc().teardown();
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
                     beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                        beeper.play(Melody::Reset)
+                        beeper.play(api::beeper::Melody::Reset)
                     });
                 } else if let SystemMode::Alarm(_, _) = self.state.mode {
                     beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                        beeper.play(Melody::Reset)
+                        beeper.play(api::beeper::Melody::Reset)
                     });
                 }
             }
             SystemMode::Config => {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                    beeper.play(Melody::Reset)
+                    beeper.play(api::beeper::Melody::Reset)
                 });
 
                 self.toggle_standby_mode(false);
 
-                usb::setup(&self.p);
-                usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.start());
+                let mut usb = self.usb();
+                usb.setup();
+                usb.start();
             }
             SystemMode::Setup(0) => beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                beeper.play(Melody::Setup)
+                beeper.play(api::beeper::Melody::Setup)
             }),
             SystemMode::Setup(c) if *c > 0 => {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep())
             }
             SystemMode::Alarm(time, _) => {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                    beeper.play(Melody::Setup)
+                    beeper.play(api::beeper::Melody::Setup)
                 });
 
-                rtc::setup(&self.p);
-                rtc::acquire(&self.p, |rtc| {
-                    rtc.set_time(Time::default());
-                    rtc.set_alarm(*time);
-                });
+                let rtc = self.rtc();
+                rtc.setup();
+                rtc.set_time(Time::default());
+                rtc.set_alarm(*time);
             }
             _ => {}
         }
@@ -113,28 +116,30 @@ impl System {
         if let SystemMode::Alarm(_, melody) = &self.state.mode {
             beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.play(*melody));
 
-            rtc::teardown(&self.p);
+            self.rtc().teardown();
 
             // Snooze alarm for 10 seconds.
-            self.set_mode(SystemMode::Alarm(Time::from_seconds(10), Melody::Beep));
+            self.set_mode(SystemMode::Alarm(
+                Time::from_seconds(10),
+                api::beeper::Melody::Beep,
+            ));
         }
     }
 
     pub fn on_usb_packet(&mut self) {
-        usb::acquire(&self.p, &mut self.state.usb_state, |usb| usb.interrupt());
+        self.usb().interrupt();
 
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep_n(num));
             } else if let CommandPacket::SetAlarm(time) = command_packet {
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                self.set_mode(SystemMode::Alarm(time, api::beeper::Melody::Alarm));
             } else if let CommandPacket::GetAlarm = command_packet {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep());
-                let alarm = rtc::acquire(&self.p, |rtc| rtc.alarm());
 
-                usb::acquire(&self.p, &mut self.state.usb_state, |usb| {
-                    usb.send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0])
-                });
+                let alarm = self.rtc().alarm();
+                self.usb()
+                    .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
             }
         }
 
@@ -162,9 +167,10 @@ impl System {
                     (_, ButtonPressType::Long, ButtonPressType::Long) => {
                         self.set_mode(SystemMode::Config)
                     }
-                    (SystemMode::Setup(counter), _, _) => {
-                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
-                    }
+                    (SystemMode::Setup(counter), _, _) => self.set_mode(SystemMode::Alarm(
+                        Time::from_hours(counter),
+                        api::beeper::Melody::Alarm,
+                    )),
                     _ => {}
                 }
             }
@@ -181,7 +187,7 @@ impl System {
                     _ => Time::from_minutes(counter as u32),
                 };
 
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                self.set_mode(SystemMode::Alarm(time, api::beeper::Melody::Alarm));
             }
             (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
                 self.set_mode(SystemMode::Setup(counter + 1))
@@ -193,6 +199,16 @@ impl System {
         }
 
         buttons::clear_pending_interrupt(&self.p);
+    }
+
+    /// Creates an instance of `RTC` controller.
+    fn rtc<'a>(&'a self) -> api::rtc::RTC<impl api::rtc::RTCHardware + 'a> {
+        rtc::create(&self.p)
+    }
+
+    /// Creates an instance of `USB` controller.
+    fn usb(&mut self) -> usb::USB {
+        usb::create(&self.p, &mut self.state.usb_state)
     }
 
     fn toggle_standby_mode(&mut self, on: bool) {

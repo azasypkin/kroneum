@@ -2,6 +2,12 @@ use crate::time::{BCDTime, Time};
 
 /// Describes the RTC hardware management interface.
 pub trait RTCHardware {
+    /// Initializes hardware if needed.
+    fn setup(&self);
+
+    /// Releases hardware if needed.
+    fn teardown(&self);
+
     /// Retrieves current RTC time in BCD format.
     fn get_time(&self) -> BCDTime;
 
@@ -22,6 +28,16 @@ pub struct RTC<T: RTCHardware> {
 impl<T: RTCHardware> RTC<T> {
     pub fn create(hw: T) -> Self {
         RTC { hw }
+    }
+
+    /// Setups RTC hardware.
+    pub fn setup(&self) {
+        self.hw.setup()
+    }
+
+    /// Tears down RTC hardware.
+    pub fn teardown(&self) {
+        self.hw.teardown()
     }
 
     pub fn alarm(&self) -> Time {

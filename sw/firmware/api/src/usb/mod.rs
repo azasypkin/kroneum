@@ -107,6 +107,12 @@ impl Default for UsbState {
 
 // Describes USB hardware management interface.
 pub trait USBHardware {
+    /// Initializes hardware if needed.
+    fn setup(&self);
+
+    /// Releases hardware if needed.
+    fn teardown(&self);
+
     /// Enables USB device.
     fn enable(&self);
 
@@ -153,6 +159,16 @@ impl<'a, T: USBHardware> USB<'a, T> {
             pma: PacketMemoryArea::default(),
             state,
         }
+    }
+
+    /// Prepares USB hardware (setup clocks, SOF etc.).
+    pub fn setup(&self) {
+        self.hw.setup()
+    }
+
+    /// Releases USB hardware (stops clocks, disables interrupts etc.).
+    pub fn teardown(&self) {
+        self.hw.teardown()
     }
 
     pub fn start(&mut self) {
