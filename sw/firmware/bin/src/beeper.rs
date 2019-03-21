@@ -1,12 +1,16 @@
-use crate::systick::SysTick;
+use kroneum_api::{
+    beeper::{PWMBeeper, PWMBeeperHardware},
+    config,
+    systick::{SysTick, SysTickHardware},
+};
 use stm32f0::stm32f0x2::Peripherals;
 
-pub struct BeeperHardwareImpl<'a> {
+pub struct BeeperHardwareImpl<'a, S: SysTickHardware> {
     p: &'a Peripherals,
-    systick: &'a mut SysTick,
+    systick: &'a mut SysTick<S>,
 }
 
-impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
+impl<'a, S: SysTickHardware> PWMBeeperHardware for BeeperHardwareImpl<'a, S> {
     fn toggle_pwm(&self, enable: bool) {
         self.p.TIM1.bdtr.modify(|_, w| {
             if enable {
@@ -21,7 +25,7 @@ impl<'a> kroneum_api::beeper::PWMBeeperHardware for BeeperHardwareImpl<'a> {
         self.p
             .TIM1
             .arr
-            .write(|w| unsafe { w.bits((kroneum_api::config::CLOCK_SPEED / note_frequency) - 1) });
+            .write(|w| unsafe { w.bits((config::CLOCK_SPEED / note_frequency) - 1) });
     }
 
     fn delay(&mut self, delay_ms: u32) {
@@ -40,7 +44,7 @@ fn setup(p: &Peripherals) {
     p.TIM1.cr1.reset();
 
     // Compute the value to be set in ARR (auto-reload) register to generate signal frequency at 17.57 Khz.
-    let timer_period: u32 = (kroneum_api::config::CLOCK_SPEED / 17_570) - 1;
+    let timer_period: u32 = (config::CLOCK_SPEED / 17_570) - 1;
     p.TIM1.arr.write(|w| unsafe { w.bits(timer_period) });
 
     // Set repetition counter.
@@ -92,15 +96,13 @@ fn teardown(p: &Peripherals) {
     p.RCC.apb2enr.modify(|_, w| w.tim1en().clear_bit());
 }
 
-pub fn acquire<F>(p: &Peripherals, systick: &mut SysTick, f: F)
+pub fn acquire<F, S: SysTickHardware>(p: &Peripherals, systick: &mut SysTick<S>, f: F)
 where
-    F: FnOnce(&mut kroneum_api::beeper::PWMBeeper<BeeperHardwareImpl>),
+    F: FnOnce(&mut PWMBeeper<BeeperHardwareImpl<S>>),
 {
     setup(&p);
 
-    f(&mut kroneum_api::beeper::PWMBeeper::create(
-        BeeperHardwareImpl { p, systick },
-    ));
+    f(&mut PWMBeeper::create(BeeperHardwareImpl { p, systick }));
 
     teardown(&p);
 }

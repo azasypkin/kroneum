@@ -19,7 +19,8 @@ use cortex_m::{
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use stm32f0::stm32f0x2::{interrupt, Interrupt, Peripherals as DevicePeripherals};
 
-static SYSTEM: Mutex<RefCell<Option<system::System>>> = Mutex::new(RefCell::new(None));
+static SYSTEM: Mutex<RefCell<Option<system::System<systick::SystickHardwareImpl>>>> =
+    Mutex::new(RefCell::new(None));
 
 // Read about interrupt setup sequence at:
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
@@ -33,7 +34,7 @@ fn main() -> ! {
 
         let mut system = system::System::new(
             device_peripherals,
-            systick::get(core_peripherals.SYST),
+            systick::create(core_peripherals.SYST),
             core_peripherals.SCB,
         );
 
@@ -79,7 +80,7 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
 
 fn interrupt_free<F>(f: F)
 where
-    F: FnOnce(&mut system::System),
+    F: FnOnce(&mut system::System<systick::SystickHardwareImpl>),
 {
     free(|cs| {
         if let Some(s) = SYSTEM.borrow(cs).borrow_mut().as_mut() {
