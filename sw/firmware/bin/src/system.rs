@@ -3,6 +3,7 @@ use crate::{beeper, buttons, rtc, usb};
 use cortex_m::peripheral::SCB;
 use stm32f0::stm32f0x2::Peripherals;
 
+use kroneum_api::buttons::{Buttons, ButtonsHardware};
 use kroneum_api::{
     beeper::Melody,
     buttons::ButtonPressType,
@@ -53,7 +54,7 @@ impl<S: SysTickHardware> System<S> {
     }
 
     pub fn setup(&mut self) {
-        buttons::setup(&self.p);
+        self.buttons().setup();
 
         self.set_mode(SystemMode::Idle);
     }
@@ -144,13 +145,11 @@ impl<S: SysTickHardware> System<S> {
             return;
         }
 
-        let (button_i, button_x) =
-            buttons::acquire(&self.p, &mut self.systick, |buttons| buttons.interrupt());
+        let (button_i, button_x) = self.buttons().interrupt();
 
         match (self.state.mode, button_i, button_x) {
             (mode, ButtonPressType::Long, ButtonPressType::Long) => {
-                let (button_i, button_x) =
-                    buttons::acquire(&self.p, &mut self.systick, |buttons| buttons.interrupt());
+                let (button_i, button_x) = self.buttons().interrupt();
 
                 match (mode, button_i, button_x) {
                     (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
@@ -191,6 +190,11 @@ impl<S: SysTickHardware> System<S> {
         }
 
         buttons::clear_pending_interrupt(&self.p);
+    }
+
+    /// Creates an instance of `RTC` controller.
+    fn buttons<'a>(&'a mut self) -> Buttons<impl ButtonsHardware + 'a> {
+        buttons::create(&self.p, &mut self.systick)
     }
 
     /// Creates an instance of `RTC` controller.

@@ -26,6 +26,12 @@ impl ButtonPressType {
 
 /// Describes the Buttons hardware management interface.
 pub trait ButtonsHardware {
+    /// Initializes hardware if needed.
+    fn setup(&self);
+
+    /// Releases hardware if needed.
+    fn teardown(&self);
+
     /// Checks whether Button with specified type is pressed.
     fn is_button_pressed(&self, button_type: ButtonType) -> bool;
 
@@ -40,6 +46,16 @@ pub struct Buttons<T: ButtonsHardware> {
 impl<T: ButtonsHardware> Buttons<T> {
     pub fn create(hw: T) -> Self {
         Buttons { hw }
+    }
+
+    /// Setups Buttons hardware.
+    pub fn setup(&self) {
+        self.hw.setup()
+    }
+
+    /// Tears down Buttons hardware.
+    pub fn teardown(&self) {
+        self.hw.teardown()
     }
 
     pub fn interrupt(&mut self) -> (ButtonPressType, ButtonPressType) {
@@ -94,11 +110,19 @@ impl<T: ButtonsHardware> Buttons<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::MockCalls;
     use core::cell::RefCell;
+
+    #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+    enum Call {
+        Setup,
+        Teardown,
+    }
 
     struct MockData<F: Fn(ButtonType, u32) -> bool> {
         pub is_button_pressed: F,
         pub current_delay: u32,
+        pub calls: MockCalls<Call>,
     }
 
     struct ButtonsHardwareMock<'a, F: Fn(ButtonType, u32) -> bool> {
@@ -106,6 +130,14 @@ mod tests {
     }
 
     impl<'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware for ButtonsHardwareMock<'a, F> {
+        fn setup(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Setup);
+        }
+
+        fn teardown(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Teardown);
+        }
+
         fn is_button_pressed(&self, button_type: ButtonType) -> bool {
             let current_delay = self.data.borrow().current_delay;
             (self.data.borrow().is_button_pressed)(button_type, current_delay)
@@ -127,10 +159,37 @@ mod tests {
     }
 
     #[test]
+    fn setup() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            current_delay: 0,
+            calls: MockCalls::default(),
+        };
+
+        create_buttons(&mut mock_data).setup();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
+    }
+
+    #[test]
+    fn teardown() {
+        let mut mock_data = MockData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            current_delay: 0,
+            calls: MockCalls::default(),
+        };
+
+        create_buttons(&mut mock_data).teardown();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
+    }
+
+    #[test]
     fn both_none() {
         let mut mock_data = MockData {
             is_button_pressed: |_bt: ButtonType, _current_delay: u32| false,
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -150,6 +209,7 @@ mod tests {
                 }
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -172,6 +232,7 @@ mod tests {
                 }
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -194,6 +255,7 @@ mod tests {
                 ButtonType::Ten => false,
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -213,6 +275,7 @@ mod tests {
                 }
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -226,6 +289,7 @@ mod tests {
         let mut mock_data = MockData {
             is_button_pressed: |_bt: ButtonType, _current_delay: u32| true,
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -242,6 +306,7 @@ mod tests {
                 ButtonType::Ten => true,
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -264,6 +329,7 @@ mod tests {
                 ButtonType::Ten => true,
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -280,6 +346,7 @@ mod tests {
                 ButtonType::Ten => false,
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
@@ -302,6 +369,7 @@ mod tests {
                 }
             },
             current_delay: 0,
+            calls: MockCalls::default(),
         };
 
         assert_eq!(
