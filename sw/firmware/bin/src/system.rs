@@ -238,6 +238,8 @@ impl<S: SysTickHardware> System<S> {
                 let alarm = self.rtc().alarm();
                 self.usb()
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
+            } else if let CommandPacket::Reset = command_packet {
+                self.reset();
             }
         }
 
@@ -323,5 +325,10 @@ impl<S: SysTickHardware> System<S> {
         } else {
             self.scb.clear_sleepdeep();
         }
+    }
+
+    /// Performs a software reset.
+    fn reset(&mut self) {
+        self.scb.system_reset();
     }
 }

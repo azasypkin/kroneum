@@ -5,6 +5,7 @@ pub enum CommandPacket {
     Unknown,
     Beep(u8),
     GetAlarm,
+    Reset,
     SetAlarm(Time),
 }
 
@@ -19,6 +20,7 @@ impl From<(u16, u16, u16)> for CommandPacket {
                 seconds: (data_2 & 0xff) as u8,
             }),
             2 => CommandPacket::GetAlarm,
+            3 => CommandPacket::Reset,
             _ => CommandPacket::Unknown,
         }
     }
