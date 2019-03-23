@@ -56,6 +56,11 @@ pub trait Device {
 
         self.write([1, 0, hours as u8, minutes as u8, seconds as u8].as_ref())
     }
+
+    fn reset(&self) -> Result<(), String> {
+        // Send `Reset` report.
+        self.write([3].as_ref())
+    }
 }
 
 pub trait DeviceContext<'a, D: Device, C = Self> {

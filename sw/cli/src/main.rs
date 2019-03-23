@@ -59,6 +59,11 @@ fn run_command<'a, T: Device>(
             }
             _ => {}
         },
+
+        ("reset", _) => {
+            println!("Device is being reset...");
+            device.reset()?
+        }
         _ => return Err("Unknown sub-command!".to_string()),
     }
 
@@ -107,6 +112,7 @@ fn main() -> Result<(), String> {
                         .help("Alarm to set in the hh:mm:ss form."),
                 ),
         )
+        .subcommand(SubCommand::with_name("reset").about("Resets Kroneum device"))
         .get_matches();
 
     if matches.is_present("libusb") {
