@@ -64,8 +64,13 @@ mod tests {
     }
 
     #[test]
+    fn reset_command() {
+        assert_eq!(CommandPacket::from((3, 0, 0)), CommandPacket::Reset);
+    }
+
+    #[test]
     fn unknown_command() {
-        assert_eq!(CommandPacket::from((3, 0, 0)), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from((4, 0, 0)), CommandPacket::Unknown);
         assert_eq!(CommandPacket::from((10, 11, 22)), CommandPacket::Unknown);
     }
 }
