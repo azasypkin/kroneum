@@ -1,7 +1,6 @@
-use crate::device::{
-    Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE,
-};
+use crate::device::{Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID};
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
+use kroneum_api::usb::command_packet::{CommandByteSequence, CommandPacket};
 
 pub struct DeviceContextHIDAPI {
     api: HidApi,
@@ -63,18 +62,15 @@ impl Device for DeviceHIDAPI {
             .ok_or_else(|| "Failed to retrieve device manufacturer.".to_string())
     }
 
-    fn write(&self, data: &[u8]) -> Result<(), String> {
-        let mut report = vec![0];
-        report.extend_from_slice(data);
-
+    fn write(&self, packet: CommandPacket) -> Result<(), String> {
         self.device
-            .write(report.as_ref())
+            .write(&packet.to_bytes())
             .map(|_| ())
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
-        let mut data = [0; REPORT_SIZE];
+    fn read(&self) -> Result<(usize, CommandByteSequence), String> {
+        let mut data = CommandByteSequence::default();
         self.device
             .read_timeout(&mut data, 5000)
             .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))

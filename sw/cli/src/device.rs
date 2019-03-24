@@ -1,8 +1,11 @@
+use kroneum_api::{
+    time::Time,
+    usb::command_packet::{CommandByteSequence, CommandPacket},
+};
 use std::{fmt, time::Duration};
 
 pub const KRONEUM_VID: u16 = 0xffff;
 pub const KRONEUM_PID: u16 = 0xffff;
-pub const REPORT_SIZE: usize = 6;
 const MAX_ALARM_SECONDS: u64 = 3600 * 24;
 
 /// Describes main parameters of the Kroneum device.
@@ -26,16 +29,15 @@ impl fmt::Display for DeviceIdentifier {
 pub trait Device {
     fn get_identifier(&self) -> DeviceIdentifier;
     fn get_manufacturer(&self) -> Result<String, String>;
-    fn write(&self, data: &[u8]) -> Result<(), String>;
-    fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String>;
+    fn write(&self, packet: CommandPacket) -> Result<(), String>;
+    fn read(&self) -> Result<(usize, CommandByteSequence), String>;
 
     fn beep(&self, beeps_n: u8) -> Result<(), String> {
-        self.write([0, 0, beeps_n].as_ref())
+        self.write(CommandPacket::Beep(beeps_n))
     }
 
     fn get_alarm(&self) -> Result<Duration, String> {
-        // Send `GetAlarm` report and then read data device sent in response report.
-        self.write([2].as_ref())
+        self.write(CommandPacket::GetAlarm)
             .and_then(|_| self.read())
             .map(|(_, data)| {
                 Duration::from_secs(
@@ -50,16 +52,13 @@ pub trait Device {
             return Err("Alarm is limited to 23h 59m 59s".to_string());
         }
 
-        let hours = duration_sec / 3600;
-        let minutes = (duration_sec - 3600 * hours) / 60;
-        let seconds = duration_sec - 3600 * hours - 60 * minutes;
-
-        self.write([1, 0, hours as u8, minutes as u8, seconds as u8].as_ref())
+        self.write(CommandPacket::SetAlarm(Time::from_seconds(
+            duration_sec as u32,
+        )))
     }
 
     fn reset(&self) -> Result<(), String> {
-        // Send `Reset` report.
-        self.write([3].as_ref())
+        self.write(CommandPacket::Reset)
     }
 }
 

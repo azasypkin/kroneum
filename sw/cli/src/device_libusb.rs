@@ -1,6 +1,5 @@
-use crate::device::{
-    Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID, REPORT_SIZE,
-};
+use crate::device::{Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID};
+use kroneum_api::usb::command_packet::{CommandByteSequence, CommandPacket};
 use std::time::Duration;
 
 const INTERFACE: u8 = 0;
@@ -144,15 +143,15 @@ impl<'a> Device for DeviceLibUSB<'a> {
         })
     }
 
-    fn write(&self, data: &[u8]) -> Result<(), String> {
+    fn write(&self, packet: CommandPacket) -> Result<(), String> {
         self.handle
-            .write_interrupt(1, data, Duration::from_secs(5))
+            .write_interrupt(1, &packet.to_bytes(), Duration::from_secs(5))
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
             .map(|_| ())
     }
 
-    fn read(&self) -> Result<(usize, [u8; REPORT_SIZE]), String> {
-        let mut data = [0; REPORT_SIZE];
+    fn read(&self) -> Result<(usize, CommandByteSequence), String> {
+        let mut data = CommandByteSequence::default();
         self.handle
             .read_interrupt(0x81, &mut data, Duration::from_secs(5))
             .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
