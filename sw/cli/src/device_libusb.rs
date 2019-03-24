@@ -1,5 +1,8 @@
-use crate::device::{Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID};
-use kroneum_api::usb::command_packet::{CommandByteSequence, CommandPacket};
+use crate::device::{Device, DeviceContext, DeviceIdentifier};
+use kroneum_api::{
+    config::{DEVICE_PID, DEVICE_VID},
+    usb::command_packet::{CommandByteSequence, CommandPacket},
+};
 use std::time::Duration;
 
 const INTERFACE: u8 = 0;
@@ -41,7 +44,7 @@ impl<'a> DeviceLibUSB<'a> {
                     .map(|dev| dev.device_descriptor().map(|descriptor| (dev, descriptor)))
                     .filter_map(|dev| dev.ok())
                     .find(|(_, desc)| {
-                        desc.vendor_id() == KRONEUM_VID && desc.product_id() == KRONEUM_PID
+                        desc.vendor_id() == DEVICE_VID && desc.product_id() == DEVICE_PID
                     })
                     .ok_or_else(|| "Failed to find LibUSB device.".to_string())
             })

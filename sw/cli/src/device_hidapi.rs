@@ -1,6 +1,9 @@
-use crate::device::{Device, DeviceContext, DeviceIdentifier, KRONEUM_PID, KRONEUM_VID};
+use crate::device::{Device, DeviceContext, DeviceIdentifier};
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
-use kroneum_api::usb::command_packet::{CommandByteSequence, CommandPacket};
+use kroneum_api::{
+    config::{DEVICE_PID, DEVICE_VID},
+    usb::command_packet::{CommandByteSequence, CommandPacket},
+};
 
 pub struct DeviceContextHIDAPI {
     api: HidApi,
@@ -31,11 +34,11 @@ impl DeviceHIDAPI {
     pub fn open(api: &HidApi) -> Result<Self, String> {
         api.devices()
             .iter()
-            .find(|dev| dev.product_id == KRONEUM_PID && dev.vendor_id == KRONEUM_VID)
+            .find(|dev| dev.product_id == DEVICE_PID && dev.vendor_id == DEVICE_VID)
             .cloned()
             .ok_or_else(|| "Failed to find HID device.".to_string())
             .and_then(|device_info| {
-                api.open(KRONEUM_VID, KRONEUM_PID)
+                api.open(DEVICE_VID, DEVICE_PID)
                     .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))
                     .map(|device| DeviceHIDAPI {
                         device_info,

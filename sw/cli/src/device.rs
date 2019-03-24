@@ -4,8 +4,6 @@ use kroneum_api::{
 };
 use std::{fmt, time::Duration};
 
-pub const KRONEUM_VID: u16 = 0xffff;
-pub const KRONEUM_PID: u16 = 0xffff;
 const MAX_ALARM_SECONDS: u64 = 3600 * 24;
 
 /// Describes main parameters of the Kroneum device.
