@@ -233,8 +233,6 @@ impl<S: SysTickHardware> System<S> {
             } else if let CommandPacket::SetAlarm(time) = command_packet {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::GetAlarm = command_packet {
-                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep());
-
                 let alarm = self.rtc().alarm();
                 self.usb()
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
