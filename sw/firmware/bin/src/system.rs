@@ -314,7 +314,7 @@ impl<S: SysTickHardware> System<S> {
         usb::create(&self.p, &mut self.state.usb_state)
     }
 
-    /// Creates an instance of `USB` controller.
+    /// Creates an instance of `Flash` controller.
     fn flash<'a>(&'a mut self) -> Flash<impl FlashHardware + 'a> {
         flash::create(&self.p)
     }
