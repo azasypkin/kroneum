@@ -5,6 +5,7 @@
 pub mod beeper;
 pub mod buttons;
 pub mod config;
+pub mod flash;
 pub mod rtc;
 pub mod systick;
 pub mod time;

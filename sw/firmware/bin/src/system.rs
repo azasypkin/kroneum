@@ -1,12 +1,12 @@
-use crate::{beeper, buttons, rtc, usb};
+use crate::{beeper, buttons, flash, rtc, usb};
 
 use cortex_m::peripheral::SCB;
 use stm32f0::stm32f0x2::Peripherals;
 
-use kroneum_api::buttons::{Buttons, ButtonsHardware};
 use kroneum_api::{
     beeper::Melody,
-    buttons::ButtonPressType,
+    buttons::{ButtonPressType, Buttons, ButtonsHardware},
+    flash::{Flash, FlashHardware},
     rtc::{RTCHardware, RTC},
     systick::{SysTick, SysTickHardware},
     time::Time,
@@ -238,6 +238,9 @@ impl<S: SysTickHardware> System<S> {
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
             } else if let CommandPacket::Reset = command_packet {
                 self.reset();
+            } else if let CommandPacket::ReadFlash(slot) = command_packet {
+                let value = self.flash().read(slot).unwrap_or_else(|| 0);
+                self.usb().send(&[value, 0, 0, 0, 0, 0]);
             }
         }
 
@@ -309,6 +312,11 @@ impl<S: SysTickHardware> System<S> {
     /// Creates an instance of `USB` controller.
     fn usb<'a>(&'a mut self) -> USB<impl USBHardware + 'a> {
         usb::create(&self.p, &mut self.state.usb_state)
+    }
+
+    /// Creates an instance of `USB` controller.
+    fn flash<'a>(&'a mut self) -> Flash<impl FlashHardware + 'a> {
+        flash::create(&self.p)
     }
 
     fn toggle_standby_mode(&mut self, on: bool) {

@@ -6,6 +6,7 @@ extern crate panic_semihosting;
 
 mod beeper;
 mod buttons;
+mod flash;
 mod rtc;
 mod system;
 mod systick;

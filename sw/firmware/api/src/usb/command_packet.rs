@@ -1,3 +1,4 @@
+use crate::flash::storage::StorageSlot;
 use crate::time::Time;
 
 const COMMAND_BYTE_SEQUENCE_LENGTH: usize = 6;
@@ -10,6 +11,7 @@ pub enum CommandPacket {
     GetAlarm,
     Reset,
     SetAlarm(Time),
+    ReadFlash(StorageSlot),
 }
 
 impl CommandPacket {
@@ -19,6 +21,7 @@ impl CommandPacket {
             CommandPacket::SetAlarm(time) => [2, 0, time.hours, time.minutes, time.seconds, 0],
             CommandPacket::GetAlarm => [3, 0, 0, 0, 0, 0],
             CommandPacket::Reset => [4, 0, 0, 0, 0, 0],
+            CommandPacket::ReadFlash(slot) => [5, 0, slot as u8, 0, 0, 0],
             CommandPacket::Unknown => [0; COMMAND_BYTE_SEQUENCE_LENGTH],
         }
     }
@@ -36,6 +39,7 @@ impl From<(u16, u16, u16)> for CommandPacket {
             }),
             3 => CommandPacket::GetAlarm,
             4 => CommandPacket::Reset,
+            5 => CommandPacket::ReadFlash(StorageSlot::from((data_1 & 0xff) as u8)),
             _ => CommandPacket::Unknown,
         }
     }
@@ -118,9 +122,22 @@ mod tests {
     }
 
     #[test]
+    fn read_flash_command() {
+        assert_eq!(
+            CommandPacket::from((5, 0x1f, 0)),
+            CommandPacket::ReadFlash(StorageSlot::One)
+        );
+
+        assert_eq!(
+            CommandPacket::ReadFlash(StorageSlot::One).to_bytes(),
+            [5, 0, 0x1f, 0, 0, 0]
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         assert_eq!(CommandPacket::from((0, 0, 0)), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from((5, 0, 0)), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from((6, 0, 0)), CommandPacket::Unknown);
         assert_eq!(CommandPacket::from((10, 11, 22)), CommandPacket::Unknown);
 
         assert_eq!(
