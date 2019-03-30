@@ -1,6 +1,9 @@
 pub mod storage;
 
 use self::storage::{Storage, StorageSlot};
+use flash::storage::StoragePage;
+
+const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 
 /// Describes the Flash hardware management interface.
 pub trait FlashHardware {
@@ -9,6 +12,9 @@ pub trait FlashHardware {
 
     /// Releases hardware if needed.
     fn teardown(&self);
+
+    /// Erases page using specified address.
+    fn erase_page(&self, page_address: usize);
 
     /// Makes peripheral to enter `write` mode.
     fn before_write(&self);
@@ -26,7 +32,18 @@ impl<T: FlashHardware> Flash<T> {
     pub fn new(hw: T) -> Self {
         Flash {
             hw,
-            storage: Storage::default(),
+            storage: Storage {
+                pages: [
+                    StoragePage {
+                        address: PAGE_ADDRESSES[0],
+                        size: 1024,
+                    },
+                    StoragePage {
+                        address: PAGE_ADDRESSES[1],
+                        size: 1024,
+                    },
+                ],
+            },
         }
     }
 
@@ -51,7 +68,18 @@ impl<T: FlashHardware> Flash<T> {
         let result = self.storage.write(slot, value);
         self.hw.after_write();
 
-        result
+        if let Err(error) = result {
+            self.hw.erase_page(error.next_page.address);
+
+            self.storage.rollover().map_err(|_| ())?;
+
+            self.hw.before_write();
+            let result = self.storage.write(slot, value);
+            self.hw.after_write();
+            result.map_err(|_| ())?;
+        }
+
+        Ok(())
     }
 }
 
