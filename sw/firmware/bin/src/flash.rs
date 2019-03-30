@@ -28,6 +28,24 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
 
     fn teardown(&self) {}
 
+    fn erase_page(&self, page_address: usize) {
+        self.busy_wait_until_ready();
+        self.toggle_write_protection(false);
+
+        self.p.FLASH.cr.modify(|_, w| w.per().set_bit());
+        self.p
+            .FLASH
+            .ar
+            .write(|w| unsafe { w.bits(page_address as u32) });
+        self.p.FLASH.cr.modify(|_, w| w.strt().set_bit());
+
+        self.busy_wait_until_ready();
+
+        self.p.FLASH.cr.modify(|_, w| w.per().clear_bit());
+
+        self.toggle_write_protection(true);
+    }
+
     fn before_write(&self) {
         self.busy_wait_until_ready();
 
