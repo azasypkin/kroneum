@@ -1,7 +1,9 @@
 pub mod storage;
+mod storage_page;
+mod storage_page_status;
 
 use self::storage::{Storage, StorageSlot};
-use flash::storage::StoragePage;
+use flash::storage_page::StoragePage;
 
 const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 

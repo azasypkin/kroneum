@@ -1,4 +1,5 @@
-use core::ops::Range;
+use super::storage_page::{StoragePage, StoragePageFullError};
+use super::storage_page_status::StoragePageStatus;
 
 /// Describes memory slot where we can write to or read from u16 data value.
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -10,14 +11,6 @@ pub enum StorageSlot {
     Five = 0x5F,
     Unknown = 0xFF,
 }
-
-const KNOWN_SLOTS: [StorageSlot; 5] = [
-    StorageSlot::One,
-    StorageSlot::Two,
-    StorageSlot::Three,
-    StorageSlot::Four,
-    StorageSlot::Five,
-];
 
 impl From<u8> for StorageSlot {
     fn from(slot_value: u8) -> Self {
@@ -32,124 +25,9 @@ impl From<u8> for StorageSlot {
     }
 }
 
-#[derive(PartialOrd, PartialEq)]
-enum StoragePageStatus {
-    Active,
-    Full,
-    Erased,
-}
-
+/// Describes multi-page storage that simulates EEPROM on top of flash.
+#[doc = r"Flash EEPROM emulation storage"]
 #[derive(Debug)]
-pub struct PageFullError<'a> {
-    pub current_page: &'a StoragePage,
-    pub next_page: &'a StoragePage,
-}
-
-#[doc = r"Flash EEPROM emulation page"]
-#[derive(Debug)]
-pub struct StoragePage {
-    pub address: usize,
-    pub size: usize,
-}
-
-impl StoragePage {
-    fn status(&self) -> StoragePageStatus {
-        match self.u16(self.address) {
-            0x0fff => StoragePageStatus::Active,
-            0x00ff => StoragePageStatus::Full,
-            _ => StoragePageStatus::Erased,
-        }
-    }
-
-    fn set_status(&self, status: StoragePageStatus) {
-        self.set_u16(
-            self.address,
-            match status {
-                StoragePageStatus::Active => 0x0fff,
-                StoragePageStatus::Full => 0x00ff,
-                StoragePageStatus::Erased => 0xffff,
-            },
-        )
-    }
-
-    fn size_hint(&self) -> u16 {
-        self.u16(self.address + 2)
-    }
-
-    fn set_size_hint(&self, size_hint: u16) {
-        self.set_u16(self.address + 2, size_hint);
-    }
-
-    fn read(&self, virtual_address: u8) -> Option<u8> {
-        assert_ne!(virtual_address, 0xff);
-        for offset in self.search_range().rev().step_by(2) {
-            let value = self.u16(self.address + offset);
-            if value != 0xffff && (value >> 8) as u8 == virtual_address {
-                return Some((value & 0xff) as u8);
-            }
-        }
-
-        None
-    }
-
-    fn write(&self, virtual_address: u8, value: u8) -> Result<(), ()> {
-        assert_ne!(virtual_address, 0xff);
-        let search_range = self.search_range();
-        let start_of_range = search_range.start;
-        let end_of_range = search_range.end;
-
-        let offset = self
-            .search_range()
-            .rev()
-            .step_by(2)
-            .find(|offset| self.u16(self.address + offset) != 0xffff)
-            .map(|offset| offset + 2)
-            .unwrap_or_else(|| {
-                if self.u16(self.address + start_of_range) == 0xffff {
-                    start_of_range
-                } else {
-                    end_of_range + 1
-                }
-            });
-
-        if offset >= self.size {
-            return Err(());
-        }
-
-        self.extend_search_range(offset);
-
-        Ok(self.set_u16(
-            self.address + offset,
-            ((virtual_address as u16) << 8) | value as u16,
-        ))
-    }
-
-    fn u16(&self, address: usize) -> u16 {
-        unsafe { core::ptr::read(address as *mut u16) }
-    }
-
-    fn set_u16(&self, address: usize, val: u16) {
-        unsafe { core::ptr::write(address as *mut u16, val) }
-    }
-
-    fn search_range(&self) -> Range<usize> {
-        Range {
-            start: 4,
-            end: 63 + (self.size_hint().leading_zeros() * 64) as usize,
-        }
-    }
-
-    fn extend_search_range(&self, upper_bound_offset: usize) {
-        let current_hint = self.size_hint();
-        let current_bound = current_hint.leading_zeros();
-
-        let required_bound = (upper_bound_offset / 64) as u32;
-        if required_bound > current_bound {
-            self.set_size_hint(current_hint >> (required_bound - current_bound));
-        }
-    }
-}
-
 pub struct Storage {
     pub pages: [StoragePage; 2],
 }
@@ -160,10 +38,10 @@ impl Storage {
         active_page.read(slot as u8)
     }
 
-    pub fn write(&self, slot: StorageSlot, value: u8) -> Result<(), PageFullError> {
+    pub fn write(&self, slot: StorageSlot, value: u8) -> Result<(), StoragePageFullError> {
         let (current_page_index, active_page) = self.active_page();
         if active_page.write(slot as u8, value).is_err() {
-            Err(PageFullError {
+            Err(StoragePageFullError {
                 current_page: active_page,
                 next_page: &self.pages[if current_page_index + 1 == self.pages.len() {
                     0
@@ -176,7 +54,7 @@ impl Storage {
         }
     }
 
-    pub fn rollover(&self) -> Result<(), PageFullError> {
+    pub fn rollover(&self) -> Result<(), StoragePageFullError> {
         let (active_page_index, active_page) = self.active_page();
         let next_page = &self.pages[if active_page_index + 1 == self.pages.len() {
             0
@@ -187,7 +65,15 @@ impl Storage {
         active_page.set_status(StoragePageStatus::Full);
         next_page.set_status(StoragePageStatus::Active);
 
-        for slot in KNOWN_SLOTS.iter() {
+        for slot in [
+            StorageSlot::One,
+            StorageSlot::Two,
+            StorageSlot::Three,
+            StorageSlot::Four,
+            StorageSlot::Five,
+        ]
+        .iter()
+        {
             if let Some(value) = active_page.read(*slot as u8) {
                 self.write(*slot, value)?
             }
