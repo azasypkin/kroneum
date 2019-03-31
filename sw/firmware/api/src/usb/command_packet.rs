@@ -21,7 +21,7 @@ impl CommandPacket {
             CommandPacket::SetAlarm(time) => [2, 0, time.hours, time.minutes, time.seconds, 0],
             CommandPacket::GetAlarm => [3, 0, 0, 0, 0, 0],
             CommandPacket::Reset => [4, 0, 0, 0, 0, 0],
-            CommandPacket::ReadFlash(slot) => [5, 0, slot as u8, 0, 0, 0],
+            CommandPacket::ReadFlash(slot) => [5, 0, slot.into(), 0, 0, 0],
             CommandPacket::Unknown => [0; COMMAND_BYTE_SEQUENCE_LENGTH],
         }
     }

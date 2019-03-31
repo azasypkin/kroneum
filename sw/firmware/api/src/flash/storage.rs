@@ -4,23 +4,36 @@ use super::storage_page_status::StoragePageStatus;
 /// Describes memory slot where we can write to or read from u16 data value.
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub enum StorageSlot {
-    One = 0x1F,
-    Two = 0x2F,
-    Three = 0x3F,
-    Four = 0x4F,
-    Five = 0x5F,
-    Unknown = 0xFF,
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Unknown,
 }
 
 impl From<u8> for StorageSlot {
     fn from(slot_value: u8) -> Self {
         match slot_value {
-            0x1F => StorageSlot::One,
-            0x2F => StorageSlot::Two,
-            0x3F => StorageSlot::Three,
-            0x4F => StorageSlot::Four,
-            0x5F => StorageSlot::Five,
+            0x1f => StorageSlot::One,
+            0x2f => StorageSlot::Two,
+            0x3f => StorageSlot::Three,
+            0x4f => StorageSlot::Four,
+            0x5f => StorageSlot::Five,
             _ => StorageSlot::Unknown,
+        }
+    }
+}
+
+impl Into<u8> for StorageSlot {
+    fn into(self) -> u8 {
+        match self {
+            StorageSlot::One => 0x1f,
+            StorageSlot::Two => 0x2f,
+            StorageSlot::Three => 0x3f,
+            StorageSlot::Four => 0x4f,
+            StorageSlot::Five => 0x5f,
+            StorageSlot::Unknown => 0xff,
         }
     }
 }
@@ -35,12 +48,12 @@ pub struct Storage {
 impl Storage {
     pub fn read(&self, slot: StorageSlot) -> Option<u8> {
         let (_, active_page) = self.active_page();
-        active_page.read(slot as u8)
+        active_page.read(slot.into())
     }
 
     pub fn write(&self, slot: StorageSlot, value: u8) -> Result<(), StoragePageFullError> {
         let (current_page_index, active_page) = self.active_page();
-        if active_page.write(slot as u8, value).is_err() {
+        if active_page.write(slot.into(), value).is_err() {
             Err(StoragePageFullError {
                 current_page: active_page,
                 next_page: &self.pages[if current_page_index + 1 == self.pages.len() {
@@ -74,7 +87,7 @@ impl Storage {
         ]
         .iter()
         {
-            if let Some(value) = active_page.read(*slot as u8) {
+            if let Some(value) = active_page.read((*slot).into()) {
                 self.write(*slot, value)?
             }
         }
