@@ -1,4 +1,4 @@
-use crate::flash::storage::StorageSlot;
+use crate::flash::storage_slot::StorageSlot;
 use crate::time::Time;
 
 const COMMAND_BYTE_SEQUENCE_LENGTH: usize = 6;

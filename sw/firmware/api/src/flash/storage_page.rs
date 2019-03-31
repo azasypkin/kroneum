@@ -102,10 +102,12 @@ impl StoragePage {
         // Try to extend search range (only if needed).
         self.extend_search_range(offset);
 
-        Ok(self.set_u16(
+        self.set_u16(
             self.address + offset,
-            ((virtual_address as u16) << 8) | value as u16,
-        ))
+            (u16::from(virtual_address) << 8) | u16::from(value),
+        );
+
+        Ok(())
     }
 
     /// Reads u16 from the specified address.

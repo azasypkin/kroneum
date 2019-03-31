@@ -1,42 +1,8 @@
-use super::storage_page::{StoragePage, StoragePageFullError};
-use super::storage_page_status::StoragePageStatus;
-
-/// Describes memory slot where we can write to or read from u16 data value.
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub enum StorageSlot {
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Unknown,
-}
-
-impl From<u8> for StorageSlot {
-    fn from(slot_value: u8) -> Self {
-        match slot_value {
-            0x1f => StorageSlot::One,
-            0x2f => StorageSlot::Two,
-            0x3f => StorageSlot::Three,
-            0x4f => StorageSlot::Four,
-            0x5f => StorageSlot::Five,
-            _ => StorageSlot::Unknown,
-        }
-    }
-}
-
-impl Into<u8> for StorageSlot {
-    fn into(self) -> u8 {
-        match self {
-            StorageSlot::One => 0x1f,
-            StorageSlot::Two => 0x2f,
-            StorageSlot::Three => 0x3f,
-            StorageSlot::Four => 0x4f,
-            StorageSlot::Five => 0x5f,
-            StorageSlot::Unknown => 0xff,
-        }
-    }
-}
+use super::{
+    storage_page::{StoragePage, StoragePageFullError},
+    storage_page_status::StoragePageStatus,
+    storage_slot::StorageSlot,
+};
 
 /// Describes multi-page storage that simulates EEPROM on top of flash.
 #[doc = r"Flash EEPROM emulation storage"]
