@@ -3,7 +3,7 @@ use core::{mem, ops::Range};
 
 #[derive(Debug)]
 pub struct StoragePageFullError<'a> {
-    pub current_page: &'a StoragePage,
+    pub active_page: &'a StoragePage,
     pub next_page: &'a StoragePage,
 }
 
@@ -17,7 +17,7 @@ pub struct StoragePageFullError<'a> {
 /// to 0s), so write new value with the same virtual address. So that when we read value from storage
 /// we are looking for the __latest__ value with the specified virtual address.
 #[doc = r"Flash EEPROM emulation page"]
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct StoragePage {
     pub address: usize,
     pub size: usize,
@@ -67,6 +67,25 @@ impl StoragePage {
         }
 
         None
+    }
+
+    /// Flushes latest version of all values from this page to another page.
+    pub(super) fn flush_to(&self, target_page: &StoragePage) -> Result<(), ()> {
+        let mut buffer: [Option<()>; core::u8::MAX as usize] = [None; core::u8::MAX as usize];
+
+        for offset in self.search_range().rev().step_by(mem::size_of::<u16>()) {
+            let value = self.u16(self.address + offset);
+            // Skip empty values (0xffff).
+            if value != 0xffff {
+                let virtual_address = (value >> 8) as usize;
+                if buffer[virtual_address].is_none() {
+                    buffer[virtual_address] = Some(());
+                    target_page.write(virtual_address as u8, (value & 0xff) as u8)?
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Writes value with the specified virtual address. The value is stored in u16 memory cell (0x1f01),
@@ -252,5 +271,45 @@ mod tests {
 
         memory_sandbox[0] = 0xffff;
         assert_eq!(page.status(), StoragePageStatus::Erased);
+    }
+
+    #[test]
+    fn correctly_flushes_content_to_another_page() {
+        let page1_sandbox: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page1 = StoragePage {
+            address: &page1_sandbox as *const _ as usize,
+            size: PAGE_SIZE,
+        };
+
+        assert_eq!(page1.write(0x1f, 1).is_ok(), true);
+        assert_eq!(page1.write(0x2f, 2).is_ok(), true);
+        assert_eq!(page1.write(0x2f, 3).is_ok(), true);
+        assert_eq!(page1.write(0x3f, 4).is_ok(), true);
+        assert_eq!(page1.write(0x5f, 15).is_ok(), true);
+
+        let page_1_slice = &page1_sandbox[..8];
+        assert_eq!(
+            page_1_slice,
+            [0xffff, 0xffff, 0x1f01, 0x2f02, 0x2f03, 0x3f04, 0x5f0f, 0xffff]
+        );
+
+        let page2_sandbox: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2 = StoragePage {
+            address: &page2_sandbox as *const _ as usize,
+            size: PAGE_SIZE,
+        };
+        assert_eq!(page1.flush_to(&page2).is_ok(), true);
+
+        let page_2_slice = &page2_sandbox[..8];
+        assert_eq!(
+            page_2_slice,
+            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0xffff, 0xffff]
+        );
+
+        assert_eq!(page2.write(0x2f, 10).is_ok(), true);
+        assert_eq!(
+            page_2_slice,
+            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0x2f0a, 0xffff]
+        );
     }
 }
