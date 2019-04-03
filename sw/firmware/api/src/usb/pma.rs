@@ -1,7 +1,6 @@
 use super::EndpointType;
 use core::ops::Deref;
 
-const BTABLE_ADDRESS: usize = 0x4000_6000;
 const CONTROL_OUT_PMA_ADDRESS: u16 = 0x10;
 const CONTROL_IN_PMA_ADDRESS: u16 = 0x50;
 const DEVICE_IN_PMA_ADDRESS: u16 = 0x90;
@@ -113,14 +112,6 @@ impl PacketMemoryArea {
     #[doc = r" Returns a pointer to the register block"]
     pub fn ptr(base_address: usize) -> *const PacketMemoryAreaAccessor {
         base_address as *const _
-    }
-}
-
-impl Default for PacketMemoryArea {
-    fn default() -> Self {
-        PacketMemoryArea {
-            base_address: BTABLE_ADDRESS,
-        }
     }
 }
 
