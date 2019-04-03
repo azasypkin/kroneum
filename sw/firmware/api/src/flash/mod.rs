@@ -73,7 +73,7 @@ impl<T: FlashHardware> Flash<T> {
         if let Err(error) = result {
             self.hw.erase_page(error.next_page.address);
 
-            self.storage.rollover().map_err(|_| ())?;
+            self.storage.rollover()?;
 
             self.hw.before_write();
             let result = self.storage.write(slot, value);
