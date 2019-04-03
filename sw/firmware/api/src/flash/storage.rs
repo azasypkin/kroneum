@@ -196,29 +196,51 @@ mod tests {
             ],
         };
 
+        // Fill all memory slots.
+        for _ in 0..510 {
+            assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
+        }
+
+        // Now we can't write anymore
+        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+        assert_eq!(&page1[510..], [0x1f01, 0x1f01])
+    }
+
+    #[test]
+    fn successfully_rolls_over_to_next_page() {
+        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        let storage = Storage {
+            pages: [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        };
+
         // Fill all memory slots, but the latest one.
         assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
         assert_eq!(storage.write(StorageSlot::Two, 2).is_ok(), true);
+
         for _ in 0..506 {
             assert_eq!(storage.write(StorageSlot::Two, 3).is_ok(), true);
         }
+
+        // Fill remaining slots.
         assert_eq!(storage.write(StorageSlot::Three, 4).is_ok(), true);
-
-        assert_eq!(storage.read(StorageSlot::One), Some(1));
-        assert_eq!(storage.read(StorageSlot::Two), Some(3));
-        assert_eq!(storage.read(StorageSlot::Three), Some(4));
-
-        let page1_slice = &page1[508..];
-
-        assert_eq!(page1_slice, [0x2f03, 0x2f03, 0x3f04, 0xffff]);
-
-        // Fill last slot
         assert_eq!(storage.write(StorageSlot::Five, 15).is_ok(), true);
-        assert_eq!(page1_slice, [0x2f03, 0x2f03, 0x3f04, 0x5f0f]);
 
         // Now we can't write anymore
-        let write_result = storage.write(StorageSlot::One, 1);
-        assert_eq!(write_result.is_err(), true);
+        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+
+        let page1_slice = &page1[508..];
+        assert_eq!(page1_slice, [0x2f03, 0x2f03, 0x3f04, 0x5f0f]);
 
         // Move to next page.
         let page2_slice = &page2[..8];
@@ -239,6 +261,76 @@ mod tests {
         assert_eq!(
             page2_slice,
             [0x0fff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0x2f0a, 0xffff]
+        );
+    }
+
+    #[test]
+    fn successfully_rolls_over_to_first_page() {
+        let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        let storage = Storage {
+            pages: [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        };
+
+        // Fill all memory slots, but the latest one.
+        assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Two, 2).is_ok(), true);
+
+        for _ in 0..506 {
+            assert_eq!(storage.write(StorageSlot::Two, 3).is_ok(), true);
+        }
+
+        // Fill remaining slots.
+        assert_eq!(storage.write(StorageSlot::Three, 4).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Five, 15).is_ok(), true);
+
+        // Now we can't write anymore
+        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+
+        assert_eq!(storage.rollover().is_ok(), true);
+
+        // Fill next page.
+        // Fill all memory slots, but the latest one.
+        assert_eq!(storage.write(StorageSlot::One, 10).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Two, 20).is_ok(), true);
+
+        for _ in 0..502 {
+            assert_eq!(storage.write(StorageSlot::Two, 30).is_ok(), true);
+        }
+
+        // Fill remaining slots.
+        assert_eq!(storage.write(StorageSlot::Three, 40).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Five, 55).is_ok(), true);
+
+        // Now we can't write anymore
+        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+
+        // Erase first page
+        for i in 0..(PAGE_SIZE / 2) {
+            page1[i] = 0xffff;
+        }
+
+        assert_eq!(storage.rollover().is_ok(), true);
+
+        assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
+
+        assert_eq!(storage.read(StorageSlot::One), Some(1));
+        assert_eq!(storage.read(StorageSlot::Two), Some(30));
+        assert_eq!(storage.read(StorageSlot::Three), Some(40));
+        assert_eq!(storage.read(StorageSlot::Five), Some(55));
+        assert_eq!(
+            &page1[..7],
+            [0x0fff, 0xffff, 0x5f37, 0x3f28, 0x2f1e, 0x1f0a, 0x1f01]
         );
     }
 }

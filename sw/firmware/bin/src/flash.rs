@@ -46,7 +46,7 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
         self.toggle_write_protection(true);
     }
 
-    fn before_write(&self) {
+    fn enable_write_mode(&self) {
         self.busy_wait_until_ready();
 
         self.toggle_write_protection(false);
@@ -54,7 +54,7 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
         self.p.FLASH.cr.modify(|_, w| w.pg().set_bit());
     }
 
-    fn after_write(&self) {
+    fn disable_write_mode(&self) {
         self.busy_wait_until_ready();
 
         self.p.FLASH.cr.modify(|_, w| w.pg().clear_bit());

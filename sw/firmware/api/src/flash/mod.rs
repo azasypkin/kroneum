@@ -19,10 +19,10 @@ pub trait FlashHardware {
     fn erase_page(&self, page_address: usize);
 
     /// Makes peripheral to enter `write` mode.
-    fn before_write(&self);
+    fn enable_write_mode(&self);
 
     /// Makes peripheral to exit `write` mode.
-    fn after_write(&self);
+    fn disable_write_mode(&self);
 }
 
 pub struct Flash<T: FlashHardware> {
@@ -66,22 +66,22 @@ impl<T: FlashHardware> Flash<T> {
 
     /// Writes a value to a specific memory slot.
     pub fn write(&self, slot: StorageSlot, value: u8) -> Result<(), ()> {
-        self.hw.before_write();
-        let result = self.storage.write(slot, value);
-        self.hw.after_write();
+        self.hw.enable_write_mode();
 
-        if let Err(error) = result {
-            self.hw.erase_page(error.next_page.address);
+        let result = self.storage.write(slot, value).or_else(|err| {
+            self.hw.disable_write_mode();
 
+            self.hw.erase_page(err.next_page.address);
             self.storage.rollover()?;
 
-            self.hw.before_write();
-            let result = self.storage.write(slot, value);
-            self.hw.after_write();
-            result.map_err(|_| ())?;
-        }
+            self.hw.enable_write_mode();
 
-        Ok(())
+            self.storage.write(slot, value).map_err(|_| {})
+        });
+
+        self.hw.disable_write_mode();
+
+        result
     }
 }
 
