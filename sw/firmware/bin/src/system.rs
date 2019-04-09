@@ -230,24 +230,26 @@ impl<S: SysTickHardware> System<S> {
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
                 beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep_n(num));
-            } else if let CommandPacket::SetAlarm(time) = command_packet {
+            } else if let CommandPacket::AlarmSet(time) = command_packet {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
-            } else if let CommandPacket::GetAlarm = command_packet {
+            } else if let CommandPacket::AlarmGet = command_packet {
                 let alarm = self.rtc().alarm();
                 self.usb()
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
             } else if let CommandPacket::Reset = command_packet {
                 self.reset();
-            } else if let CommandPacket::ReadFlash(slot) = command_packet {
+            } else if let CommandPacket::FlashRead(slot) = command_packet {
                 let value = self.flash().read(slot).unwrap_or_else(|| 0);
                 self.usb().send(&[value, 0, 0, 0, 0, 0]);
-            } else if let CommandPacket::WriteFlash(slot, value) = command_packet {
+            } else if let CommandPacket::FlashWrite(slot, value) = command_packet {
                 let status = if self.flash().write(slot, value).is_ok() {
                     1
                 } else {
                     0
                 };
                 self.usb().send(&[status, 0, 0, 0, 0, 0]);
+            } else if let CommandPacket::FlashEraseAll = command_packet {
+                self.flash().erase_all();
             }
         }
 
