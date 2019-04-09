@@ -12,6 +12,7 @@ pub enum CommandPacket {
     Reset,
     SetAlarm(Time),
     ReadFlash(StorageSlot),
+    WriteFlash(StorageSlot, u8),
 }
 
 impl CommandPacket {
@@ -22,6 +23,7 @@ impl CommandPacket {
             CommandPacket::GetAlarm => [3, 0, 0, 0, 0, 0],
             CommandPacket::Reset => [4, 0, 0, 0, 0, 0],
             CommandPacket::ReadFlash(slot) => [5, 0, slot.into(), 0, 0, 0],
+            CommandPacket::WriteFlash(slot, value) => [6, 0, slot.into(), value, 0, 0],
             CommandPacket::Unknown => [0; COMMAND_BYTE_SEQUENCE_LENGTH],
         }
     }
@@ -40,6 +42,10 @@ impl From<(u16, u16, u16)> for CommandPacket {
             3 => CommandPacket::GetAlarm,
             4 => CommandPacket::Reset,
             5 => CommandPacket::ReadFlash(StorageSlot::from((data_1 & 0xff) as u8)),
+            6 => CommandPacket::WriteFlash(
+                StorageSlot::from((data_1 & 0xff) as u8),
+                ((data_1 & 0xff00) >> 8) as u8,
+            ),
             _ => CommandPacket::Unknown,
         }
     }
@@ -135,9 +141,22 @@ mod tests {
     }
 
     #[test]
+    fn write_flash_command() {
+        assert_eq!(
+            CommandPacket::from((6, 0x051f, 0)),
+            CommandPacket::WriteFlash(StorageSlot::One, 5)
+        );
+
+        assert_eq!(
+            CommandPacket::WriteFlash(StorageSlot::One, 5).to_bytes(),
+            [6, 0, 0x1f, 5, 0, 0]
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         assert_eq!(CommandPacket::from((0, 0, 0)), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from((6, 0, 0)), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from((7, 0, 0)), CommandPacket::Unknown);
         assert_eq!(CommandPacket::from((10, 11, 22)), CommandPacket::Unknown);
 
         assert_eq!(

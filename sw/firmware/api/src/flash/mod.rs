@@ -5,6 +5,7 @@ pub mod storage_slot;
 
 use self::{storage::Storage, storage_page::StoragePage, storage_slot::StorageSlot};
 
+/// Sector 7, page 30 and 31 of STM32F04x flash memory.
 const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 
 /// Describes the Flash hardware management interface.
