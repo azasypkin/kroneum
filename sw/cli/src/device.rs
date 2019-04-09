@@ -1,4 +1,5 @@
 use kroneum_api::{
+    flash::storage_slot::StorageSlot,
     time::Time,
     usb::command_packet::{CommandByteSequence, CommandPacket},
 };
@@ -35,7 +36,7 @@ pub trait Device {
     }
 
     fn get_alarm(&self) -> Result<Duration, String> {
-        self.write(CommandPacket::GetAlarm)
+        self.write(CommandPacket::AlarmGet)
             .and_then(|_| self.read())
             .map(|(_, data)| {
                 Duration::from_secs(
@@ -50,9 +51,43 @@ pub trait Device {
             return Err("Alarm is limited to 23h 59m 59s".to_string());
         }
 
-        self.write(CommandPacket::SetAlarm(Time::from_seconds(
+        self.write(CommandPacket::AlarmSet(Time::from_seconds(
             duration_sec as u32,
         )))
+    }
+
+    fn read_flash(&self, slot: StorageSlot) -> Result<u8, String> {
+        if let StorageSlot::Unknown = slot {
+            return Err("Unknown memory slot is provided".to_string());
+        }
+
+        self.write(CommandPacket::FlashRead(slot))
+            .and_then(|_| self.read())
+            .map(|(_, data)| data[0])
+    }
+
+    fn write_flash(&self, slot: StorageSlot, value: u8) -> Result<(), String> {
+        if let StorageSlot::Unknown = slot {
+            return Err("Unknown memory slot is provided".to_string());
+        }
+
+        if self
+            .write(CommandPacket::FlashWrite(slot, value))
+            .and_then(|_| self.read())
+            .map(|(_, data)| if data[0] == 1 { true } else { false })?
+        {
+            Ok(())
+        } else {
+            Err(format!(
+                "Could not write value {} to a memory slot {:#X}",
+                value,
+                Into::<u8>::into(slot)
+            ))
+        }
+    }
+
+    fn erase_flash(&self) -> Result<(), String> {
+        self.write(CommandPacket::FlashEraseAll)
     }
 
     fn reset(&self) -> Result<(), String> {

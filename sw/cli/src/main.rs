@@ -6,6 +6,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use device::{Device, DeviceContext};
 use device_hidapi::DeviceContextHIDAPI;
 use device_libusb::DeviceContextLibUSB;
+use kroneum_api::flash::storage_slot::StorageSlot;
 use std::time::Duration;
 
 fn run_command<'a, T: Device>(
@@ -59,6 +60,44 @@ fn run_command<'a, T: Device>(
             }
             _ => {}
         },
+        ("flash", Some(matches)) => match matches.value_of("ACTION").unwrap() {
+            "erase" => {
+                device.erase_flash()?;
+                println!("Flash is erased");
+            }
+            operation @ _ => {
+                let slot: StorageSlot = matches
+                    .value_of("SLOT")
+                    .ok_or_else(|| "<SLOT> argument is not provided.".to_string())
+                    .and_then(|slot_str| {
+                        u8::from_str_radix(&slot_str[2..], 16).or_else(|err| {
+                            Err(format!("Failed to parse <SLOT> argument: {:?}", err))
+                        })
+                    })?
+                    .into();
+
+                match operation {
+                    "write" => {
+                        let value = matches
+                            .value_of("VALUE")
+                            .ok_or_else(|| "<VALUE> argument is not provided.".to_string())
+                            .and_then(|value_str| {
+                                u8::from_str_radix(value_str, 10).or_else(|err| {
+                                    Err(format!("Failed to parse <VALUE> argument: {:?}", err))
+                                })
+                            })?;
+
+                        device.write_flash(slot, value)?;
+
+                        println!("Value {} is written to memory.", value);
+                    }
+                    "read" => println!("Value read from memory: {}", device.read_flash(slot)?),
+                    _ => {}
+                }
+
+                device.read_flash(slot)?;
+            }
+        },
 
         ("reset", _) => {
             println!("Device is being reset...");
@@ -110,6 +149,30 @@ fn main() -> Result<(), String> {
                         .default_value("5s")
                         .required_if("ACTION", "set")
                         .help("Alarm to set in the hh:mm:ss form."),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("flash")
+                .about("Manages Kroneum flash memory")
+                .arg(
+                    Arg::with_name("ACTION")
+                        .index(1)
+                        .required(true)
+                        .possible_values(["read", "write", "erase"].as_ref())
+                        .help("Reads from, writes to or erases Kroneum flash memory"),
+                )
+                .arg(
+                    Arg::with_name("SLOT")
+                        .index(2)
+                        .required_ifs(&[("ACTION", "read"), ("ACTION", "write")])
+                        .possible_values(&["0x1f", "0x2f", "0x3f", "0x4f", "0x5f"])
+                        .help("Address of the memory slot."),
+                )
+                .arg(
+                    Arg::with_name("VALUE")
+                        .index(3)
+                        .required_if("ACTION", "write")
+                        .help("Value to write to a memory slot. Value must be an unsigned byte."),
                 ),
         )
         .subcommand(SubCommand::with_name("reset").about("Resets Kroneum device"))
