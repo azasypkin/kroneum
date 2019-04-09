@@ -241,6 +241,13 @@ impl<S: SysTickHardware> System<S> {
             } else if let CommandPacket::ReadFlash(slot) = command_packet {
                 let value = self.flash().read(slot).unwrap_or_else(|| 0);
                 self.usb().send(&[value, 0, 0, 0, 0, 0]);
+            } else if let CommandPacket::WriteFlash(slot, value) = command_packet {
+                let status = if self.flash().write(slot, value).is_ok() {
+                    1
+                } else {
+                    0
+                };
+                self.usb().send(&[status, 0, 0, 0, 0, 0]);
             }
         }
 
