@@ -86,4 +86,223 @@ impl<T: FlashHardware> Flash<T> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::tests::MockCalls;
+    use core::cell::RefCell;
+
+    // Size of the page in bytes (u8).
+    const PAGE_SIZE: usize = 1024;
+
+    #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+    enum Call {
+        Setup,
+        Teardown,
+        EnableWriteMode,
+        DisableWriteMode,
+        ErasePage(usize),
+    }
+
+    #[derive(Default)]
+    struct MockData {
+        pub calls: MockCalls<Call>,
+    }
+
+    struct FlashHardwareMock<'a> {
+        data: RefCell<&'a mut MockData>,
+    }
+
+    impl<'a> FlashHardware for FlashHardwareMock<'a> {
+        fn setup(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Setup);
+        }
+
+        fn teardown(&self) {
+            self.data.borrow_mut().calls.log_call(Call::Teardown);
+        }
+
+        fn erase_page(&self, page_address: usize) {
+            self.data
+                .borrow_mut()
+                .calls
+                .log_call(Call::ErasePage(page_address));
+        }
+
+        fn enable_write_mode(&self) {
+            self.data.borrow_mut().calls.log_call(Call::EnableWriteMode);
+        }
+
+        fn disable_write_mode(&self) {
+            self.data
+                .borrow_mut()
+                .calls
+                .log_call(Call::DisableWriteMode);
+        }
+    }
+
+    fn create_flash(mock_data: &mut MockData, pages: [StoragePage; 2]) -> Flash<FlashHardwareMock> {
+        Flash {
+            hw: FlashHardwareMock {
+                data: RefCell::new(mock_data),
+            },
+            storage: Storage { pages },
+        }
+    }
+
+    #[test]
+    fn setup() {
+        let mut mock_data = MockData::default();
+        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        create_flash(
+            &mut mock_data,
+            [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        )
+        .setup();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
+    }
+
+    #[test]
+    fn teardown() {
+        let mut mock_data = MockData::default();
+        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        create_flash(
+            &mut mock_data,
+            [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        )
+        .teardown();
+
+        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
+    }
+
+    #[test]
+    fn read() {
+        let mut mock_data = MockData::default();
+        let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        let flash = create_flash(
+            &mut mock_data,
+            [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        );
+
+        assert_eq!(flash.read(StorageSlot::One), None);
+        assert_eq!(flash.read(StorageSlot::Two), None);
+
+        page1[2] = 0x1f0f;
+
+        assert_eq!(flash.read(StorageSlot::One), Some(0x0f));
+        assert_eq!(flash.read(StorageSlot::Two), None);
+
+        page1[3] = 0x2f01;
+
+        assert_eq!(flash.read(StorageSlot::One), Some(0x0f));
+        assert_eq!(flash.read(StorageSlot::Two), Some(0x01));
+    }
+
+    #[test]
+    fn write_when_page_has_enough_space() {
+        let mut mock_data = MockData::default();
+        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        {
+            let flash = create_flash(
+                &mut mock_data,
+                [
+                    StoragePage {
+                        address: &page1 as *const _ as usize,
+                        size: PAGE_SIZE,
+                    },
+                    StoragePage {
+                        address: &page2 as *const _ as usize,
+                        size: PAGE_SIZE,
+                    },
+                ],
+            );
+
+            assert_eq!(flash.write(StorageSlot::One, 10).is_ok(), true);
+        }
+
+        assert_eq!(page1[..4], [0x0fff, 0xffff, 0x1f0a, 0xffff]);
+        assert_eq!(
+            mock_data.calls.logs(),
+            [Some(Call::EnableWriteMode), Some(Call::DisableWriteMode)]
+        )
+    }
+
+    #[test]
+    fn write_when_page_is_full() {
+        let mut mock_data = MockData::default();
+        let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        {
+            let flash = create_flash(
+                &mut mock_data,
+                [
+                    StoragePage {
+                        address: &page1 as *const _ as usize,
+                        size: PAGE_SIZE,
+                    },
+                    StoragePage {
+                        address: &page2 as *const _ as usize,
+                        size: PAGE_SIZE,
+                    },
+                ],
+            );
+
+            // Imitate fully populated page.
+            page1[0] = 0x0fff;
+            page1[1] = 0x0001;
+            for i in 2..(PAGE_SIZE / 2) {
+                page1[i] = 0x1f12;
+            }
+
+            assert_eq!(flash.write(StorageSlot::Two, 0x17).is_ok(), true);
+        }
+
+        assert_eq!(page2[..5], [0x0fff, 0xffff, 0x1f12, 0x2f17, 0xffff]);
+        assert_eq!(
+            mock_data.calls.logs(),
+            [
+                Some(Call::EnableWriteMode),
+                Some(Call::DisableWriteMode),
+                Some(Call::ErasePage(&page2 as *const _ as usize)),
+                Some(Call::EnableWriteMode),
+                Some(Call::DisableWriteMode)
+            ]
+        )
+    }
+}
