@@ -44,8 +44,21 @@ connected to the host PC via micro USB cable:
 
 ```bash
 $ cargo run -- info
+
+$ cargo run -- beep -n5
+
+$ cargo run -- alarm get
 $ cargo run -- alarm set "5m 15s"
+
+$ cargo run -- flash read 0x1f
+$ cargo run -- flash write 0x1f 10
+$ cargo run -- flash erase
+
+$ cargo run -- reset
+
 ```
+
+Run `cargo run -- help` for more details.
 
 ## Prototype or DIY
 
