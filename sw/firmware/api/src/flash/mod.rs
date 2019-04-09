@@ -5,9 +5,6 @@ pub mod storage_slot;
 
 use self::{storage::Storage, storage_page::StoragePage, storage_slot::StorageSlot};
 
-/// Sector 7, page 30 and 31 of STM32F04x flash memory.
-const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
-
 /// Describes the Flash hardware management interface.
 pub trait FlashHardware {
     /// Initializes hardware if needed.
@@ -32,17 +29,17 @@ pub struct Flash<T: FlashHardware> {
 }
 
 impl<T: FlashHardware> Flash<T> {
-    pub fn new(hw: T) -> Self {
+    pub fn new(hw: T, page_addresses: [usize; 2]) -> Self {
         Flash {
             hw,
             storage: Storage {
                 pages: [
                     StoragePage {
-                        address: PAGE_ADDRESSES[0],
+                        address: page_addresses[0],
                         size: 1024,
                     },
                     StoragePage {
-                        address: PAGE_ADDRESSES[1],
+                        address: page_addresses[1],
                         size: 1024,
                     },
                 ],
@@ -83,6 +80,13 @@ impl<T: FlashHardware> Flash<T> {
         self.hw.disable_write_mode();
 
         result
+    }
+
+    /// Erases all storage pages.
+    pub fn erase_all(&self) {
+        for page in self.storage.pages.iter() {
+            self.hw.erase_page(page.address);
+        }
     }
 }
 
@@ -303,6 +307,36 @@ mod tests {
                 Some(Call::ErasePage(&page2 as *const _ as usize)),
                 Some(Call::EnableWriteMode),
                 Some(Call::DisableWriteMode)
+            ]
+        )
+    }
+
+    #[test]
+    fn erase_all() {
+        let mut mock_data = MockData::default();
+        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
+
+        create_flash(
+            &mut mock_data,
+            [
+                StoragePage {
+                    address: &page1 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+                StoragePage {
+                    address: &page2 as *const _ as usize,
+                    size: PAGE_SIZE,
+                },
+            ],
+        )
+        .erase_all();
+
+        assert_eq!(
+            mock_data.calls.logs(),
+            [
+                Some(Call::ErasePage(&page1 as *const _ as usize)),
+                Some(Call::ErasePage(&page2 as *const _ as usize))
             ]
         )
     }

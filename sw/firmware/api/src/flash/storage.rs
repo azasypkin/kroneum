@@ -27,7 +27,7 @@ impl Storage {
     /// page if needed and switch to rolling over all existing values from the current page.
     pub fn write(&self, slot: StorageSlot, value: u8) -> Result<(), StoragePageFullError> {
         let active_page = self.active_page();
-        if let Err(_) = active_page.write(slot.into(), value) {
+        if active_page.write(slot.into(), value).is_err() {
             Err(StoragePageFullError {
                 active_page,
                 next_page: self.next_page(),

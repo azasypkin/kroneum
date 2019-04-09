@@ -8,8 +8,6 @@ use self::descriptors::*;
 use self::pma::PacketMemoryArea;
 use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
 
-const BTABLE_ADDRESS: usize = 0x4000_6000;
-
 #[derive(Copy, Clone)]
 pub enum EndpointType {
     Control = 0b0,
@@ -155,11 +153,11 @@ pub struct USB<'a, T: USBHardware> {
 }
 
 impl<'a, T: USBHardware> USB<'a, T> {
-    pub fn new(hw: T, state: &'a mut UsbState) -> Self {
+    pub fn new(hw: T, state: &'a mut UsbState, pma_base_address: usize) -> Self {
         USB {
             hw,
             pma: PacketMemoryArea {
-                base_address: BTABLE_ADDRESS,
+                base_address: pma_base_address,
             },
             state,
         }

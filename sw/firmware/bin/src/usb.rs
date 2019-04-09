@@ -5,6 +5,8 @@ use kroneum_api::usb::{
     UsbInterrupt, UsbState, USB,
 };
 
+const BTABLE_ADDRESS: usize = 0x4000_6000;
+
 pub struct USBHardwareImpl<'a> {
     p: &'a Peripherals,
 }
@@ -372,5 +374,5 @@ fn stop_clock(p: &Peripherals) {
 }
 
 pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a, USBHardwareImpl<'a>> {
-    USB::new(USBHardwareImpl { p }, state)
+    USB::new(USBHardwareImpl { p }, state, BTABLE_ADDRESS)
 }
