@@ -12,12 +12,18 @@ pub struct ButtonsHardwareImpl<'a, S: SysTickHardware> {
 impl<'a, S: SysTickHardware> ButtonsHardware for ButtonsHardwareImpl<'a, S> {
     fn setup(&self) {
         // Enable wakers.
-        toggle_wakers(self.p, true);
+        self.p
+            .PWR
+            .csr
+            .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
     }
 
     fn teardown(&self) {
         // Disable waker.
-        toggle_wakers(self.p, false);
+        self.p
+            .PWR
+            .csr
+            .modify(|_, w| w.ewup1().clear_bit().ewup4().clear_bit());
     }
 
     fn is_button_pressed(&self, button_type: ButtonType) -> bool {
@@ -31,12 +37,6 @@ impl<'a, S: SysTickHardware> ButtonsHardware for ButtonsHardwareImpl<'a, S> {
     fn delay(&mut self, delay_ms: u32) {
         self.systick.delay_ms(delay_ms);
     }
-}
-
-fn toggle_wakers(p: &Peripherals, toggle: bool) {
-    p.PWR
-        .csr
-        .modify(|_, w| w.ewup1().bit(toggle).ewup4().bit(toggle));
 }
 
 pub fn has_pending_interrupt(p: &Peripherals) -> bool {
