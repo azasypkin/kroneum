@@ -121,11 +121,9 @@ mod tests {
     }
 
     fn create_rtc(mock_data: &mut MockData) -> RTC<RTCHardwareMock> {
-        RTC {
-            hw: RTCHardwareMock {
-                data: RefCell::new(mock_data),
-            },
-        }
+        RTC::new(RTCHardwareMock {
+            data: RefCell::new(mock_data),
+        })
     }
 
     #[test]

@@ -13,7 +13,7 @@ pub struct SysTick<T: SysTickHardware> {
 }
 
 impl<'a, T: 'a + SysTickHardware> SysTick<T> {
-    pub fn create(hw: T) -> Self {
+    pub fn new(hw: T) -> Self {
         SysTick { hw }
     }
 

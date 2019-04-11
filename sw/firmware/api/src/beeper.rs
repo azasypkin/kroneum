@@ -70,7 +70,7 @@ pub struct PWMBeeper<T: PWMBeeperHardware> {
 }
 
 impl<T: PWMBeeperHardware> PWMBeeper<T> {
-    pub fn create(hw: T) -> Self {
+    pub fn new(hw: T) -> Self {
         PWMBeeper { hw }
     }
 
@@ -166,11 +166,9 @@ mod tests {
     }
 
     fn create_beeper(mock_data: &mut MockData) -> PWMBeeper<PWMBeeperHardwareMock> {
-        PWMBeeper {
-            hw: PWMBeeperHardwareMock {
-                data: RefCell::new(mock_data),
-            },
-        }
+        PWMBeeper::new(PWMBeeperHardwareMock {
+            data: RefCell::new(mock_data),
+        })
     }
 
     #[test]

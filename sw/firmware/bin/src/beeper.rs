@@ -102,7 +102,7 @@ where
 {
     setup(&p);
 
-    f(&mut PWMBeeper::create(BeeperHardwareImpl { p, systick }));
+    f(&mut PWMBeeper::new(BeeperHardwareImpl { p, systick }));
 
     teardown(&p);
 }

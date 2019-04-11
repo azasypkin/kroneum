@@ -145,13 +145,16 @@ mod tests {
         }
     }
 
-    fn create_flash(mock_data: &mut MockData, pages: [StoragePage; 2]) -> Flash<FlashHardwareMock> {
-        Flash {
-            hw: FlashHardwareMock {
+    fn create_flash(
+        mock_data: &mut MockData,
+        page_addresses: [usize; 2],
+    ) -> Flash<FlashHardwareMock> {
+        Flash::new(
+            FlashHardwareMock {
                 data: RefCell::new(mock_data),
             },
-            storage: Storage { pages },
-        }
+            page_addresses,
+        )
     }
 
     #[test]
@@ -162,16 +165,7 @@ mod tests {
 
         create_flash(
             &mut mock_data,
-            [
-                StoragePage {
-                    address: &page1 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-                StoragePage {
-                    address: &page2 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-            ],
+            [&page1 as *const _ as usize, &page2 as *const _ as usize],
         )
         .setup();
 
@@ -186,16 +180,7 @@ mod tests {
 
         create_flash(
             &mut mock_data,
-            [
-                StoragePage {
-                    address: &page1 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-                StoragePage {
-                    address: &page2 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-            ],
+            [&page1 as *const _ as usize, &page2 as *const _ as usize],
         )
         .teardown();
 
@@ -210,16 +195,7 @@ mod tests {
 
         let flash = create_flash(
             &mut mock_data,
-            [
-                StoragePage {
-                    address: &page1 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-                StoragePage {
-                    address: &page2 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-            ],
+            [&page1 as *const _ as usize, &page2 as *const _ as usize],
         );
 
         assert_eq!(flash.read(StorageSlot::One), None);
@@ -245,16 +221,7 @@ mod tests {
         {
             let flash = create_flash(
                 &mut mock_data,
-                [
-                    StoragePage {
-                        address: &page1 as *const _ as usize,
-                        size: PAGE_SIZE,
-                    },
-                    StoragePage {
-                        address: &page2 as *const _ as usize,
-                        size: PAGE_SIZE,
-                    },
-                ],
+                [&page1 as *const _ as usize, &page2 as *const _ as usize],
             );
 
             assert_eq!(flash.write(StorageSlot::One, 10).is_ok(), true);
@@ -276,16 +243,7 @@ mod tests {
         {
             let flash = create_flash(
                 &mut mock_data,
-                [
-                    StoragePage {
-                        address: &page1 as *const _ as usize,
-                        size: PAGE_SIZE,
-                    },
-                    StoragePage {
-                        address: &page2 as *const _ as usize,
-                        size: PAGE_SIZE,
-                    },
-                ],
+                [&page1 as *const _ as usize, &page2 as *const _ as usize],
             );
 
             // Imitate fully populated page.
@@ -319,16 +277,7 @@ mod tests {
 
         create_flash(
             &mut mock_data,
-            [
-                StoragePage {
-                    address: &page1 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-                StoragePage {
-                    address: &page2 as *const _ as usize,
-                    size: PAGE_SIZE,
-                },
-            ],
+            [&page1 as *const _ as usize, &page2 as *const _ as usize],
         )
         .erase_all();
 

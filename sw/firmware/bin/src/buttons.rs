@@ -53,5 +53,5 @@ pub fn create<'a>(
     p: &'a Peripherals,
     systick: &'a mut SysTick<impl SysTickHardware>,
 ) -> Buttons<ButtonsHardwareImpl<'a, impl SysTickHardware>> {
-    Buttons::create(ButtonsHardwareImpl { p, systick })
+    Buttons::new(ButtonsHardwareImpl { p, systick })
 }

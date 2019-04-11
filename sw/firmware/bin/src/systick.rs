@@ -27,5 +27,5 @@ impl SysTickHardware for SystickHardwareImpl {
 }
 
 pub fn create(syst: SYST) -> SysTick<SystickHardwareImpl> {
-    SysTick::create(SystickHardwareImpl { syst })
+    SysTick::new(SystickHardwareImpl { syst })
 }

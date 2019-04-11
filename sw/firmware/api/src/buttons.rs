@@ -44,7 +44,7 @@ pub struct Buttons<T: ButtonsHardware> {
 }
 
 impl<T: ButtonsHardware> Buttons<T> {
-    pub fn create(hw: T) -> Self {
+    pub fn new(hw: T) -> Self {
         Buttons { hw }
     }
 
@@ -151,11 +151,9 @@ mod tests {
     fn create_buttons<F: Fn(ButtonType, u32) -> bool>(
         mock_data: &mut MockData<F>,
     ) -> Buttons<ButtonsHardwareMock<F>> {
-        Buttons {
-            hw: ButtonsHardwareMock {
-                data: RefCell::new(mock_data),
-            },
-        }
+        Buttons::new(ButtonsHardwareMock {
+            data: RefCell::new(mock_data),
+        })
     }
 
     #[test]
