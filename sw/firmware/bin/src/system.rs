@@ -4,7 +4,7 @@ use cortex_m::peripheral::SCB;
 use stm32f0::stm32f0x2::Peripherals;
 
 use kroneum_api::{
-    beeper::Melody,
+    beeper::{Melody, PWMBeeper, PWMBeeperHardware},
     buttons::{ButtonPressType, Buttons, ButtonsHardware},
     flash::{Flash, FlashHardware},
     rtc::{RTCHardware, RTC},
@@ -173,34 +173,22 @@ impl<S: SysTickHardware> System<S> {
 
                 // If we are exiting `Config` or `Alarm` mode let's play special signal.
                 if let SystemMode::Setup(_) = self.state.mode {
-                    beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                        beeper.play(Melody::Reset)
-                    });
+                    self.beeper().play(Melody::Reset);
                 } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                        beeper.play(Melody::Reset)
-                    });
+                    self.beeper().play(Melody::Reset);
                 }
             }
             SystemMode::Config => {
-                beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                    beeper.play(Melody::Reset)
-                });
+                self.beeper().play(Melody::Reset);
 
                 self.toggle_standby_mode(false);
 
                 self.usb().setup();
             }
-            SystemMode::Setup(0) => beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                beeper.play(Melody::Setup)
-            }),
-            SystemMode::Setup(c) if *c > 0 => {
-                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep())
-            }
+            SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
+            SystemMode::Setup(c) if *c > 0 => self.beeper().beep(),
             SystemMode::Alarm(time, _) => {
-                beeper::acquire(&self.p, &mut self.systick, |beeper| {
-                    beeper.play(Melody::Setup)
-                });
+                self.beeper().play(Melody::Setup);
 
                 let rtc = self.rtc();
                 rtc.setup();
@@ -214,8 +202,8 @@ impl<S: SysTickHardware> System<S> {
     }
 
     pub fn on_rtc_alarm(&mut self) {
-        if let SystemMode::Alarm(_, melody) = &self.state.mode {
-            beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.play(*melody));
+        if let SystemMode::Alarm(_, melody) = self.state.mode {
+            self.beeper().play(melody);
 
             self.rtc().teardown();
 
@@ -229,7 +217,7 @@ impl<S: SysTickHardware> System<S> {
 
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
-                beeper::acquire(&self.p, &mut self.systick, |beeper| beeper.beep_n(num));
+                self.beeper().beep_n(num);
             } else if let CommandPacket::AlarmSet(time) = command_packet {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::AlarmGet = command_packet {
@@ -308,7 +296,12 @@ impl<S: SysTickHardware> System<S> {
         buttons::clear_pending_interrupt(&self.p);
     }
 
-    /// Creates an instance of `RTC` controller.
+    /// Creates an instance of `Beeper` controller.
+    fn beeper<'a>(&'a mut self) -> PWMBeeper<impl PWMBeeperHardware + 'a> {
+        beeper::create(&self.p, &mut self.systick)
+    }
+
+    /// Creates an instance of `Buttons` controller.
     fn buttons<'a>(&'a mut self) -> Buttons<impl ButtonsHardware + 'a> {
         buttons::create(&self.p, &mut self.systick)
     }

@@ -86,7 +86,8 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
         };
 
         notes.iter().for_each(|(frequency, delay)| {
-            self.play_note(frequency.clone(), delay.clone());
+            self.hw.pulse(*frequency);
+            self.hw.delay(*delay);
         });
 
         self.hw.toggle_pwm(false);
@@ -106,11 +107,6 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
                 self.hw.delay(100);
             }
         }
-    }
-
-    fn play_note(&mut self, note_frequency: u32, delay: u32) {
-        self.hw.pulse(note_frequency);
-        self.hw.delay(delay);
     }
 }
 
