@@ -7,6 +7,7 @@ pub mod buttons;
 pub mod config;
 pub mod flash;
 pub mod rtc;
+pub mod system;
 pub mod systick;
 pub mod time;
 pub mod usb;

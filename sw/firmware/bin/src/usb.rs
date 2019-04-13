@@ -180,6 +180,10 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         self.p.USB.daddr.write(|w| w.ef().set_bit());
     }
 
+    fn btable_address(&self) -> usize {
+        BTABLE_ADDRESS
+    }
+
     fn transaction(&self) -> Transaction {
         let istr_reg = self.p.USB.istr.read();
 
@@ -374,5 +378,5 @@ fn stop_clock(p: &Peripherals) {
 }
 
 pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a, USBHardwareImpl<'a>> {
-    USB::new(USBHardwareImpl { p }, state, BTABLE_ADDRESS)
+    USB::new(USBHardwareImpl { p }, state)
 }

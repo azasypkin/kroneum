@@ -8,33 +8,11 @@ use kroneum_api::{
     buttons::{ButtonPressType, Buttons, ButtonsHardware},
     flash::{Flash, FlashHardware},
     rtc::{RTCHardware, RTC},
+    system::{SystemMode, SystemState},
     systick::{SysTick, SysTickHardware},
     time::Time,
-    usb::{command_packet::CommandPacket, USBHardware, UsbState, USB},
+    usb::{command_packet::CommandPacket, USBHardware, USB},
 };
-
-#[derive(Debug, Copy, Clone)]
-pub enum SystemMode {
-    Idle,
-    Setup(u32),
-    Alarm(Time, Melody),
-    Config,
-}
-
-#[derive(Copy, Clone)]
-struct SystemState {
-    mode: SystemMode,
-    usb_state: UsbState,
-}
-
-impl Default for SystemState {
-    fn default() -> Self {
-        SystemState {
-            mode: SystemMode::Idle,
-            usb_state: UsbState::default(),
-        }
-    }
-}
 
 pub struct System<S: SysTickHardware> {
     p: Peripherals,

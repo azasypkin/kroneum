@@ -13,6 +13,9 @@ pub trait FlashHardware {
     /// Releases hardware if needed.
     fn teardown(&self);
 
+    /// Returns addresses of the flash memory pages.
+    fn page_addresses(&self) -> [usize; 2];
+
     /// Erases page using specified address.
     fn erase_page(&self, page_address: usize);
 
@@ -29,7 +32,8 @@ pub struct Flash<T: FlashHardware> {
 }
 
 impl<T: FlashHardware> Flash<T> {
-    pub fn new(hw: T, page_addresses: [usize; 2]) -> Self {
+    pub fn new(hw: T) -> Self {
+        let page_addresses = hw.page_addresses();
         Flash {
             hw,
             storage: Storage {
@@ -115,6 +119,7 @@ mod tests {
 
     struct FlashHardwareMock<'a> {
         data: RefCell<&'a mut MockData>,
+        page_addresses: [usize; 2],
     }
 
     impl<'a> FlashHardware for FlashHardwareMock<'a> {
@@ -124,6 +129,10 @@ mod tests {
 
         fn teardown(&self) {
             self.data.borrow_mut().calls.log_call(Call::Teardown);
+        }
+
+        fn page_addresses(&self) -> [usize; 2] {
+            self.page_addresses
         }
 
         fn erase_page(&self, page_address: usize) {
@@ -149,12 +158,10 @@ mod tests {
         mock_data: &mut MockData,
         page_addresses: [usize; 2],
     ) -> Flash<FlashHardwareMock> {
-        Flash::new(
-            FlashHardwareMock {
-                data: RefCell::new(mock_data),
-            },
+        Flash::new(FlashHardwareMock {
+            data: RefCell::new(mock_data),
             page_addresses,
-        )
+        })
     }
 
     #[test]

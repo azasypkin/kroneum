@@ -116,6 +116,9 @@ pub trait USBHardware {
     /// Enables USB device.
     fn enable(&self);
 
+    /// Returns start address of the BTABLE.
+    fn btable_address(&self) -> usize;
+
     /// Used to retrieve transaction that has been completed and caused `Correct Transfer` interrupt.
     fn transaction(&self) -> Transaction;
 
@@ -153,12 +156,11 @@ pub struct USB<'a, T: USBHardware> {
 }
 
 impl<'a, T: USBHardware> USB<'a, T> {
-    pub fn new(hw: T, state: &'a mut UsbState, pma_base_address: usize) -> Self {
+    pub fn new(hw: T, state: &'a mut UsbState) -> Self {
+        let base_address = hw.btable_address();
         USB {
             hw,
-            pma: PacketMemoryArea {
-                base_address: pma_base_address,
-            },
+            pma: PacketMemoryArea { base_address },
             state,
         }
     }

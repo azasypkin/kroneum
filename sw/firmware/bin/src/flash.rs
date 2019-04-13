@@ -31,6 +31,10 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
 
     fn teardown(&self) {}
 
+    fn page_addresses(&self) -> [usize; 2] {
+        PAGE_ADDRESSES
+    }
+
     fn erase_page(&self, page_address: usize) {
         self.busy_wait_until_ready();
         self.toggle_write_protection(false);
@@ -67,5 +71,5 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
 }
 
 pub fn create(p: &Peripherals) -> Flash<FlashHardwareImpl> {
-    Flash::new(FlashHardwareImpl { p }, PAGE_ADDRESSES)
+    Flash::new(FlashHardwareImpl { p })
 }
