@@ -1,3 +1,5 @@
+use systick::{SysTick, SysTickHardware};
+
 /// Note durations based on `200 b/m` (beats per minute), see https://msu.edu/course/asc/232/song_project/dectalk_pages/note_to_%20ms.html.
 const EIGHTH_NOTE: u32 = 150;
 const QUARTER_DOT_NOTE: u32 = 450;
@@ -60,18 +62,16 @@ pub trait PWMBeeperHardware {
 
     /// Forces PWM to pulse of the specified frequency.
     fn pulse(&self, note_frequency: u32);
-
-    /// Blocks the thread for the specified number of milliseconds.
-    fn delay(&mut self, delay_ms: u32);
 }
 
-pub struct PWMBeeper<T: PWMBeeperHardware> {
+pub struct PWMBeeper<'a, T: PWMBeeperHardware, S: SysTickHardware> {
     hw: T,
+    systick: &'a mut SysTick<S>,
 }
 
-impl<T: PWMBeeperHardware> PWMBeeper<T> {
-    pub fn new(hw: T) -> Self {
-        PWMBeeper { hw }
+impl<'a, T: PWMBeeperHardware, S: SysTickHardware> PWMBeeper<'a, T, S> {
+    pub fn new(hw: T, systick: &'a mut SysTick<S>) -> Self {
+        PWMBeeper { hw, systick }
     }
 
     /// Plays predefined melody.
@@ -87,7 +87,7 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
 
         notes.iter().for_each(|(frequency, delay)| {
             self.hw.pulse(*frequency);
-            self.hw.delay(*delay);
+            self.systick.delay_ms(*delay);
         });
 
         self.hw.toggle_pwm(false);
@@ -104,7 +104,7 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
             self.play(Melody::Beep);
 
             if i < n {
-                self.hw.delay(100);
+                self.systick.delay_ms(100);
             }
         }
     }
@@ -113,31 +113,21 @@ impl<T: PWMBeeperHardware> PWMBeeper<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::MockCalls;
+    use crate::systick::tests::{
+        create_systick, AssociatedData, Call as SystickCall, SystickHardwareMock,
+    };
+    use crate::tests::MockData;
     use core::cell::RefCell;
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
     enum Call {
         EnablePWM,
         DisablePWM,
-        Delay(u32),
         Pulse(u32),
     }
 
-    struct MockData {
-        pub calls: MockCalls<Call>,
-    }
-
-    impl MockData {
-        pub fn new() -> Self {
-            MockData {
-                calls: MockCalls::default(),
-            }
-        }
-    }
-
     struct PWMBeeperHardwareMock<'a> {
-        data: RefCell<&'a mut MockData>,
+        data: RefCell<&'a mut MockData<Call>>,
     }
 
     impl<'a> PWMBeeperHardware for PWMBeeperHardwareMock<'a> {
@@ -155,29 +145,38 @@ mod tests {
                 .calls
                 .log_call(Call::Pulse(note_frequency));
         }
-
-        fn delay(&mut self, delay_ms: u32) {
-            self.data.borrow_mut().calls.log_call(Call::Delay(delay_ms));
-        }
     }
 
-    fn create_beeper(mock_data: &mut MockData) -> PWMBeeper<PWMBeeperHardwareMock> {
-        PWMBeeper::new(PWMBeeperHardwareMock {
-            data: RefCell::new(mock_data),
-        })
+    fn create_beeper<'a>(
+        beeper_mock: &'a mut MockData<Call>,
+        systick: &'a mut SysTick<SystickHardwareMock<'a>>,
+    ) -> PWMBeeper<'a, PWMBeeperHardwareMock<'a>, SystickHardwareMock<'a>> {
+        PWMBeeper::new(
+            PWMBeeperHardwareMock {
+                data: RefCell::new(beeper_mock),
+            },
+            systick,
+        )
     }
 
     #[test]
     fn handles_beep() {
-        let mut mock_data = MockData::new();
+        let mut beeper_mock: MockData<Call> = MockData::new();
+        let mut systick_mock: MockData<SystickCall, AssociatedData> = MockData::new();
 
-        create_beeper(&mut mock_data).beep();
+        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep();
+
         assert_eq!(
-            mock_data.calls.logs(),
+            systick_mock.calls.logs(),
+            [Some(SystickCall::Delay(BEEP_MELODY[0].1))]
+        );
+
+        assert_eq!(
+            beeper_mock.calls.logs(),
             [
                 Some(Call::EnablePWM),
                 Some(Call::Pulse(BEEP_MELODY[0].0)),
-                Some(Call::Delay(BEEP_MELODY[0].1)),
+                // Delay
                 Some(Call::DisablePWM)
             ]
         );
@@ -185,25 +184,38 @@ mod tests {
 
     #[test]
     fn handles_beep_n() {
-        let mut mock_data = MockData::new();
+        let mut beeper_mock: MockData<Call> = MockData::new();
+        let mut systick_mock: MockData<SystickCall, AssociatedData> = MockData::new();
 
-        create_beeper(&mut mock_data).beep_n(3);
+        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep_n(3);
+
         assert_eq!(
-            mock_data.calls.logs(),
+            systick_mock.calls.logs(),
+            [
+                Some(SystickCall::Delay(BEEP_MELODY[0].1)),
+                Some(SystickCall::Delay(100)),
+                Some(SystickCall::Delay(BEEP_MELODY[0].1)),
+                Some(SystickCall::Delay(100)),
+                Some(SystickCall::Delay(BEEP_MELODY[0].1))
+            ]
+        );
+
+        assert_eq!(
+            beeper_mock.calls.logs(),
             [
                 Some(Call::EnablePWM),
                 Some(Call::Pulse(BEEP_MELODY[0].0)),
-                Some(Call::Delay(BEEP_MELODY[0].1)),
+                // Delay
                 Some(Call::DisablePWM),
-                Some(Call::Delay(100)),
+                // Delay 100ms
                 Some(Call::EnablePWM),
                 Some(Call::Pulse(BEEP_MELODY[0].0)),
-                Some(Call::Delay(BEEP_MELODY[0].1)),
+                // Delay
                 Some(Call::DisablePWM),
-                Some(Call::Delay(100)),
+                // Delay 100ms
                 Some(Call::EnablePWM),
                 Some(Call::Pulse(BEEP_MELODY[0].0)),
-                Some(Call::Delay(BEEP_MELODY[0].1)),
+                // Delay
                 Some(Call::DisablePWM)
             ]
         );
@@ -211,17 +223,27 @@ mod tests {
 
     #[test]
     fn handles_play() {
-        let mut mock_data = MockData::new();
+        let mut beeper_mock: MockData<Call> = MockData::new();
+        let mut systick_mock: MockData<SystickCall, AssociatedData> = MockData::new();
 
-        create_beeper(&mut mock_data).play(Melody::Setup);
+        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).play(Melody::Setup);
+
         assert_eq!(
-            mock_data.calls.logs(),
+            systick_mock.calls.logs(),
+            [
+                Some(SystickCall::Delay(SETUP_MELODY[0].1)),
+                Some(SystickCall::Delay(SETUP_MELODY[1].1)),
+            ]
+        );
+
+        assert_eq!(
+            beeper_mock.calls.logs(),
             [
                 Some(Call::EnablePWM),
                 Some(Call::Pulse(SETUP_MELODY[0].0)),
-                Some(Call::Delay(SETUP_MELODY[0].1)),
+                // Delay
                 Some(Call::Pulse(SETUP_MELODY[1].0)),
-                Some(Call::Delay(SETUP_MELODY[1].1)),
+                // Delay
                 Some(Call::DisablePWM)
             ]
         );

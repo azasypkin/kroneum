@@ -275,7 +275,9 @@ impl<S: SysTickHardware> System<S> {
     }
 
     /// Creates an instance of `Beeper` controller.
-    fn beeper<'a>(&'a mut self) -> PWMBeeper<impl PWMBeeperHardware + 'a> {
+    fn beeper<'a>(
+        &'a mut self,
+    ) -> PWMBeeper<'a, impl PWMBeeperHardware + 'a, impl SysTickHardware> {
         beeper::create(&self.p, &mut self.systick)
     }
 

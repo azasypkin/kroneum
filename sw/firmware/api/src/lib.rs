@@ -38,4 +38,18 @@ mod tests {
             }
         }
     }
+
+    pub(crate) struct MockData<T: Copy, D: Default = ()> {
+        pub calls: MockCalls<T>,
+        pub data: D,
+    }
+
+    impl<T: Copy, D: Default> MockData<T, D> {
+        pub fn new() -> Self {
+            MockData {
+                data: D::default(),
+                calls: MockCalls::default(),
+            }
+        }
+    }
 }
