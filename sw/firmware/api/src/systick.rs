@@ -50,11 +50,11 @@ pub(crate) mod tests {
         pub ticks: u32,
     }
 
-    pub(crate) struct SystickHardwareMock<'a> {
-        mock: &'a mut MockData<Call, AssociatedData>,
+    pub(crate) struct SystickHardwareMock<'a, 'b: 'a> {
+        mock: &'a mut MockData<'b, Call, AssociatedData>,
     }
 
-    impl<'a> SysTickHardware for SystickHardwareMock<'a> {
+    impl<'a, 'b: 'a> SysTickHardware for SystickHardwareMock<'a, 'b> {
         fn configure(&mut self, reload_value: u32) {
             self.mock.data.reload_value = reload_value;
             self.mock
@@ -74,9 +74,9 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn create_systick(
-        systick_mock: &mut MockData<Call, AssociatedData>,
-    ) -> SysTick<SystickHardwareMock> {
+    pub(crate) fn create_systick<'a, 'b: 'a>(
+        systick_mock: &'a mut MockData<'b, Call, AssociatedData>,
+    ) -> SysTick<SystickHardwareMock<'a, 'b>> {
         SysTick {
             hw: SystickHardwareMock { mock: systick_mock },
         }

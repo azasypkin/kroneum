@@ -119,17 +119,19 @@ mod tests {
         Teardown,
     }
 
-    struct MockData<F: Fn(ButtonType, u32) -> bool> {
+    struct MockData<'a, F: Fn(ButtonType, u32) -> bool> {
         pub is_button_pressed: F,
         pub current_delay: u32,
-        pub calls: MockCalls<Call>,
+        pub calls: MockCalls<'a, Call>,
     }
 
-    struct ButtonsHardwareMock<'a, F: Fn(ButtonType, u32) -> bool> {
-        data: RefCell<&'a mut MockData<F>>,
+    struct ButtonsHardwareMock<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> {
+        data: RefCell<&'a mut MockData<'b, F>>,
     }
 
-    impl<'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware for ButtonsHardwareMock<'a, F> {
+    impl<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware
+        for ButtonsHardwareMock<'a, 'b, F>
+    {
         fn setup(&self) {
             self.data.borrow_mut().calls.log_call(Call::Setup);
         }
@@ -148,9 +150,9 @@ mod tests {
         }
     }
 
-    fn create_buttons<F: Fn(ButtonType, u32) -> bool>(
-        mock_data: &mut MockData<F>,
-    ) -> Buttons<ButtonsHardwareMock<F>> {
+    fn create_buttons<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool>(
+        mock_data: &'a mut MockData<'b, F>,
+    ) -> Buttons<ButtonsHardwareMock<'a, 'b, F>> {
         Buttons::new(ButtonsHardwareMock {
             data: RefCell::new(mock_data),
         })

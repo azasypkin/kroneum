@@ -113,16 +113,16 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockData {
-        pub calls: MockCalls<Call>,
+    struct MockData<'a> {
+        pub calls: MockCalls<'a, Call>,
     }
 
-    struct FlashHardwareMock<'a> {
-        data: RefCell<&'a mut MockData>,
+    struct FlashHardwareMock<'a, 'b: 'a> {
+        data: RefCell<&'a mut MockData<'b>>,
         page_addresses: [usize; 2],
     }
 
-    impl<'a> FlashHardware for FlashHardwareMock<'a> {
+    impl<'a, 'b: 'a> FlashHardware for FlashHardwareMock<'a, 'b> {
         fn setup(&self) {
             self.data.borrow_mut().calls.log_call(Call::Setup);
         }
@@ -154,10 +154,10 @@ mod tests {
         }
     }
 
-    fn create_flash(
-        mock_data: &mut MockData,
+    fn create_flash<'a, 'b: 'a>(
+        mock_data: &'a mut MockData<'b>,
         page_addresses: [usize; 2],
-    ) -> Flash<FlashHardwareMock> {
+    ) -> Flash<FlashHardwareMock<'a, 'b>> {
         Flash::new(FlashHardwareMock {
             data: RefCell::new(mock_data),
             page_addresses,

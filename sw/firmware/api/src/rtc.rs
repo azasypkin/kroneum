@@ -70,17 +70,17 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockData {
+    struct MockData<'a> {
         pub time: BCDTime,
         pub alarm: BCDTime,
-        pub calls: MockCalls<Call>,
+        pub calls: MockCalls<'a, Call>,
     }
 
-    struct RTCHardwareMock<'a> {
-        data: RefCell<&'a mut MockData>,
+    struct RTCHardwareMock<'a, 'b: 'a> {
+        data: RefCell<&'a mut MockData<'b>>,
     }
 
-    impl<'a> RTCHardware for RTCHardwareMock<'a> {
+    impl<'a, 'b: 'a> RTCHardware for RTCHardwareMock<'a, 'b> {
         fn setup(&self) {
             self.data.borrow_mut().calls.log_call(Call::Setup);
         }
@@ -120,7 +120,7 @@ mod tests {
         }
     }
 
-    fn create_rtc(mock_data: &mut MockData) -> RTC<RTCHardwareMock> {
+    fn create_rtc<'a, 'b: 'a>(mock_data: &'a mut MockData<'b>) -> RTC<RTCHardwareMock<'a, 'b>> {
         RTC::new(RTCHardwareMock {
             data: RefCell::new(mock_data),
         })
