@@ -97,7 +97,7 @@ impl<T: FlashHardware> Flash<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::MockCalls;
+    use crate::tests::MockData;
     use core::cell::RefCell;
 
     // Size of the page in bytes (u8).
@@ -112,13 +112,8 @@ mod tests {
         ErasePage(usize),
     }
 
-    #[derive(Default)]
-    struct MockData<'a> {
-        pub calls: MockCalls<'a, Call>,
-    }
-
     struct FlashHardwareMock<'a, 'b: 'a> {
-        data: RefCell<&'a mut MockData<'b>>,
+        data: RefCell<&'a mut MockData<'b, Call>>,
         page_addresses: [usize; 2],
     }
 
@@ -155,7 +150,7 @@ mod tests {
     }
 
     fn create_flash<'a, 'b: 'a>(
-        mock_data: &'a mut MockData<'b>,
+        mock_data: &'a mut MockData<'b, Call>,
         page_addresses: [usize; 2],
     ) -> Flash<FlashHardwareMock<'a, 'b>> {
         Flash::new(FlashHardwareMock {
@@ -166,7 +161,7 @@ mod tests {
 
     #[test]
     fn setup() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
@@ -181,7 +176,7 @@ mod tests {
 
     #[test]
     fn teardown() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
@@ -196,7 +191,7 @@ mod tests {
 
     #[test]
     fn read() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
@@ -221,7 +216,7 @@ mod tests {
 
     #[test]
     fn write_when_page_has_enough_space() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
@@ -243,7 +238,7 @@ mod tests {
 
     #[test]
     fn write_when_page_is_full() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
@@ -278,7 +273,7 @@ mod tests {
 
     #[test]
     fn erase_all() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 

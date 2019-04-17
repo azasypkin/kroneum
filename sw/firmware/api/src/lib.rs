@@ -87,6 +87,13 @@ mod tests {
             }
         }
 
+        pub fn without_data() -> MockData<'a, T, ()> {
+            MockData {
+                data: (),
+                calls: MockCalls::default(),
+            }
+        }
+
         pub fn with_call_order(order: &'a Order) -> MockData<'a, T, ()> {
             MockData {
                 data: (),
