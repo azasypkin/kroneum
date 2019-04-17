@@ -162,9 +162,9 @@ mod tests {
     #[test]
     fn handles_beep() {
         let order = Order::default();
-        let mut beeper_mock: MockData<Call> = MockData::with_call_order(&order);
-        let mut systick_mock: MockData<SystickCall, AssociatedData> =
-            MockData::with_call_order(&order);
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
 
         create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep();
 
@@ -186,9 +186,9 @@ mod tests {
     #[test]
     fn handles_beep_n() {
         let order = Order::default();
-        let mut beeper_mock: MockData<Call> = MockData::with_call_order(&order);
-        let mut systick_mock: MockData<SystickCall, AssociatedData> =
-            MockData::with_call_order(&order);
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
 
         create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep_n(3);
 
@@ -227,9 +227,9 @@ mod tests {
     #[test]
     fn handles_play() {
         let order = Order::default();
-        let mut beeper_mock: MockData<Call> = MockData::with_call_order(&order);
-        let mut systick_mock: MockData<SystickCall, AssociatedData> =
-            MockData::with_call_order(&order);
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
 
         create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).play(Melody::Setup);
 

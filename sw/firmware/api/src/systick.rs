@@ -85,13 +85,13 @@ pub(crate) mod tests {
     #[test]
     #[should_panic(expected = "timeout is too large")]
     fn fails_for_large_timeout() {
-        let mut systick_mock = MockData::new();
+        let mut systick_mock = MockData::new(AssociatedData::default());
         create_systick(&mut systick_mock).delay_ms(5000);
     }
 
     #[test]
     fn handles_timeout() {
-        let mut systick_mock = MockData::new();
+        let mut systick_mock = MockData::new(AssociatedData::default());
 
         create_systick(&mut systick_mock).delay_ms(1234);
         assert_eq!(systick_mock.data.reload_value, 9872000);

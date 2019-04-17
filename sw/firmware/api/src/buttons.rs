@@ -110,7 +110,7 @@ impl<T: ButtonsHardware> Buttons<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::MockCalls;
+    use crate::tests::MockData;
     use core::cell::RefCell;
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -119,14 +119,13 @@ mod tests {
         Teardown,
     }
 
-    struct MockData<'a, F: Fn(ButtonType, u32) -> bool> {
+    pub(crate) struct AssociatedData<F: Fn(ButtonType, u32) -> bool> {
         pub is_button_pressed: F,
         pub current_delay: u32,
-        pub calls: MockCalls<'a, Call>,
     }
 
     struct ButtonsHardwareMock<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> {
-        data: RefCell<&'a mut MockData<'b, F>>,
+        data: RefCell<&'a mut MockData<'b, Call, AssociatedData<F>>>,
     }
 
     impl<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware
@@ -141,17 +140,17 @@ mod tests {
         }
 
         fn is_button_pressed(&self, button_type: ButtonType) -> bool {
-            let current_delay = self.data.borrow().current_delay;
-            (self.data.borrow().is_button_pressed)(button_type, current_delay)
+            let current_delay = self.data.borrow().data.current_delay;
+            (self.data.borrow().data.is_button_pressed)(button_type, current_delay)
         }
 
         fn delay(&mut self, delay_ms: u32) {
-            self.data.borrow_mut().current_delay += delay_ms;
+            self.data.borrow_mut().data.current_delay += delay_ms;
         }
     }
 
     fn create_buttons<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool>(
-        mock_data: &'a mut MockData<'b, F>,
+        mock_data: &'a mut MockData<'b, Call, AssociatedData<F>>,
     ) -> Buttons<ButtonsHardwareMock<'a, 'b, F>> {
         Buttons::new(ButtonsHardwareMock {
             data: RefCell::new(mock_data),
@@ -160,11 +159,10 @@ mod tests {
 
     #[test]
     fn setup() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         create_buttons(&mut mock_data).setup();
 
@@ -173,11 +171,10 @@ mod tests {
 
     #[test]
     fn teardown() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         create_buttons(&mut mock_data).teardown();
 
@@ -186,11 +183,10 @@ mod tests {
 
     #[test]
     fn both_none() {
-        let mut mock_data = MockData {
-            is_button_pressed: |_bt: ButtonType, _current_delay: u32| false,
+        let mut mock_data = MockData::new(AssociatedData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -200,7 +196,7 @@ mod tests {
 
     #[test]
     fn both_short() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, current_delay: u32| {
                 if current_delay >= 250 {
                     false
@@ -209,8 +205,7 @@ mod tests {
                 }
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -220,7 +215,7 @@ mod tests {
 
     #[test]
     fn one_none_ten_short() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => false,
                 ButtonType::Ten => {
@@ -232,8 +227,7 @@ mod tests {
                 }
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -243,7 +237,7 @@ mod tests {
 
     #[test]
     fn one_short_ten_none() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => {
                     if current_delay >= 250 {
@@ -255,8 +249,7 @@ mod tests {
                 ButtonType::Ten => false,
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -266,7 +259,7 @@ mod tests {
 
     #[test]
     fn both_long() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, current_delay: u32| {
                 if current_delay >= 1500 {
                     false
@@ -275,8 +268,7 @@ mod tests {
                 }
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -286,11 +278,10 @@ mod tests {
 
     #[test]
     fn both_long_when_infinitely_pressed() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, _current_delay: u32| true,
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -300,14 +291,13 @@ mod tests {
 
     #[test]
     fn one_none_ten_long() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
                 ButtonType::One => false,
                 ButtonType::Ten => true,
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -317,7 +307,7 @@ mod tests {
 
     #[test]
     fn one_short_ten_long() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => {
                     if current_delay >= 250 {
@@ -329,8 +319,7 @@ mod tests {
                 ButtonType::Ten => true,
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -340,14 +329,13 @@ mod tests {
 
     #[test]
     fn one_long_ten_none() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
                 ButtonType::One => true,
                 ButtonType::Ten => false,
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),
@@ -357,7 +345,7 @@ mod tests {
 
     #[test]
     fn one_long_ten_short() {
-        let mut mock_data = MockData {
+        let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => true,
                 ButtonType::Ten => {
@@ -369,8 +357,7 @@ mod tests {
                 }
             },
             current_delay: 0,
-            calls: MockCalls::default(),
-        };
+        });
 
         assert_eq!(
             create_buttons(&mut mock_data).interrupt(),

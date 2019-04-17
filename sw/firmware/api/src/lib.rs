@@ -74,22 +74,29 @@ mod tests {
         }
     }
 
-    pub(crate) struct MockData<'a, T: Copy, D: Default = ()> {
+    pub(crate) struct MockData<'a, T: Copy, D = ()> {
         pub calls: MockCalls<'a, T>,
         pub data: D,
     }
 
-    impl<'a, T: Copy, D: Default> MockData<'a, T, D> {
-        pub fn new() -> Self {
+    impl<'a, T: Copy, D> MockData<'a, T, D> {
+        pub fn new(inner_data: D) -> Self {
             MockData {
-                data: D::default(),
+                data: inner_data,
                 calls: MockCalls::default(),
             }
         }
 
-        pub fn with_call_order(order: &'a Order) -> Self {
+        pub fn with_call_order(order: &'a Order) -> MockData<'a, T, ()> {
             MockData {
-                data: D::default(),
+                data: (),
+                calls: MockCalls::with_order(order),
+            }
+        }
+
+        pub fn with_data_and_call_order(data: D, order: &'a Order) -> Self {
+            MockData {
+                data,
                 calls: MockCalls::with_order(order),
             }
         }
