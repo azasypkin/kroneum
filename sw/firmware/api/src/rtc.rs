@@ -60,7 +60,7 @@ impl<T: RTCHardware> RTC<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::MockCalls;
+    use crate::tests::MockData;
     use core::cell::RefCell;
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -70,14 +70,13 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockData<'a> {
+    pub(crate) struct AssociatedData {
         pub time: BCDTime,
         pub alarm: BCDTime,
-        pub calls: MockCalls<'a, Call>,
     }
 
     struct RTCHardwareMock<'a, 'b: 'a> {
-        data: RefCell<&'a mut MockData<'b>>,
+        data: RefCell<&'a mut MockData<'b, Call, AssociatedData>>,
     }
 
     impl<'a, 'b: 'a> RTCHardware for RTCHardwareMock<'a, 'b> {
@@ -112,15 +111,17 @@ mod tests {
         }
 
         fn set_time(&self, bcd_time: BCDTime) {
-            self.data.borrow_mut().time = bcd_time;
+            self.data.borrow_mut().data.time = bcd_time;
         }
 
         fn set_alarm(&self, bcd_time: BCDTime) {
-            self.data.borrow_mut().alarm = bcd_time;
+            self.data.borrow_mut().data.alarm = bcd_time;
         }
     }
 
-    fn create_rtc<'a, 'b: 'a>(mock_data: &'a mut MockData<'b>) -> RTC<RTCHardwareMock<'a, 'b>> {
+    fn create_rtc<'a, 'b: 'a>(
+        mock_data: &'a mut MockData<'b, Call, AssociatedData>,
+    ) -> RTC<RTCHardwareMock<'a, 'b>> {
         RTC::new(RTCHardwareMock {
             data: RefCell::new(mock_data),
         })
@@ -128,7 +129,7 @@ mod tests {
 
     #[test]
     fn setup() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         create_rtc(&mut mock_data).setup();
 
@@ -137,7 +138,7 @@ mod tests {
 
     #[test]
     fn teardown() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         create_rtc(&mut mock_data).teardown();
 
@@ -146,7 +147,7 @@ mod tests {
 
     #[test]
     fn get_time() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         assert_eq!(
             create_rtc(&mut mock_data).time(),
@@ -160,7 +161,7 @@ mod tests {
 
     #[test]
     fn get_alarm() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         assert_eq!(
             create_rtc(&mut mock_data).alarm(),
@@ -174,7 +175,7 @@ mod tests {
 
     #[test]
     fn set_time() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         create_rtc(&mut mock_data).set_time(Time {
             hours: 13,
@@ -183,7 +184,7 @@ mod tests {
         });
 
         assert_eq!(
-            mock_data.time,
+            mock_data.data.time,
             BCDTime {
                 hours_tens: 1,
                 hours: 3,
@@ -197,7 +198,7 @@ mod tests {
 
     #[test]
     fn set_alarm() {
-        let mut mock_data = MockData::default();
+        let mut mock_data = MockData::new(AssociatedData::default());
 
         create_rtc(&mut mock_data).set_alarm(Time {
             hours: 13,
@@ -206,7 +207,7 @@ mod tests {
         });
 
         assert_eq!(
-            mock_data.alarm,
+            mock_data.data.alarm,
             BCDTime {
                 hours_tens: 1,
                 hours: 3,
