@@ -22,3 +22,15 @@ impl Default for SystemState {
         }
     }
 }
+
+/// Describes the System hardware management interface.
+pub trait SystemHardware {
+    /// Initializes hardware if needed.
+    fn setup(&self);
+
+    /// Turns on/off system standby mode.
+    fn toggle_standby_mode(&mut self, on: bool);
+
+    /// Performs a software reset.
+    fn reset(&mut self);
+}

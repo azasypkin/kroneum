@@ -8,30 +8,25 @@ use kroneum_api::{
     buttons::{ButtonPressType, Buttons, ButtonsHardware},
     flash::{Flash, FlashHardware},
     rtc::{RTCHardware, RTC},
-    system::{SystemMode, SystemState},
+    system::{SystemHardware, SystemMode, SystemState},
     systick::{SysTick, SysTickHardware},
     time::Time,
     usb::{command_packet::CommandPacket, USBHardware, USB},
 };
 
-pub struct System<S: SysTickHardware> {
+pub struct SystemHardwareImpl {
     p: Peripherals,
-    systick: SysTick<S>,
     scb: SCB,
-    state: SystemState,
 }
 
-impl<S: SysTickHardware> System<S> {
-    pub fn new(p: Peripherals, systick: SysTick<S>, scb: SCB) -> Self {
-        System {
-            p,
-            state: SystemState::default(),
-            systick,
-            scb,
-        }
+impl SystemHardwareImpl {
+    fn p(&mut self) -> &mut Peripherals {
+        &mut self.p
     }
+}
 
-    pub fn setup(&mut self) {
+impl SystemHardware for SystemHardwareImpl {
+    fn setup(&self) {
         // Remap PA9-10 to PA11-12 for USB.
         self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
         self.p
@@ -135,6 +130,44 @@ impl<S: SysTickHardware> System<S> {
             .GPIOA
             .afrh
             .modify(|_, w| w.afrh11().af2().afrh12().af2());
+    }
+
+    fn toggle_standby_mode(&mut self, on: bool) {
+        // Toggle STANDBY mode.
+        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
+
+        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
+
+        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
+        if on {
+            self.scb.set_sleepdeep();
+        } else {
+            self.scb.clear_sleepdeep();
+        }
+    }
+
+    fn reset(&mut self) {
+        self.scb.system_reset();
+    }
+}
+
+pub struct System<S: SysTickHardware> {
+    hw: SystemHardwareImpl,
+    systick: SysTick<S>,
+    state: SystemState,
+}
+
+impl<S: SysTickHardware> System<S> {
+    pub fn new(p: Peripherals, systick: SysTick<S>, scb: SCB) -> Self {
+        System {
+            hw: SystemHardwareImpl { p, scb },
+            state: SystemState::default(),
+            systick,
+        }
+    }
+
+    pub fn setup(&mut self) {
+        self.hw.setup();
 
         self.buttons().setup();
 
@@ -144,7 +177,7 @@ impl<S: SysTickHardware> System<S> {
     pub fn set_mode(&mut self, mode: SystemMode) {
         match &mode {
             SystemMode::Idle => {
-                self.toggle_standby_mode(true);
+                self.hw.toggle_standby_mode(true);
 
                 self.usb().teardown();
                 self.rtc().teardown();
@@ -159,7 +192,7 @@ impl<S: SysTickHardware> System<S> {
             SystemMode::Config => {
                 self.beeper().play(Melody::Reset);
 
-                self.toggle_standby_mode(false);
+                self.hw.toggle_standby_mode(false);
 
                 self.usb().setup();
             }
@@ -203,7 +236,7 @@ impl<S: SysTickHardware> System<S> {
                 self.usb()
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
             } else if let CommandPacket::Reset = command_packet {
-                self.reset();
+                self.hw.reset();
             } else if let CommandPacket::FlashRead(slot) = command_packet {
                 let value = self.flash().read(slot).unwrap_or_else(|| 0);
                 self.usb().send(&[value, 0, 0, 0, 0, 0]);
@@ -223,7 +256,7 @@ impl<S: SysTickHardware> System<S> {
     }
 
     pub fn on_button_press(&mut self) {
-        if !buttons::has_pending_interrupt(&self.p) {
+        if !buttons::has_pending_interrupt(&self.hw.p()) {
             return;
         }
 
@@ -271,52 +304,33 @@ impl<S: SysTickHardware> System<S> {
             _ => {}
         }
 
-        buttons::clear_pending_interrupt(&self.p);
+        buttons::clear_pending_interrupt(self.hw.p());
     }
 
     /// Creates an instance of `Beeper` controller.
     fn beeper<'a>(
         &'a mut self,
     ) -> PWMBeeper<'a, impl PWMBeeperHardware + 'a, impl SysTickHardware> {
-        beeper::create(&self.p, &mut self.systick)
+        beeper::create(self.hw.p(), &mut self.systick)
     }
 
     /// Creates an instance of `Buttons` controller.
     fn buttons<'a>(&'a mut self) -> Buttons<impl ButtonsHardware + 'a> {
-        buttons::create(&self.p, &mut self.systick)
+        buttons::create(self.hw.p(), &mut self.systick)
     }
 
     /// Creates an instance of `RTC` controller.
-    fn rtc<'a>(&'a self) -> RTC<impl RTCHardware + 'a> {
-        rtc::create(&self.p)
+    fn rtc<'a>(&'a mut self) -> RTC<impl RTCHardware + 'a> {
+        rtc::create(self.hw.p())
     }
 
     /// Creates an instance of `USB` controller.
     fn usb<'a>(&'a mut self) -> USB<impl USBHardware + 'a> {
-        usb::create(&self.p, &mut self.state.usb_state)
+        usb::create(self.hw.p(), &mut self.state.usb_state)
     }
 
     /// Creates an instance of `Flash` controller.
     fn flash<'a>(&'a mut self) -> Flash<impl FlashHardware + 'a> {
-        flash::create(&self.p)
-    }
-
-    fn toggle_standby_mode(&mut self, on: bool) {
-        // Toggle STANDBY mode.
-        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
-
-        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
-
-        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
-        if on {
-            self.scb.set_sleepdeep();
-        } else {
-            self.scb.clear_sleepdeep();
-        }
-    }
-
-    /// Performs a software reset.
-    fn reset(&mut self) {
-        self.scb.system_reset();
+        flash::create(self.hw.p())
     }
 }
