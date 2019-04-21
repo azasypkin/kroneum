@@ -1,4 +1,5 @@
 use crate::{beeper::Melody, time::Time, usb::UsbState};
+use flash::FlashHardware;
 use rtc::RTCHardware;
 
 #[derive(Debug, Copy, Clone)]
@@ -27,6 +28,7 @@ impl Default for SystemState {
 /// Describes the System hardware management interface.
 pub trait SystemHardware<'a> {
     type R: RTCHardware;
+    type F: FlashHardware;
 
     /// Initializes hardware if needed.
     fn setup(&self);
@@ -39,4 +41,7 @@ pub trait SystemHardware<'a> {
 
     /// Returns an `RTCHardware` used to create `RTC` component.
     fn rtc<'b: 'a>(&'b self) -> Self::R;
+
+    /// Returns an `FlashHardware` used to create `Flash` component.
+    fn flash<'b: 'a>(&'b self) -> Self::F;
 }

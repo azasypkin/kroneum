@@ -1,11 +1,11 @@
-use kroneum_api::flash::{Flash, FlashHardware};
+use kroneum_api::flash::FlashHardware;
 use stm32f0::stm32f0x2::Peripherals;
 
 /// Sector 7, page 30 and 31 of STM32F04x flash memory.
 const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 
 pub struct FlashHardwareImpl<'a> {
-    p: &'a Peripherals,
+    pub p: &'a Peripherals,
 }
 
 impl<'a> FlashHardwareImpl<'a> {
@@ -68,8 +68,4 @@ impl<'a> FlashHardware for FlashHardwareImpl<'a> {
 
         self.toggle_write_protection(true);
     }
-}
-
-pub fn create(p: &Peripherals) -> Flash<FlashHardwareImpl> {
-    Flash::new(FlashHardwareImpl { p })
 }
