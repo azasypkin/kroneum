@@ -29,11 +29,14 @@ impl<'a> ButtonsHardware for ButtonsHardwareImpl<'a> {
             ButtonType::Ten => reg.idr2().bit_is_set(),
         }
     }
-}
 
-pub fn has_pending_interrupt(p: &Peripherals) -> bool {
-    let reg = p.EXTI.pr.read();
-    reg.pif0().bit_is_set() || reg.pif2().bit_is_set()
+    fn is_button_activated(&self, button_type: ButtonType) -> bool {
+        let reg = &self.p.EXTI.pr.read();
+        match button_type {
+            ButtonType::One => reg.pif0().bit_is_set(),
+            ButtonType::Ten => reg.pif2().bit_is_set(),
+        }
+    }
 }
 
 pub fn clear_pending_interrupt(p: &Peripherals) {

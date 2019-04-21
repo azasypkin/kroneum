@@ -282,10 +282,6 @@ impl<S: SysTickHardware> System<S> {
     }
 
     pub fn on_button_press(&mut self) {
-        if !buttons::has_pending_interrupt(&self.hw.p()) {
-            return;
-        }
-
         let (button_i, button_x) = self.buttons().interrupt();
 
         match (self.state.mode, button_i, button_x) {
