@@ -1,11 +1,8 @@
-use kroneum_api::{
-    buttons::{ButtonType, Buttons, ButtonsHardware},
-    systick::{SysTick, SysTickHardware},
-};
+use kroneum_api::buttons::{ButtonType, ButtonsHardware};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct ButtonsHardwareImpl<'a> {
-    p: &'a Peripherals,
+    pub p: &'a Peripherals,
 }
 
 impl<'a> ButtonsHardware for ButtonsHardwareImpl<'a> {
@@ -42,11 +39,4 @@ pub fn has_pending_interrupt(p: &Peripherals) -> bool {
 pub fn clear_pending_interrupt(p: &Peripherals) {
     // Clear exti line 0 and 2 flags.
     p.EXTI.pr.modify(|_, w| w.pif0().set_bit().pif2().set_bit());
-}
-
-pub fn create<'a>(
-    p: &'a Peripherals,
-    systick: &'a mut SysTick<impl SysTickHardware>,
-) -> Buttons<'a, ButtonsHardwareImpl<'a>, impl SysTickHardware> {
-    Buttons::new(ButtonsHardwareImpl { p }, systick)
 }

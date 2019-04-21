@@ -1,5 +1,6 @@
 use crate::{beeper::Melody, time::Time, usb::UsbState};
 use beeper::PWMBeeperHardware;
+use buttons::ButtonsHardware;
 use flash::FlashHardware;
 use rtc::RTCHardware;
 use usb::USBHardware;
@@ -29,9 +30,10 @@ impl Default for SystemState {
 
 /// Describes the System hardware management interface.
 pub trait SystemHardware<'a> {
-    type B: PWMBeeperHardware;
-    type R: RTCHardware;
+    type B: ButtonsHardware;
     type F: FlashHardware;
+    type P: PWMBeeperHardware;
+    type R: RTCHardware;
     type U: USBHardware;
 
     /// Initializes hardware if needed.
@@ -44,7 +46,10 @@ pub trait SystemHardware<'a> {
     fn reset(&mut self);
 
     /// Returns the `PWMBeeperHardware` used to create `PWMBeeper` component.
-    fn beeper<'b: 'a>(&'b self) -> Self::B;
+    fn beeper<'b: 'a>(&'b self) -> Self::P;
+
+    // Returns the `ButtonsHardware` used to create `Buttons` component.
+    fn buttons<'b: 'a>(&'b self) -> Self::B;
 
     /// Returns the `RTCHardware` used to create `RTC` component.
     fn rtc<'b: 'a>(&'b self) -> Self::R;

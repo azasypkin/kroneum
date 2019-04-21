@@ -26,9 +26,10 @@ impl SystemHardwareImpl {
 }
 
 impl<'a> SystemHardware<'a> for SystemHardwareImpl {
-    type B = beeper::BeeperHardwareImpl<'a>;
-    type R = rtc::RTCHardwareImpl<'a>;
+    type B = buttons::ButtonsHardwareImpl<'a>;
     type F = flash::FlashHardwareImpl<'a>;
+    type P = beeper::BeeperHardwareImpl<'a>;
+    type R = rtc::RTCHardwareImpl<'a>;
     type U = usb::USBHardwareImpl<'a>;
 
     fn setup(&self) {
@@ -155,8 +156,12 @@ impl<'a> SystemHardware<'a> for SystemHardwareImpl {
         self.scb.system_reset();
     }
 
-    fn beeper<'b: 'a>(&'b self) -> Self::B {
+    fn beeper<'b: 'a>(&'b self) -> Self::P {
         beeper::BeeperHardwareImpl { p: &self.p }
+    }
+
+    fn buttons<'b: 'a>(&'b self) -> Self::B {
+        buttons::ButtonsHardwareImpl { p: &self.p }
     }
 
     fn rtc<'b: 'a>(&'b self) -> Self::R {
@@ -337,7 +342,7 @@ impl<S: SysTickHardware> System<S> {
 
     /// Creates an instance of `Buttons` controller.
     fn buttons<'a>(&'a mut self) -> Buttons<'a, impl ButtonsHardware + 'a, impl SysTickHardware> {
-        buttons::create(self.hw.p(), &mut self.systick)
+        Buttons::new(self.hw.buttons(), &mut self.systick)
     }
 
     /// Creates an instance of `RTC` controller.
