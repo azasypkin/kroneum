@@ -1,11 +1,8 @@
-use kroneum_api::{
-    rtc::{RTCHardware, RTC},
-    time::BCDTime,
-};
+use kroneum_api::{rtc::RTCHardware, time::BCDTime};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct RTCHardwareImpl<'a> {
-    p: &'a Peripherals,
+    pub p: &'a Peripherals,
 }
 
 impl<'a> RTCHardwareImpl<'a> {
@@ -180,8 +177,4 @@ fn toggle_alarm(p: &Peripherals, enable: bool) {
         w.alraie().bit(enable);
         w.alrae().bit(enable)
     });
-}
-
-pub fn create(p: &Peripherals) -> RTC<RTCHardwareImpl> {
-    RTC::new(RTCHardwareImpl { p })
 }

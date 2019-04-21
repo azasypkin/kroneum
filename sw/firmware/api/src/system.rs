@@ -1,4 +1,5 @@
 use crate::{beeper::Melody, time::Time, usb::UsbState};
+use rtc::RTCHardware;
 
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
@@ -24,7 +25,9 @@ impl Default for SystemState {
 }
 
 /// Describes the System hardware management interface.
-pub trait SystemHardware {
+pub trait SystemHardware<'a> {
+    type R: RTCHardware;
+
     /// Initializes hardware if needed.
     fn setup(&self);
 
@@ -33,4 +36,7 @@ pub trait SystemHardware {
 
     /// Performs a software reset.
     fn reset(&mut self);
+
+    /// Returns an `RTCHardware` used to create `RTC` component.
+    fn rtc<'b: 'a>(&'b self) -> Self::R;
 }

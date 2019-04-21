@@ -25,7 +25,9 @@ impl SystemHardwareImpl {
     }
 }
 
-impl SystemHardware for SystemHardwareImpl {
+impl<'a> SystemHardware<'a> for SystemHardwareImpl {
+    type R = rtc::RTCHardwareImpl<'a>;
+
     fn setup(&self) {
         // Remap PA9-10 to PA11-12 for USB.
         self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
@@ -148,6 +150,10 @@ impl SystemHardware for SystemHardwareImpl {
 
     fn reset(&mut self) {
         self.scb.system_reset();
+    }
+
+    fn rtc<'b: 'a>(&'b self) -> Self::R {
+        rtc::RTCHardwareImpl { p: &self.p }
     }
 }
 
@@ -321,7 +327,7 @@ impl<S: SysTickHardware> System<S> {
 
     /// Creates an instance of `RTC` controller.
     fn rtc<'a>(&'a mut self) -> RTC<impl RTCHardware + 'a> {
-        rtc::create(self.hw.p())
+        RTC::new(self.hw.rtc())
     }
 
     /// Creates an instance of `USB` controller.
