@@ -12,7 +12,7 @@ pub struct SysTick<T: SysTickHardware> {
     hw: T,
 }
 
-impl<'a, T: 'a + SysTickHardware> SysTick<T> {
+impl<T: SysTickHardware> SysTick<T> {
     pub fn new(hw: T) -> Self {
         SysTick { hw }
     }
