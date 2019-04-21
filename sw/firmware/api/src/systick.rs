@@ -38,6 +38,23 @@ impl<T: SysTickHardware> SysTick<T> {
 pub(crate) mod tests {
     use super::*;
     use crate::tests::MockData;
+    use core::cell::RefCell;
+
+    #[derive(Default)]
+    pub(crate) struct Clock {
+        value: RefCell<u32>,
+    }
+
+    impl Clock {
+        pub fn ticks(&self) -> u32 {
+            *self.value.borrow()
+        }
+
+        fn tick(&self, ticks: u32) {
+            let current = *self.value.borrow();
+            self.value.replace(current + ticks);
+        }
+    }
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
     pub(crate) enum Call {
@@ -45,21 +62,26 @@ pub(crate) mod tests {
     }
 
     #[derive(Default)]
-    pub(crate) struct AssociatedData {
+    pub(crate) struct AssociatedData<'a> {
+        pub clock: Option<&'a Clock>,
         pub reload_value: u32,
         pub ticks: u32,
     }
 
     pub(crate) struct SystickHardwareMock<'a, 'b: 'a> {
-        mock: &'a mut MockData<'b, Call, AssociatedData>,
+        mock: &'a mut MockData<'b, Call, AssociatedData<'b>>,
     }
 
     impl<'a, 'b: 'a> SysTickHardware for SystickHardwareMock<'a, 'b> {
         fn configure(&mut self, reload_value: u32) {
             self.mock.data.reload_value = reload_value;
-            self.mock
-                .calls
-                .log_call(Call::Delay(reload_value / (config::CLOCK_SPEED / 1000)));
+
+            let ticks = reload_value / (config::CLOCK_SPEED / 1000);
+            if let Some(clock) = self.mock.data.clock {
+                clock.tick(ticks);
+            }
+
+            self.mock.calls.log_call(Call::Delay(ticks));
         }
 
         fn enable_counter(&mut self) {
@@ -75,7 +97,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn create_systick<'a, 'b: 'a>(
-        systick_mock: &'a mut MockData<'b, Call, AssociatedData>,
+        systick_mock: &'a mut MockData<'b, Call, AssociatedData<'b>>,
     ) -> SysTick<SystickHardwareMock<'a, 'b>> {
         SysTick {
             hw: SystickHardwareMock { mock: systick_mock },

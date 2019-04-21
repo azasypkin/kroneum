@@ -1,3 +1,5 @@
+use systick::{SysTick, SysTickHardware};
+
 /// Defines known button types.
 pub enum ButtonType {
     One,
@@ -34,18 +36,16 @@ pub trait ButtonsHardware {
 
     /// Checks whether Button with specified type is pressed.
     fn is_button_pressed(&self, button_type: ButtonType) -> bool;
-
-    /// Blocks the thread for the specified number of milliseconds.
-    fn delay(&mut self, delay_ms: u32);
 }
 
-pub struct Buttons<T: ButtonsHardware> {
+pub struct Buttons<'a, T: ButtonsHardware, S: SysTickHardware> {
     hw: T,
+    systick: &'a mut SysTick<S>,
 }
 
-impl<T: ButtonsHardware> Buttons<T> {
-    pub fn new(hw: T) -> Self {
-        Buttons { hw }
+impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
+    pub fn new(hw: T, systick: &'a mut SysTick<S>) -> Self {
+        Buttons { hw, systick }
     }
 
     /// Setups Buttons hardware.
@@ -76,7 +76,7 @@ impl<T: ButtonsHardware> Buttons<T> {
         }
 
         for i in 1u8..8u8 {
-            self.hw.delay(250);
+            self.systick.delay_ms(250);
 
             if !self.hw.is_button_pressed(ButtonType::One)
                 && !self.hw.is_button_pressed(ButtonType::Ten)
@@ -110,6 +110,9 @@ impl<T: ButtonsHardware> Buttons<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::systick::tests::{
+        create_systick, AssociatedData as SystickAssociatedData, Clock, SystickHardwareMock,
+    };
     use crate::tests::MockData;
     use core::cell::RefCell;
 
@@ -119,13 +122,13 @@ mod tests {
         Teardown,
     }
 
-    pub(crate) struct AssociatedData<F: Fn(ButtonType, u32) -> bool> {
+    pub(crate) struct AssociatedData<'a, F: Fn(ButtonType, u32) -> bool> {
         pub is_button_pressed: F,
-        pub current_delay: u32,
+        pub clock: &'a Clock,
     }
 
     struct ButtonsHardwareMock<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> {
-        data: RefCell<&'a mut MockData<'b, Call, AssociatedData<F>>>,
+        data: RefCell<&'a mut MockData<'b, Call, AssociatedData<'b, F>>>,
     }
 
     impl<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool> ButtonsHardware
@@ -140,62 +143,74 @@ mod tests {
         }
 
         fn is_button_pressed(&self, button_type: ButtonType) -> bool {
-            let current_delay = self.data.borrow().data.current_delay;
+            let current_delay = self.data.borrow().data.clock.ticks();
             (self.data.borrow().data.is_button_pressed)(button_type, current_delay)
-        }
-
-        fn delay(&mut self, delay_ms: u32) {
-            self.data.borrow_mut().data.current_delay += delay_ms;
         }
     }
 
     fn create_buttons<'a, 'b: 'a, F: Fn(ButtonType, u32) -> bool>(
-        mock_data: &'a mut MockData<'b, Call, AssociatedData<F>>,
-    ) -> Buttons<ButtonsHardwareMock<'a, 'b, F>> {
-        Buttons::new(ButtonsHardwareMock {
-            data: RefCell::new(mock_data),
-        })
+        mock_data: &'a mut MockData<'b, Call, AssociatedData<'b, F>>,
+        systick: &'a mut SysTick<SystickHardwareMock<'a, 'b>>,
+    ) -> Buttons<'a, ButtonsHardwareMock<'a, 'b, F>, SystickHardwareMock<'a, 'b>> {
+        Buttons::new(
+            ButtonsHardwareMock {
+                data: RefCell::new(mock_data),
+            },
+            systick,
+        )
     }
 
     #[test]
     fn setup() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            current_delay: 0,
+            clock: &clock,
         });
 
-        create_buttons(&mut mock_data).setup();
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).setup();
 
         assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
     }
 
     #[test]
     fn teardown() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            current_delay: 0,
+            clock: &clock,
         });
 
-        create_buttons(&mut mock_data).teardown();
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).teardown();
 
         assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
     }
 
     #[test]
     fn both_none() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::None, ButtonPressType::None)
         );
     }
 
     #[test]
     fn both_short() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, current_delay: u32| {
                 if current_delay >= 250 {
@@ -204,17 +219,23 @@ mod tests {
                     true
                 }
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Short, ButtonPressType::Short)
         );
     }
 
     #[test]
     fn one_none_ten_short() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => false,
@@ -226,17 +247,23 @@ mod tests {
                     }
                 }
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::None, ButtonPressType::Short)
         );
     }
 
     #[test]
     fn one_short_ten_none() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => {
@@ -248,17 +275,23 @@ mod tests {
                 }
                 ButtonType::Ten => false,
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Short, ButtonPressType::None)
         );
     }
 
     #[test]
     fn both_long() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, current_delay: u32| {
                 if current_delay >= 1500 {
@@ -267,46 +300,56 @@ mod tests {
                     true
                 }
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Long)
         );
     }
 
     #[test]
     fn both_long_when_infinitely_pressed() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, _current_delay: u32| true,
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Long)
         );
     }
 
     #[test]
     fn one_none_ten_long() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
                 ButtonType::One => false,
                 ButtonType::Ten => true,
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::None, ButtonPressType::Long)
         );
     }
 
     #[test]
     fn one_short_ten_long() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => {
@@ -318,33 +361,41 @@ mod tests {
                 }
                 ButtonType::Ten => true,
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Short, ButtonPressType::Long)
         );
     }
 
     #[test]
     fn one_long_ten_none() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, _current_delay: u32| match bt {
                 ButtonType::One => true,
                 ButtonType::Ten => false,
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Long, ButtonPressType::None)
         );
     }
 
     #[test]
     fn one_long_ten_short() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData {
+            clock: Some(&clock),
+            ..Default::default()
+        });
+
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |bt: ButtonType, current_delay: u32| match bt {
                 ButtonType::One => true,
@@ -356,11 +407,11 @@ mod tests {
                     }
                 }
             },
-            current_delay: 0,
+            clock: &clock,
         });
 
         assert_eq!(
-            create_buttons(&mut mock_data).interrupt(),
+            create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt(),
             (ButtonPressType::Long, ButtonPressType::Short)
         );
     }

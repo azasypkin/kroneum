@@ -315,7 +315,7 @@ impl<S: SysTickHardware> System<S> {
     }
 
     /// Creates an instance of `Buttons` controller.
-    fn buttons<'a>(&'a mut self) -> Buttons<impl ButtonsHardware + 'a> {
+    fn buttons<'a>(&'a mut self) -> Buttons<'a, impl ButtonsHardware + 'a, impl SysTickHardware> {
         buttons::create(self.hw.p(), &mut self.systick)
     }
 

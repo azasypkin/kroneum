@@ -4,12 +4,11 @@ use kroneum_api::{
 };
 use stm32f0::stm32f0x2::Peripherals;
 
-pub struct ButtonsHardwareImpl<'a, S: SysTickHardware> {
+pub struct ButtonsHardwareImpl<'a> {
     p: &'a Peripherals,
-    systick: &'a mut SysTick<S>,
 }
 
-impl<'a, S: SysTickHardware> ButtonsHardware for ButtonsHardwareImpl<'a, S> {
+impl<'a> ButtonsHardware for ButtonsHardwareImpl<'a> {
     fn setup(&self) {
         // Enable wakers.
         self.p
@@ -33,10 +32,6 @@ impl<'a, S: SysTickHardware> ButtonsHardware for ButtonsHardwareImpl<'a, S> {
             ButtonType::Ten => reg.idr2().bit_is_set(),
         }
     }
-
-    fn delay(&mut self, delay_ms: u32) {
-        self.systick.delay_ms(delay_ms);
-    }
 }
 
 pub fn has_pending_interrupt(p: &Peripherals) -> bool {
@@ -52,6 +47,6 @@ pub fn clear_pending_interrupt(p: &Peripherals) {
 pub fn create<'a>(
     p: &'a Peripherals,
     systick: &'a mut SysTick<impl SysTickHardware>,
-) -> Buttons<ButtonsHardwareImpl<'a, impl SysTickHardware>> {
-    Buttons::new(ButtonsHardwareImpl { p, systick })
+) -> Buttons<'a, ButtonsHardwareImpl<'a>, impl SysTickHardware> {
+    Buttons::new(ButtonsHardwareImpl { p }, systick)
 }
