@@ -2,13 +2,13 @@ use stm32f0::stm32f0x2::Peripherals;
 
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
-    UsbInterrupt, UsbState, USB,
+    UsbInterrupt,
 };
 
 const BTABLE_ADDRESS: usize = 0x4000_6000;
 
 pub struct USBHardwareImpl<'a> {
-    p: &'a Peripherals,
+    pub p: &'a Peripherals,
 }
 
 impl<'a> USBHardwareImpl<'a> {
@@ -375,8 +375,4 @@ fn stop_clock(p: &Peripherals) {
     // Disable HSI48.
     p.RCC.cr2.modify(|_, w| w.hsi48on().clear_bit());
     while p.RCC.cr2.read().hsi48rdy().bit_is_set() {}
-}
-
-pub fn create<'a>(p: &'a Peripherals, state: &'a mut UsbState) -> USB<'a, USBHardwareImpl<'a>> {
-    USB::new(USBHardwareImpl { p }, state)
 }

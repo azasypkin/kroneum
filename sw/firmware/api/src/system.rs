@@ -1,6 +1,7 @@
 use crate::{beeper::Melody, time::Time, usb::UsbState};
 use flash::FlashHardware;
 use rtc::RTCHardware;
+use usb::USBHardware;
 
 #[derive(Debug, Copy, Clone)]
 pub enum SystemMode {
@@ -29,6 +30,7 @@ impl Default for SystemState {
 pub trait SystemHardware<'a> {
     type R: RTCHardware;
     type F: FlashHardware;
+    type U: USBHardware;
 
     /// Initializes hardware if needed.
     fn setup(&self);
@@ -44,4 +46,7 @@ pub trait SystemHardware<'a> {
 
     /// Returns an `FlashHardware` used to create `Flash` component.
     fn flash<'b: 'a>(&'b self) -> Self::F;
+
+    /// Returns an `USBHardware` used to create `USB` component.
+    fn usb<'b: 'a>(&'b self) -> Self::U;
 }

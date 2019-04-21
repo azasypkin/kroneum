@@ -28,6 +28,7 @@ impl SystemHardwareImpl {
 impl<'a> SystemHardware<'a> for SystemHardwareImpl {
     type R = rtc::RTCHardwareImpl<'a>;
     type F = flash::FlashHardwareImpl<'a>;
+    type U = usb::USBHardwareImpl<'a>;
 
     fn setup(&self) {
         // Remap PA9-10 to PA11-12 for USB.
@@ -159,6 +160,10 @@ impl<'a> SystemHardware<'a> for SystemHardwareImpl {
 
     fn flash<'b: 'a>(&'b self) -> Self::F {
         flash::FlashHardwareImpl { p: &self.p }
+    }
+
+    fn usb<'b: 'a>(&'b self) -> Self::U {
+        usb::USBHardwareImpl { p: &self.p }
     }
 }
 
@@ -337,7 +342,7 @@ impl<S: SysTickHardware> System<S> {
 
     /// Creates an instance of `USB` controller.
     fn usb<'a>(&'a mut self) -> USB<impl USBHardware + 'a> {
-        usb::create(self.hw.p(), &mut self.state.usb_state)
+        USB::new(self.hw.usb(), &mut self.state.usb_state)
     }
 
     /// Creates an instance of `Flash` controller.
