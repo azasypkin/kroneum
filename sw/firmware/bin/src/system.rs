@@ -19,12 +19,6 @@ pub struct SystemHardwareImpl {
     scb: SCB,
 }
 
-impl SystemHardwareImpl {
-    fn p(&mut self) -> &mut Peripherals {
-        &mut self.p
-    }
-}
-
 impl<'a> SystemHardware<'a> for SystemHardwareImpl {
     type B = buttons::ButtonsHardwareImpl<'a>;
     type F = flash::FlashHardwareImpl<'a>;
@@ -325,8 +319,6 @@ impl<S: SysTickHardware> System<S> {
             }
             _ => {}
         }
-
-        buttons::clear_pending_interrupt(self.hw.p());
     }
 
     /// Creates an instance of `Beeper` controller.

@@ -1,6 +1,7 @@
 use systick::{SysTick, SysTickHardware};
 
 /// Defines known button types.
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub enum ButtonType {
     One,
     Ten,
@@ -37,10 +38,13 @@ pub trait ButtonsHardware {
     /// Checks whether Button with specified type is pressed.
     fn is_button_pressed(&self, button_type: ButtonType) -> bool;
 
-    /// Checks whether button with the specified type was activated (e.g. by interrupt). Being
-    /// activated doesn't mean to be pressed, button could have been activated, but isn't
-    /// pressed anymore when this method is called.
-    fn is_button_activated(&self, button_type: ButtonType) -> bool;
+    /// Checks whether button with the specified type was triggered (e.g. by interrupt). Being
+    /// triggered doesn't mean to be pressed, button could have been triggered, but isn't pressed
+    /// anymore when this method is called.
+    fn is_button_triggered(&self, button_type: ButtonType) -> bool;
+
+    /// Clears "triggered" flag for a button and makes it listen to a new trigger event.
+    fn reactivate_button(&self, button_type: ButtonType);
 }
 
 pub struct Buttons<'a, T: ButtonsHardware, S: SysTickHardware> {
@@ -64,51 +68,56 @@ impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
     }
 
     pub fn interrupt(&mut self) -> (ButtonPressType, ButtonPressType) {
-        let button_one_activated = self.hw.is_button_activated(ButtonType::One);
+        let button_one_triggered = self.hw.is_button_triggered(ButtonType::One);
         let mut button_one_state =
-            if button_one_activated && self.hw.is_button_pressed(ButtonType::One) {
+            if button_one_triggered && self.hw.is_button_pressed(ButtonType::One) {
                 ButtonPressType::Short
             } else {
                 ButtonPressType::None
             };
 
-        let button_ten_activated = self.hw.is_button_activated(ButtonType::Ten);
+        let button_ten_triggered = self.hw.is_button_triggered(ButtonType::Ten);
         let mut button_ten_state =
-            if button_ten_activated && self.hw.is_button_pressed(ButtonType::Ten) {
+            if button_ten_triggered && self.hw.is_button_pressed(ButtonType::Ten) {
                 ButtonPressType::Short
             } else {
                 ButtonPressType::None
             };
 
-        if button_one_state.is_none() && button_ten_state.is_none() {
-            // Here we should check which button was activated and clear "activation" flag.
-            return (button_one_state, button_ten_state);
+        if !button_one_state.is_none() || !button_ten_state.is_none() {
+            for i in 1u8..8u8 {
+                self.systick.delay_ms(250);
+
+                let button_one_pressed =
+                    button_one_triggered && self.hw.is_button_pressed(ButtonType::One);
+                let button_ten_pressed =
+                    button_ten_triggered && self.hw.is_button_pressed(ButtonType::Ten);
+                if !button_one_pressed && !button_ten_pressed {
+                    break;
+                }
+
+                let (new_state, works_for_none) = match i {
+                    0...4 => (ButtonPressType::Short, true),
+                    5...8 => (ButtonPressType::Long, false),
+                    _ => break,
+                };
+
+                if button_one_pressed && (!button_one_state.is_none() || works_for_none) {
+                    button_one_state = new_state;
+                }
+
+                if button_ten_pressed && (!button_ten_state.is_none() || works_for_none) {
+                    button_ten_state = new_state;
+                }
+            }
         }
 
-        for i in 1u8..8u8 {
-            self.systick.delay_ms(250);
+        if button_one_triggered {
+            self.hw.reactivate_button(ButtonType::One);
+        }
 
-            let button_one_pressed =
-                button_one_activated && self.hw.is_button_pressed(ButtonType::One);
-            let button_ten_pressed =
-                button_ten_activated && self.hw.is_button_pressed(ButtonType::Ten);
-            if !button_one_pressed && !button_ten_pressed {
-                break;
-            }
-
-            let (new_state, works_for_none) = match i {
-                0...4 => (ButtonPressType::Short, true),
-                5...8 => (ButtonPressType::Long, false),
-                _ => break,
-            };
-
-            if button_one_pressed && (!button_one_state.is_none() || works_for_none) {
-                button_one_state = new_state;
-            }
-
-            if button_ten_pressed && (!button_ten_state.is_none() || works_for_none) {
-                button_ten_state = new_state;
-            }
+        if button_ten_triggered {
+            self.hw.reactivate_button(ButtonType::Ten);
         }
 
         (button_one_state, button_ten_state)
@@ -128,11 +137,12 @@ mod tests {
     enum Call {
         Setup,
         Teardown,
+        Reactivate(ButtonType),
     }
 
     pub(crate) struct AssociatedData<'a, F: Fn(ButtonType, u32) -> bool, FA: Fn(ButtonType) -> bool> {
         pub is_button_pressed: F,
-        pub is_button_activated: FA,
+        pub is_button_triggered: FA,
         pub clock: &'a Clock,
     }
 
@@ -161,8 +171,15 @@ mod tests {
             (self.data.borrow().data.is_button_pressed)(button_type, current_delay)
         }
 
-        fn is_button_activated(&self, button_type: ButtonType) -> bool {
-            (self.data.borrow().data.is_button_activated)(button_type)
+        fn is_button_triggered(&self, button_type: ButtonType) -> bool {
+            (self.data.borrow().data.is_button_triggered)(button_type)
+        }
+
+        fn reactivate_button(&self, button_type: ButtonType) {
+            self.data
+                .borrow_mut()
+                .calls
+                .log_call(Call::Reactivate(button_type));
         }
     }
 
@@ -184,7 +201,7 @@ mod tests {
         let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            is_button_activated: |_: ButtonType| false,
+            is_button_triggered: |_: ButtonType| false,
             clock: &clock,
         });
 
@@ -199,7 +216,7 @@ mod tests {
         let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            is_button_activated: |_: ButtonType| false,
+            is_button_triggered: |_: ButtonType| false,
             clock: &clock,
         });
 
@@ -209,12 +226,90 @@ mod tests {
     }
 
     #[test]
+    fn does_not_reactivate_if_was_not_triggered() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
+        let mut mock_data = MockData::new(AssociatedData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            is_button_triggered: |_: ButtonType| false,
+            clock: &clock,
+        });
+
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt();
+
+        assert_eq!(mock_data.calls.logs(), [])
+    }
+
+    #[test]
+    fn reactivates_one_only_if_only_one_was_triggered() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
+        let mut mock_data = MockData::new(AssociatedData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            is_button_triggered: |bt: ButtonType| match bt {
+                ButtonType::One => true,
+                ButtonType::Ten => false,
+            },
+            clock: &clock,
+        });
+
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt();
+
+        assert_eq!(
+            [Some(Call::Reactivate(ButtonType::One))],
+            mock_data.calls.logs(),
+        )
+    }
+
+    #[test]
+    fn reactivates_ten_only_if_only_ten_was_triggered() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
+        let mut mock_data = MockData::new(AssociatedData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            is_button_triggered: |bt: ButtonType| match bt {
+                ButtonType::One => false,
+                ButtonType::Ten => true,
+            },
+            clock: &clock,
+        });
+
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt();
+
+        assert_eq!(
+            [Some(Call::Reactivate(ButtonType::Ten))],
+            mock_data.calls.logs(),
+        )
+    }
+
+    #[test]
+    fn reactivates_both_if_both_were_triggered() {
+        let clock = Clock::default();
+        let mut systick_mock = MockData::new(SystickAssociatedData::default());
+        let mut mock_data = MockData::new(AssociatedData {
+            is_button_pressed: |_: ButtonType, _: u32| false,
+            is_button_triggered: |_: ButtonType| true,
+            clock: &clock,
+        });
+
+        create_buttons(&mut mock_data, &mut create_systick(&mut systick_mock)).interrupt();
+
+        assert_eq!(
+            [
+                Some(Call::Reactivate(ButtonType::One)),
+                Some(Call::Reactivate(ButtonType::Ten))
+            ],
+            mock_data.calls.logs(),
+        )
+    }
+
+    #[test]
     fn both_none() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| false,
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -225,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn both_none_if_not_activated() {
+    fn both_none_if_not_triggered() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData {
             clock: Some(&clock),
@@ -240,7 +335,7 @@ mod tests {
                     true
                 }
             },
-            is_button_activated: |_: ButtonType| false,
+            is_button_triggered: |_: ButtonType| false,
             clock: &clock,
         });
 
@@ -251,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn one_none_ten_short_when_one_not_activated() {
+    fn one_none_ten_short_when_one_not_triggered() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData {
             clock: Some(&clock),
@@ -266,7 +361,7 @@ mod tests {
                     true
                 }
             },
-            is_button_activated: |bt: ButtonType| match bt {
+            is_button_triggered: |bt: ButtonType| match bt {
                 ButtonType::One => false,
                 ButtonType::Ten => true,
             },
@@ -280,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn one_short_ten_none_when_ten_not_activated() {
+    fn one_short_ten_none_when_ten_not_triggered() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData {
             clock: Some(&clock),
@@ -295,7 +390,7 @@ mod tests {
                     true
                 }
             },
-            is_button_activated: |bt: ButtonType| match bt {
+            is_button_triggered: |bt: ButtonType| match bt {
                 ButtonType::One => true,
                 ButtonType::Ten => false,
             },
@@ -309,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn one_none_ten_long_when_one_not_activated() {
+    fn one_none_ten_long_when_one_not_triggered() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData {
             clock: Some(&clock),
@@ -318,7 +413,7 @@ mod tests {
 
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| true,
-            is_button_activated: |bt: ButtonType| match bt {
+            is_button_triggered: |bt: ButtonType| match bt {
                 ButtonType::One => false,
                 ButtonType::Ten => true,
             },
@@ -332,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn one_long_ten_none_when_ten_not_activated() {
+    fn one_long_ten_none_when_ten_not_triggered() {
         let clock = Clock::default();
         let mut systick_mock = MockData::new(SystickAssociatedData {
             clock: Some(&clock),
@@ -341,7 +436,7 @@ mod tests {
 
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_: ButtonType, _: u32| true,
-            is_button_activated: |bt: ButtonType| match bt {
+            is_button_triggered: |bt: ButtonType| match bt {
                 ButtonType::One => true,
                 ButtonType::Ten => false,
             },
@@ -370,7 +465,7 @@ mod tests {
                     true
                 }
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -399,7 +494,7 @@ mod tests {
                     }
                 }
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -428,7 +523,7 @@ mod tests {
                 }
                 ButtonType::Ten => false,
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -454,7 +549,7 @@ mod tests {
                     true
                 }
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -470,7 +565,7 @@ mod tests {
         let mut systick_mock = MockData::new(SystickAssociatedData::default());
         let mut mock_data = MockData::new(AssociatedData {
             is_button_pressed: |_bt: ButtonType, _current_delay: u32| true,
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -489,7 +584,7 @@ mod tests {
                 ButtonType::One => false,
                 ButtonType::Ten => true,
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -518,7 +613,7 @@ mod tests {
                 }
                 ButtonType::Ten => true,
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -537,7 +632,7 @@ mod tests {
                 ButtonType::One => true,
                 ButtonType::Ten => false,
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 
@@ -566,7 +661,7 @@ mod tests {
                     }
                 }
             },
-            is_button_activated: |_: ButtonType| true,
+            is_button_triggered: |_: ButtonType| true,
             clock: &clock,
         });
 

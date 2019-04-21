@@ -30,16 +30,18 @@ impl<'a> ButtonsHardware for ButtonsHardwareImpl<'a> {
         }
     }
 
-    fn is_button_activated(&self, button_type: ButtonType) -> bool {
+    fn is_button_triggered(&self, button_type: ButtonType) -> bool {
         let reg = &self.p.EXTI.pr.read();
         match button_type {
             ButtonType::One => reg.pif0().bit_is_set(),
             ButtonType::Ten => reg.pif2().bit_is_set(),
         }
     }
-}
 
-pub fn clear_pending_interrupt(p: &Peripherals) {
-    // Clear exti line 0 and 2 flags.
-    p.EXTI.pr.modify(|_, w| w.pif0().set_bit().pif2().set_bit());
+    fn reactivate_button(&self, button_type: ButtonType) {
+        self.p.EXTI.pr.modify(|_, w| match button_type {
+            ButtonType::One => w.pif0().set_bit(),
+            ButtonType::Ten => w.pif2().set_bit(),
+        });
+    }
 }
