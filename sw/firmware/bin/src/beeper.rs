@@ -1,12 +1,8 @@
-use kroneum_api::{
-    beeper::{PWMBeeper, PWMBeeperHardware},
-    config,
-    systick::{SysTick, SysTickHardware},
-};
+use kroneum_api::{beeper::PWMBeeperHardware, config};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct BeeperHardwareImpl<'a> {
-    p: &'a Peripherals,
+    pub p: &'a Peripherals,
 }
 
 impl<'a> PWMBeeperHardware for BeeperHardwareImpl<'a> {
@@ -97,11 +93,4 @@ impl<'a> BeeperHardwareImpl<'a> {
         // Disable TIM1 clock.
         self.p.RCC.apb2enr.modify(|_, w| w.tim1en().clear_bit());
     }
-}
-
-pub fn create<'a>(
-    p: &'a Peripherals,
-    systick: &'a mut SysTick<impl SysTickHardware>,
-) -> PWMBeeper<'a, BeeperHardwareImpl<'a>, impl SysTickHardware> {
-    PWMBeeper::new(BeeperHardwareImpl { p }, systick)
 }
