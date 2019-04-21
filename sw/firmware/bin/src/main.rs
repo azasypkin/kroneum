@@ -32,9 +32,11 @@ fn main() -> ! {
 
     free(|cs| {
         let mut system = system::System::new(
-            device_peripherals,
+            system::SystemHardwareImpl {
+                p: device_peripherals,
+                scb: core_peripherals.SCB,
+            },
             systick::create(core_peripherals.SYST),
-            core_peripherals.SCB,
         );
 
         system.setup();

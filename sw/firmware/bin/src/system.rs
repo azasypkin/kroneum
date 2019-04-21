@@ -15,8 +15,8 @@ use kroneum_api::{
 };
 
 pub struct SystemHardwareImpl {
-    p: Peripherals,
-    scb: SCB,
+    pub p: Peripherals,
+    pub scb: SCB,
 }
 
 impl<'a> SystemHardware<'a> for SystemHardwareImpl {
@@ -178,9 +178,9 @@ pub struct System<S: SysTickHardware> {
 }
 
 impl<S: SysTickHardware> System<S> {
-    pub fn new(p: Peripherals, systick: SysTick<S>, scb: SCB) -> Self {
+    pub fn new(hw: SystemHardwareImpl, systick: SysTick<S>) -> Self {
         System {
-            hw: SystemHardwareImpl { p, scb },
+            hw,
             state: SystemState::default(),
             systick,
         }
@@ -322,14 +322,12 @@ impl<S: SysTickHardware> System<S> {
     }
 
     /// Creates an instance of `Beeper` controller.
-    fn beeper<'a>(
-        &'a mut self,
-    ) -> PWMBeeper<'a, impl PWMBeeperHardware + 'a, impl SysTickHardware> {
+    fn beeper<'a>(&'a mut self) -> PWMBeeper<'a, impl PWMBeeperHardware + 'a, S> {
         PWMBeeper::new(self.hw.beeper(), &mut self.systick)
     }
 
     /// Creates an instance of `Buttons` controller.
-    fn buttons<'a>(&'a mut self) -> Buttons<'a, impl ButtonsHardware + 'a, impl SysTickHardware> {
+    fn buttons<'a>(&'a mut self) -> Buttons<'a, impl ButtonsHardware + 'a, S> {
         Buttons::new(self.hw.buttons(), &mut self.systick)
     }
 
