@@ -30,11 +30,11 @@ impl Default for SystemState {
 
 /// Describes the System hardware management interface.
 pub trait SystemHardware<'a> {
-    type B: ButtonsHardware;
-    type F: FlashHardware;
-    type P: PWMBeeperHardware;
-    type R: RTCHardware;
-    type U: USBHardware;
+    type B: ButtonsHardware + 'a;
+    type F: FlashHardware + 'a;
+    type P: PWMBeeperHardware + 'a;
+    type R: RTCHardware + 'a;
+    type U: USBHardware + 'a;
 
     /// Initializes hardware if needed.
     fn setup(&self);
@@ -46,17 +46,17 @@ pub trait SystemHardware<'a> {
     fn reset(&mut self);
 
     /// Returns the `PWMBeeperHardware` used to create `PWMBeeper` component.
-    fn beeper<'b: 'a>(&'b self) -> Self::P;
+    fn beeper(&'a self) -> Self::P;
 
     // Returns the `ButtonsHardware` used to create `Buttons` component.
-    fn buttons<'b: 'a>(&'b self) -> Self::B;
+    fn buttons(&'a self) -> Self::B;
 
     /// Returns the `RTCHardware` used to create `RTC` component.
-    fn rtc<'b: 'a>(&'b self) -> Self::R;
+    fn rtc(&'a self) -> Self::R;
 
     /// Returns the `FlashHardware` used to create `Flash` component.
-    fn flash<'b: 'a>(&'b self) -> Self::F;
+    fn flash(&'a self) -> Self::F;
 
     /// Returns the `USBHardware` used to create `USB` component.
-    fn usb<'b: 'a>(&'b self) -> Self::U;
+    fn usb(&'a self) -> Self::U;
 }

@@ -150,23 +150,23 @@ impl<'a> SystemHardware<'a> for SystemHardwareImpl {
         self.scb.system_reset();
     }
 
-    fn beeper<'b: 'a>(&'b self) -> Self::P {
+    fn beeper(&'a self) -> Self::P {
         beeper::BeeperHardwareImpl { p: &self.p }
     }
 
-    fn buttons<'b: 'a>(&'b self) -> Self::B {
+    fn buttons(&'a self) -> Self::B {
         buttons::ButtonsHardwareImpl { p: &self.p }
     }
 
-    fn rtc<'b: 'a>(&'b self) -> Self::R {
+    fn rtc(&'a self) -> Self::R {
         rtc::RTCHardwareImpl { p: &self.p }
     }
 
-    fn flash<'b: 'a>(&'b self) -> Self::F {
+    fn flash(&'a self) -> Self::F {
         flash::FlashHardwareImpl { p: &self.p }
     }
 
-    fn usb<'b: 'a>(&'b self) -> Self::U {
+    fn usb(&'a self) -> Self::U {
         usb::USBHardwareImpl { p: &self.p }
     }
 }
