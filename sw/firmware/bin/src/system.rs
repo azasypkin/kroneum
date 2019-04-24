@@ -282,6 +282,10 @@ impl<S: SysTickHardware> System<S> {
     }
 
     pub fn on_button_press(&mut self) {
+        if !self.buttons().triggered() {
+            return;
+        }
+
         let (button_i, button_x) = self.buttons().interrupt();
 
         match (self.state.mode, button_i, button_x) {
@@ -325,6 +329,8 @@ impl<S: SysTickHardware> System<S> {
             }
             _ => {}
         }
+
+        self.buttons().reactivate();
     }
 
     /// Creates an instance of `Beeper` controller.
