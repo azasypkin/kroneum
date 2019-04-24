@@ -2,7 +2,13 @@ use kroneum_api::{rtc::RTCHardware, time::BCDTime};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct RTCHardwareImpl<'a> {
-    pub p: &'a Peripherals,
+    p: &'a Peripherals,
+}
+
+impl<'a> RTCHardwareImpl<'a> {
+    pub fn new(p: &'a Peripherals) -> Self {
+        Self { p }
+    }
 }
 
 impl<'a> RTCHardwareImpl<'a> {

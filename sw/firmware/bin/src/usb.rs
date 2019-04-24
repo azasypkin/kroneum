@@ -8,7 +8,13 @@ use kroneum_api::usb::{
 const BTABLE_ADDRESS: usize = 0x4000_6000;
 
 pub struct USBHardwareImpl<'a> {
-    pub p: &'a Peripherals,
+    p: &'a Peripherals,
+}
+
+impl<'a> USBHardwareImpl<'a> {
+    pub fn new(p: &'a Peripherals) -> Self {
+        Self { p }
+    }
 }
 
 impl<'a> USBHardwareImpl<'a> {

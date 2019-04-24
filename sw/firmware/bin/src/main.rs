@@ -12,16 +12,20 @@ mod system;
 mod systick;
 mod usb;
 
+use crate::{
+    system::{System, SystemHardwareImpl},
+    systick::SystickHardwareImpl,
+};
 use core::cell::RefCell;
 use cortex_m::{
     interrupt::{free, Mutex},
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
+use kroneum_api::systick::SysTick;
 use stm32f0::stm32f0x2::{interrupt, Interrupt, Peripherals as DevicePeripherals};
 
-static SYSTEM: Mutex<RefCell<Option<system::System<systick::SystickHardwareImpl>>>> =
-    Mutex::new(RefCell::new(None));
+static SYSTEM: Mutex<RefCell<Option<System<SystickHardwareImpl>>>> = Mutex::new(RefCell::new(None));
 
 // Read about interrupt setup sequence at:
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
@@ -31,12 +35,9 @@ fn main() -> ! {
     let device_peripherals = DevicePeripherals::take().expect("Can not take device peripherals");
 
     free(|cs| {
-        let mut system = system::System::new(
-            system::SystemHardwareImpl {
-                p: device_peripherals,
-                scb: core_peripherals.SCB,
-            },
-            systick::create(core_peripherals.SYST),
+        let mut system = System::new(
+            SystemHardwareImpl::new(device_peripherals, core_peripherals.SCB),
+            SysTick::new(SystickHardwareImpl::new(core_peripherals.SYST)),
         );
 
         system.setup();
@@ -63,22 +64,22 @@ fn main() -> ! {
 
 #[interrupt]
 fn EXTI2_3() {
-    interrupt_free(|system| system.on_button_press());
+    interrupt_free(System::on_button_press);
 }
 
 #[interrupt]
 fn EXTI0_1() {
-    interrupt_free(|system| system.on_button_press());
+    interrupt_free(System::on_button_press);
 }
 
 #[interrupt]
 fn RTC() {
-    interrupt_free(|system| system.on_rtc_alarm());
+    interrupt_free(System::on_rtc_alarm);
 }
 
 #[interrupt]
 fn USB() {
-    interrupt_free(|system| system.on_usb_packet());
+    interrupt_free(System::on_usb_packet);
 }
 
 #[exception]
@@ -93,7 +94,7 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
 
 fn interrupt_free<F>(f: F)
 where
-    F: FnOnce(&mut system::System<systick::SystickHardwareImpl>),
+    F: FnOnce(&mut System<SystickHardwareImpl>),
 {
     free(|cs| {
         if let Some(s) = SYSTEM.borrow(cs).borrow_mut().as_mut() {

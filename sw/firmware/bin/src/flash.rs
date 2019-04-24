@@ -5,7 +5,13 @@ use stm32f0::stm32f0x2::Peripherals;
 const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 
 pub struct FlashHardwareImpl<'a> {
-    pub p: &'a Peripherals,
+    p: &'a Peripherals,
+}
+
+impl<'a> FlashHardwareImpl<'a> {
+    pub fn new(p: &'a Peripherals) -> Self {
+        Self { p }
+    }
 }
 
 impl<'a> FlashHardwareImpl<'a> {

@@ -15,8 +15,14 @@ use kroneum_api::{
 };
 
 pub struct SystemHardwareImpl {
-    pub p: Peripherals,
-    pub scb: SCB,
+    p: Peripherals,
+    scb: SCB,
+}
+
+impl SystemHardwareImpl {
+    pub fn new(p: Peripherals, scb: SCB) -> Self {
+        Self { p, scb }
+    }
 }
 
 impl<'a> SystemHardware<'a> for SystemHardwareImpl {
@@ -151,23 +157,23 @@ impl<'a> SystemHardware<'a> for SystemHardwareImpl {
     }
 
     fn beeper(&'a self) -> Self::P {
-        beeper::BeeperHardwareImpl { p: &self.p }
+        beeper::BeeperHardwareImpl::new(&self.p)
     }
 
     fn buttons(&'a self) -> Self::B {
-        buttons::ButtonsHardwareImpl { p: &self.p }
+        buttons::ButtonsHardwareImpl::new(&self.p)
     }
 
     fn rtc(&'a self) -> Self::R {
-        rtc::RTCHardwareImpl { p: &self.p }
+        rtc::RTCHardwareImpl::new(&self.p)
     }
 
     fn flash(&'a self) -> Self::F {
-        flash::FlashHardwareImpl { p: &self.p }
+        flash::FlashHardwareImpl::new(&self.p)
     }
 
     fn usb(&'a self) -> Self::U {
-        usb::USBHardwareImpl { p: &self.p }
+        usb::USBHardwareImpl::new(&self.p)
     }
 }
 

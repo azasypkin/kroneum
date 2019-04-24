@@ -1,9 +1,14 @@
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
-
-use kroneum_api::systick::{SysTick, SysTickHardware};
+use kroneum_api::systick::SysTickHardware;
 
 pub struct SystickHardwareImpl {
     syst: SYST,
+}
+
+impl SystickHardwareImpl {
+    pub fn new(syst: SYST) -> Self {
+        Self { syst }
+    }
 }
 
 impl SysTickHardware for SystickHardwareImpl {
@@ -24,8 +29,4 @@ impl SysTickHardware for SystickHardwareImpl {
     fn has_wrapped(&mut self) -> bool {
         self.syst.has_wrapped()
     }
-}
-
-pub fn create(syst: SYST) -> SysTick<SystickHardwareImpl> {
-    SysTick::new(SystickHardwareImpl { syst })
 }

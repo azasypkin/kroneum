@@ -2,7 +2,13 @@ use kroneum_api::{beeper::PWMBeeperHardware, config};
 use stm32f0::stm32f0x2::Peripherals;
 
 pub struct BeeperHardwareImpl<'a> {
-    pub p: &'a Peripherals,
+    p: &'a Peripherals,
+}
+
+impl<'a> BeeperHardwareImpl<'a> {
+    pub fn new(p: &'a Peripherals) -> Self {
+        Self { p }
+    }
 }
 
 impl<'a> PWMBeeperHardware for BeeperHardwareImpl<'a> {
