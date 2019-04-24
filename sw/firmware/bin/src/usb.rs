@@ -18,128 +18,6 @@ impl<'a> USBHardwareImpl<'a> {
 }
 
 impl<'a> USBHardwareImpl<'a> {
-    fn open_control_endpoints(&self) {
-        self.p.USB.epr[0].write(|w| {
-            w.ep_type()
-                .bits(0b01)
-                .ctr_rx()
-                .set_bit()
-                .ctr_tx()
-                .set_bit()
-                .stat_tx()
-                .bits(self.status_bits(0, EndpointStatus::Nak))
-                .stat_rx()
-                .bits(self.status_bits(0, EndpointStatus::Valid))
-        });
-    }
-
-    fn open_device_endpoints(&self) {
-        self.p.USB.epr[1].modify(|r, w| {
-            w.ep_type()
-                .bits(0b11)
-                .ea()
-                .bits(0x1)
-                .ctr_rx()
-                .set_bit()
-                .ctr_tx()
-                .set_bit()
-                .stat_tx()
-                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
-                .stat_rx()
-                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
-        });
-    }
-
-    fn close_control_endpoints(&self) {
-        self.p.USB.epr[0].modify(|r, w| {
-            w.stat_tx()
-                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
-                .stat_rx()
-                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
-        });
-    }
-
-    fn close_device_endpoints(&self) {
-        self.p.USB.epr[1].modify(|r, w| {
-            w.stat_tx()
-                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
-                .stat_rx()
-                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
-        });
-    }
-
-    fn set_rx_endpoint_status(&self, endpoint: EndpointType, status: EndpointStatus) {
-        // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
-        match endpoint {
-            EndpointType::Control => {
-                self.p.USB.epr[0].modify(|r, w| {
-                    w.stat_rx()
-                        .bits(self.status_bits(r.stat_rx().bits(), status))
-                        .ctr_tx()
-                        .set_bit()
-                        .ctr_rx()
-                        .set_bit()
-                        .dtog_tx()
-                        .clear_bit()
-                        .dtog_rx()
-                        .clear_bit()
-                        .stat_tx()
-                        .bits(0b00)
-                });
-            }
-            EndpointType::Device => self.p.USB.epr[1].modify(|r, w| {
-                w.stat_rx()
-                    .bits(self.status_bits(r.stat_rx().bits(), status))
-                    .ctr_tx()
-                    .set_bit()
-                    .ctr_rx()
-                    .set_bit()
-                    .dtog_tx()
-                    .clear_bit()
-                    .dtog_rx()
-                    .clear_bit()
-                    .stat_tx()
-                    .bits(0b00)
-            }),
-        }
-    }
-
-    fn set_tx_endpoint_status(&self, endpoint: EndpointType, status: EndpointStatus) {
-        // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
-        match endpoint {
-            EndpointType::Control => {
-                self.p.USB.epr[0].modify(|r, w| {
-                    w.stat_tx()
-                        .bits(self.status_bits(r.stat_tx().bits(), status))
-                        .ctr_tx()
-                        .set_bit()
-                        .ctr_rx()
-                        .set_bit()
-                        .dtog_tx()
-                        .clear_bit()
-                        .dtog_rx()
-                        .clear_bit()
-                        .stat_rx()
-                        .bits(0b00)
-                });
-            }
-            EndpointType::Device => self.p.USB.epr[1].modify(|r, w| {
-                w.stat_tx()
-                    .bits(self.status_bits(r.stat_tx().bits(), status))
-                    .ctr_tx()
-                    .set_bit()
-                    .ctr_rx()
-                    .set_bit()
-                    .dtog_tx()
-                    .clear_bit()
-                    .dtog_rx()
-                    .clear_bit()
-                    .stat_rx()
-                    .bits(0b00)
-            }),
-        }
-    }
-
     fn status_bits(&self, current_bits: u8, status: EndpointStatus) -> u8 {
         current_bits ^ status as u8
     }
@@ -191,14 +69,6 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 
     fn transaction(&self) -> Transaction {
-        let istr_reg = self.p.USB.istr.read();
-
-        let endpoint = match istr_reg.ep_id().bits() {
-            0 => EndpointType::Control,
-            1 => EndpointType::Device,
-            _ => panic!("Unknown endpoint"),
-        };
-
         // This bit is written by the hardware according to the direction of the successful transaction,
         // which generated the interrupt request. If DIR bit=0, CTR_TX bit is set in the USB_EPnR register
         // related to the interrupting endpoint. The interrupting transaction is of IN type (data
@@ -207,35 +77,25 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         // If DIR bit=1, CTR_RX bit or both CTR_TX/CTR_RX are set in the USB_EPnR register related to
         // the interrupting endpoint. The interrupting transaction is of OUT type (data received by the
         // USB peripheral from the host PC) or two pending transactions are waiting to be processed.
-        let direction = if istr_reg.dir().bit_is_set() {
-            EndpointDirection::Receive
-        } else {
-            EndpointDirection::Transmit
-        };
-
-        let flags = match endpoint {
-            EndpointType::Control => {
-                let ep_reg = self.p.USB.epr[0].read();
-                TransactionFlags {
-                    setup: ep_reg.setup().bit_is_set(),
-                    rx: ep_reg.ctr_rx().bit_is_set(),
-                    tx: ep_reg.ctr_tx().bit_is_set(),
-                }
-            }
-            EndpointType::Device => {
-                let ep_reg = self.p.USB.epr[1].read();
-                TransactionFlags {
-                    setup: ep_reg.setup().bit_is_set(),
-                    rx: ep_reg.ctr_rx().bit_is_set(),
-                    tx: ep_reg.ctr_tx().bit_is_set(),
-                }
-            }
-        };
-
+        let istr_reg = self.p.USB.istr.read();
+        let endpoint_index = istr_reg.ep_id().bits();
+        let ep_reg = self.p.USB.epr[endpoint_index as usize].read();
         Transaction {
-            endpoint,
-            direction,
-            flags,
+            endpoint: match endpoint_index {
+                0 => EndpointType::Control,
+                1 => EndpointType::Device,
+                _ => panic!("Unknown endpoint"),
+            },
+            direction: if istr_reg.dir().bit_is_set() {
+                EndpointDirection::Receive
+            } else {
+                EndpointDirection::Transmit
+            },
+            flags: TransactionFlags {
+                setup: ep_reg.setup().bit_is_set(),
+                rx: ep_reg.ctr_rx().bit_is_set(),
+                tx: ep_reg.ctr_tx().bit_is_set(),
+            },
         }
     }
 
@@ -245,10 +105,33 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         direction: EndpointDirection,
         status: EndpointStatus,
     ) {
-        match direction {
-            EndpointDirection::Receive => self.set_rx_endpoint_status(endpoint, status),
-            EndpointDirection::Transmit => self.set_tx_endpoint_status(endpoint, status),
-        }
+        let endpoint_index = match endpoint {
+            EndpointType::Control => 0,
+            EndpointType::Device => 1,
+        };
+
+        self.p.USB.epr[endpoint_index].modify(|r, w| {
+            let w = match direction {
+                EndpointDirection::Receive => w
+                    .stat_rx()
+                    .bits(self.status_bits(r.stat_rx().bits(), status)),
+                EndpointDirection::Transmit => w
+                    .stat_tx()
+                    .bits(self.status_bits(r.stat_tx().bits(), status)),
+            };
+
+            // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
+            w.ctr_tx()
+                .set_bit()
+                .ctr_rx()
+                .set_bit()
+                .dtog_tx()
+                .clear_bit()
+                .dtog_rx()
+                .clear_bit()
+                .stat_tx()
+                .bits(0b00)
+        });
     }
 
     fn set_address(&self, address: u8) {
@@ -259,17 +142,47 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 
     fn open_endpoint(&self, endpoint: EndpointType) {
-        match endpoint {
-            EndpointType::Control => self.open_control_endpoints(),
-            EndpointType::Device => self.open_device_endpoints(),
-        }
+        let endpoint_index = match endpoint {
+            EndpointType::Control => 0,
+            EndpointType::Device => 1,
+        };
+
+        self.p.USB.epr[endpoint_index].modify(|r, w| {
+            let w = match endpoint {
+                EndpointType::Control => w
+                    .ep_type()
+                    .bits(0b01)
+                    .stat_tx()
+                    .bits(self.status_bits(0, EndpointStatus::Nak))
+                    .stat_rx()
+                    .bits(self.status_bits(0, EndpointStatus::Valid)),
+                EndpointType::Device => w
+                    .ep_type()
+                    .bits(0b11)
+                    .ea()
+                    .bits(0x1)
+                    .stat_tx()
+                    .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
+                    .stat_rx()
+                    .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid)),
+            };
+
+            w.ctr_rx().set_bit().ctr_tx().set_bit()
+        });
     }
 
     fn close_endpoint(&self, endpoint: EndpointType) {
-        match endpoint {
-            EndpointType::Control => self.close_control_endpoints(),
-            EndpointType::Device => self.close_device_endpoints(),
-        }
+        let endpoint_index = match endpoint {
+            EndpointType::Control => 0,
+            EndpointType::Device => 1,
+        };
+
+        self.p.USB.epr[endpoint_index].modify(|r, w| {
+            w.stat_tx()
+                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
+                .stat_rx()
+                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
+        });
     }
 
     fn is_interrupt_active(&self, interrupt: UsbInterrupt) -> bool {
@@ -298,8 +211,6 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 
     fn mark_transaction_as_handled(&self, endpoint: EndpointType, direction: EndpointDirection) {
-        let stat_bits = 0b00;
-
         // These bits are set by the hardware when an OUT/IN transaction is successfully completed
         // on this endpoint; the software can only clear this bit.
         // A transaction ended with a NAK or STALL handshake does not set this bit, since no data is
@@ -310,40 +221,26 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
             EndpointDirection::Transmit => (true, false),
         };
 
-        match endpoint {
-            EndpointType::Control => {
-                self.p.USB.epr[0].modify(|_, w| {
-                    w.ctr_rx()
-                        .bit(rx_bit)
-                        .ctr_tx()
-                        .bit(tx_bit)
-                        .dtog_tx()
-                        .clear_bit()
-                        .dtog_rx()
-                        .clear_bit()
-                        .stat_tx()
-                        .bits(stat_bits)
-                        .stat_rx()
-                        .bits(stat_bits)
-                });
-            }
-            EndpointType::Device => {
-                self.p.USB.epr[1].modify(|_, w| {
-                    w.ctr_rx()
-                        .bit(rx_bit)
-                        .ctr_tx()
-                        .bit(tx_bit)
-                        .dtog_tx()
-                        .clear_bit()
-                        .dtog_rx()
-                        .clear_bit()
-                        .stat_tx()
-                        .bits(stat_bits)
-                        .stat_rx()
-                        .bits(stat_bits)
-                });
-            }
-        }
+        let endpoint_index = match endpoint {
+            EndpointType::Control => 0,
+            EndpointType::Device => 1,
+        };
+
+        let stat_bits = 0b00;
+        self.p.USB.epr[endpoint_index].modify(|_, w| {
+            w.ctr_rx()
+                .bit(rx_bit)
+                .ctr_tx()
+                .bit(tx_bit)
+                .dtog_tx()
+                .clear_bit()
+                .dtog_rx()
+                .clear_bit()
+                .stat_tx()
+                .bits(stat_bits)
+                .stat_rx()
+                .bits(stat_bits)
+        });
     }
 }
 
