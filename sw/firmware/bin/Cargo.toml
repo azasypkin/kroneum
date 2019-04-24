@@ -10,15 +10,15 @@ license = "MIT"
 repository = "https://github.com/azasypkin/kroneum"
 
 [dependencies]
-cortex-m = "0.5.8"
+cortex-m = "0.6.0"
 cortex-m-rt = "0.6.8"
-cortex-m-semihosting = "0.3.2"
+cortex-m-semihosting = "0.3.3"
 kroneum-api = { version = "0.1.0", path = "../api" }
 panic-semihosting = "0.5.1"
 vcell = "0.1.0"
 
 [dependencies.stm32f0]
-version = "0.6.0"
+version = "0.7.0"
 features = ["stm32f0x2", "rt"]
 
 # this lets you use `cargo fix`!
