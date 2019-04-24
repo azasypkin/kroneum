@@ -54,7 +54,12 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
         self.p.RCC.csr.modify(|_, w| w.lsion().clear_bit());
         while self.p.RCC.csr.read().lsirdy().bit_is_set() {}
 
-        clear_pending_interrupt(self.p);
+        // Clear pending interrupt
+
+        // Clear Alarm A flag.
+        self.p.RTC.isr.modify(|_, w| w.alraf().clear_bit());
+        // Clear EXTI line 17 flag.
+        self.p.EXTI.pr.modify(|_, w| w.pif17().set_bit());
     }
 
     fn get_time(&self) -> BCDTime {
@@ -162,14 +167,6 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
 
         self.toggle_write_protection(true);
     }
-}
-
-fn clear_pending_interrupt(p: &Peripherals) {
-    // Clear Alarm A flag.
-    p.RTC.isr.modify(|_, w| w.alraf().clear_bit());
-
-    // Clear EXTI line 17 flag.
-    p.EXTI.pr.modify(|_, w| w.pif17().set_bit());
 }
 
 fn toggle_alarm(p: &Peripherals, enable: bool) {
