@@ -111,13 +111,9 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         };
 
         self.p.USB.epr[endpoint_index].modify(|r, w| {
-            let w = match direction {
-                EndpointDirection::Receive => w
-                    .stat_rx()
-                    .bits(self.status_bits(r.stat_rx().bits(), status)),
-                EndpointDirection::Transmit => w
-                    .stat_tx()
-                    .bits(self.status_bits(r.stat_tx().bits(), status)),
+            let (rx, tx) = match direction {
+                EndpointDirection::Receive => (self.status_bits(r.stat_rx().bits(), status), 0b00),
+                EndpointDirection::Transmit => (0b00, self.status_bits(r.stat_tx().bits(), status)),
             };
 
             // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
@@ -129,8 +125,10 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
                 .clear_bit()
                 .dtog_rx()
                 .clear_bit()
+                .stat_rx()
+                .bits(rx)
                 .stat_tx()
-                .bits(0b00)
+                .bits(tx)
         });
     }
 
@@ -148,26 +146,23 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         };
 
         self.p.USB.epr[endpoint_index].modify(|r, w| {
-            let w = match endpoint {
-                EndpointType::Control => w
-                    .ep_type()
-                    .bits(0b01)
-                    .stat_tx()
-                    .bits(self.status_bits(0, EndpointStatus::Nak))
-                    .stat_rx()
-                    .bits(self.status_bits(0, EndpointStatus::Valid)),
-                EndpointType::Device => w
-                    .ep_type()
-                    .bits(0b11)
-                    .ea()
-                    .bits(0x1)
-                    .stat_tx()
-                    .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
-                    .stat_rx()
-                    .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid)),
+            let (endpoint_type, endpoint_address) = match endpoint {
+                EndpointType::Control => (0b01, r.ea().bits()),
+                EndpointType::Device => (0b11, 0x1),
             };
 
-            w.ctr_rx().set_bit().ctr_tx().set_bit()
+            w.ep_type()
+                .bits(endpoint_type)
+                .ea()
+                .bits(endpoint_address)
+                .stat_rx()
+                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
+                .stat_tx()
+                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
+                .ctr_rx()
+                .set_bit()
+                .ctr_tx()
+                .set_bit()
         });
     }
 
