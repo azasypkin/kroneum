@@ -3,6 +3,7 @@ use beeper::PWMBeeperHardware;
 use buttons::ButtonsHardware;
 use flash::FlashHardware;
 use rtc::RTCHardware;
+use system_control::SystemControlHardware;
 use usb::USBHardware;
 
 #[derive(Debug, Copy, Clone)]
@@ -34,16 +35,11 @@ pub trait SystemHardware<'a> {
     type F: FlashHardware + 'a;
     type P: PWMBeeperHardware + 'a;
     type R: RTCHardware + 'a;
+    type S: SystemControlHardware + 'a;
     type U: USBHardware + 'a;
 
     /// Initializes hardware if needed.
-    fn setup(&self);
-
-    /// Turns on/off system standby mode.
-    fn toggle_standby_mode(&mut self, on: bool);
-
-    /// Performs a software reset.
-    fn reset(&mut self);
+    fn setup(&'a self);
 
     /// Returns the `PWMBeeperHardware` used to create `PWMBeeper` component.
     fn beeper(&'a self) -> Self::P;
@@ -53,6 +49,9 @@ pub trait SystemHardware<'a> {
 
     /// Returns the `RTCHardware` used to create `RTC` component.
     fn rtc(&'a self) -> Self::R;
+
+    /// Returns the `SystemControlHardware` used to create `SystemControl` component.
+    fn system_control(&'a mut self) -> Self::S;
 
     /// Returns the `FlashHardware` used to create `Flash` component.
     fn flash(&'a self) -> Self::F;

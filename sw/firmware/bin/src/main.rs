@@ -9,6 +9,7 @@ mod buttons;
 mod flash;
 mod rtc;
 mod system;
+mod system_control;
 mod systick;
 mod usb;
 

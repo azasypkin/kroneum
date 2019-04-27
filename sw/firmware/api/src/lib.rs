@@ -8,6 +8,7 @@ pub mod config;
 pub mod flash;
 pub mod rtc;
 pub mod system;
+pub mod system_control;
 pub mod systick;
 pub mod time;
 pub mod usb;
