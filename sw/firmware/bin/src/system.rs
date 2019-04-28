@@ -1,40 +1,46 @@
-use crate::{beeper, buttons, flash, rtc, system_control, usb};
-
+use crate::{
+    beeper::BeeperHardwareImpl, buttons::ButtonsHardwareImpl, flash::FlashHardwareImpl,
+    rtc::RTCHardwareImpl, usb::USBHardwareImpl,
+};
 use cortex_m::peripheral::SCB;
+use kroneum_api::system::SystemHardware;
 use stm32f0::stm32f0x2::Peripherals;
 
-use kroneum_api::{
-    beeper::{Melody, PWMBeeper, PWMBeeperHardware},
-    buttons::{ButtonPressType, Buttons, ButtonsHardware},
-    flash::{Flash, FlashHardware},
-    rtc::{RTCHardware, RTC},
-    system::{SystemHardware, SystemMode, SystemState},
-    system_control::{SystemControl, SystemControlHardware},
-    systick::{SysTick, SysTickHardware},
-    time::Time,
-    usb::{command_packet::CommandPacket, USBHardware, USB},
-};
-
-pub struct SystemHardwareImpl {
-    p: Peripherals,
-    scb: SCB,
+pub struct SystemHardwareImpl<'a> {
+    p: &'a Peripherals,
+    scb: &'a mut SCB,
 }
 
-impl SystemHardwareImpl {
-    pub fn new(p: Peripherals, scb: SCB) -> Self {
+impl<'a> SystemHardwareImpl<'a> {
+    pub fn new(p: &'a Peripherals, scb: &'a mut SCB) -> Self {
         Self { p, scb }
     }
 }
 
-impl<'a> SystemHardware<'a> for SystemHardwareImpl {
-    type B = buttons::ButtonsHardwareImpl<'a>;
-    type F = flash::FlashHardwareImpl<'a>;
-    type P = beeper::BeeperHardwareImpl<'a>;
-    type R = rtc::RTCHardwareImpl<'a>;
-    type S = system_control::SystemControlHardwareImpl<'a>;
-    type U = usb::USBHardwareImpl<'a>;
+impl<'a> SystemHardwareImpl<'a> {
+    fn toggle_standby_mode(&mut self, on: bool) {
+        // Toggle STANDBY mode.
+        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
 
-    fn setup(&'a self) {
+        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
+
+        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
+        if on {
+            self.scb.set_sleepdeep();
+        } else {
+            self.scb.clear_sleepdeep();
+        }
+    }
+}
+
+impl<'a> SystemHardware for SystemHardwareImpl<'a> {
+    type B = ButtonsHardwareImpl<'a>;
+    type F = FlashHardwareImpl<'a>;
+    type P = BeeperHardwareImpl<'a>;
+    type R = RTCHardwareImpl<'a>;
+    type U = USBHardwareImpl<'a>;
+
+    fn setup(&self) {
         // Remap PA9-10 to PA11-12 for USB.
         self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
         self.p
@@ -140,214 +146,35 @@ impl<'a> SystemHardware<'a> for SystemHardwareImpl {
             .modify(|_, w| w.afrh11().af2().afrh12().af2());
     }
 
-    fn beeper(&'a self) -> Self::P {
-        beeper::BeeperHardwareImpl::new(&self.p)
+    fn enter_standby_mode(&mut self) {
+        self.toggle_standby_mode(true);
     }
 
-    fn buttons(&'a self) -> Self::B {
-        buttons::ButtonsHardwareImpl::new(&self.p)
+    fn exit_standby_mode(&mut self) {
+        self.toggle_standby_mode(false);
     }
 
-    fn rtc(&'a self) -> Self::R {
-        rtc::RTCHardwareImpl::new(&self.p)
+    fn reset(&mut self) {
+        self.scb.system_reset();
     }
 
-    fn system_control(&'a mut self) -> Self::S {
-        system_control::SystemControlHardwareImpl::new(&self.p.PWR.cr, &mut self.scb)
+    fn beeper(&self) -> Self::P {
+        BeeperHardwareImpl::new(&self.p)
     }
 
-    fn flash(&'a self) -> Self::F {
-        flash::FlashHardwareImpl::new(&self.p)
+    fn buttons(&self) -> Self::B {
+        ButtonsHardwareImpl::new(&self.p)
     }
 
-    fn usb(&'a self) -> Self::U {
-        usb::USBHardwareImpl::new(&self.p)
-    }
-}
-
-pub struct System<S: SysTickHardware> {
-    hw: SystemHardwareImpl,
-    systick: SysTick<S>,
-    state: SystemState,
-}
-
-impl<S: SysTickHardware> System<S> {
-    pub fn new(hw: SystemHardwareImpl, systick: SysTick<S>) -> Self {
-        System {
-            hw,
-            state: SystemState::default(),
-            systick,
-        }
+    fn flash(&self) -> Self::F {
+        FlashHardwareImpl::new(&self.p)
     }
 
-    pub fn setup(&mut self) {
-        self.hw.setup();
-
-        self.buttons().setup();
-
-        self.set_mode(SystemMode::Idle);
+    fn rtc(&self) -> Self::R {
+        RTCHardwareImpl::new(&self.p)
     }
 
-    pub fn set_mode(&mut self, mode: SystemMode) {
-        match &mode {
-            SystemMode::Idle => {
-                self.system_control().enter_standby_mode();
-
-                self.usb().teardown();
-                self.rtc().teardown();
-
-                // If we are exiting `Config` or `Alarm` mode let's play special signal.
-                if let SystemMode::Setup(_) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                }
-            }
-            SystemMode::Config => {
-                self.beeper().play(Melody::Reset);
-
-                self.system_control().exit_standby_mode();
-
-                self.usb().setup();
-            }
-            SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
-            SystemMode::Setup(c) if *c > 0 => self.beeper().beep(),
-            SystemMode::Alarm(time, _) => {
-                self.beeper().play(Melody::Setup);
-
-                let rtc = self.rtc();
-                rtc.setup();
-                rtc.set_time(Time::default());
-                rtc.set_alarm(*time);
-            }
-            _ => {}
-        }
-
-        self.state.mode = mode;
-    }
-
-    pub fn on_rtc_alarm(&mut self) {
-        if let SystemMode::Alarm(_, melody) = self.state.mode {
-            self.beeper().play(melody);
-
-            self.rtc().teardown();
-
-            // Snooze alarm for 10 seconds.
-            self.set_mode(SystemMode::Alarm(Time::from_seconds(10), Melody::Beep));
-        }
-    }
-
-    pub fn on_usb_packet(&mut self) {
-        self.usb().interrupt();
-
-        if let Some(command_packet) = self.state.usb_state.command {
-            if let CommandPacket::Beep(num) = command_packet {
-                self.beeper().beep_n(num);
-            } else if let CommandPacket::AlarmSet(time) = command_packet {
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
-            } else if let CommandPacket::AlarmGet = command_packet {
-                let alarm = self.rtc().alarm();
-                self.usb()
-                    .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
-            } else if let CommandPacket::Reset = command_packet {
-                self.system_control().reset();
-            } else if let CommandPacket::FlashRead(slot) = command_packet {
-                let value = self.flash().read(slot).unwrap_or_else(|| 0);
-                self.usb().send(&[value, 0, 0, 0, 0, 0]);
-            } else if let CommandPacket::FlashWrite(slot, value) = command_packet {
-                let status = if self.flash().write(slot, value).is_ok() {
-                    1
-                } else {
-                    0
-                };
-                self.usb().send(&[status, 0, 0, 0, 0, 0]);
-            } else if let CommandPacket::FlashEraseAll = command_packet {
-                self.flash().erase_all();
-            }
-        }
-
-        self.state.usb_state.command = None;
-    }
-
-    pub fn on_button_press(&mut self) {
-        if !self.buttons().triggered() {
-            return;
-        }
-
-        let (button_i, button_x) = self.buttons().interrupt();
-
-        match (self.state.mode, button_i, button_x) {
-            (mode, ButtonPressType::Long, ButtonPressType::Long) => {
-                let (button_i, button_x) = self.buttons().interrupt();
-
-                match (mode, button_i, button_x) {
-                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
-                    | (SystemMode::Alarm(_, _), ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Idle)
-                    }
-                    (_, ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Config)
-                    }
-                    (SystemMode::Setup(counter), _, _) => {
-                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
-                    }
-                    _ => {}
-                }
-            }
-            (SystemMode::Idle, ButtonPressType::Long, _)
-            | (SystemMode::Idle, _, ButtonPressType::Long)
-            | (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
-            | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
-                self.set_mode(SystemMode::Setup(0))
-            }
-            (SystemMode::Setup(counter), ButtonPressType::Long, _)
-            | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
-                let time = match button_i {
-                    ButtonPressType::Long => Time::from_seconds(counter as u32),
-                    _ => Time::from_minutes(counter as u32),
-                };
-
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
-            }
-            (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
-                self.set_mode(SystemMode::Setup(counter + 1))
-            }
-            (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
-                self.set_mode(SystemMode::Setup(counter + 10))
-            }
-            _ => {}
-        }
-
-        self.buttons().reactivate();
-    }
-
-    /// Creates an instance of `Beeper` controller.
-    fn beeper<'a>(&'a mut self) -> PWMBeeper<'a, impl PWMBeeperHardware + 'a, S> {
-        PWMBeeper::new(self.hw.beeper(), &mut self.systick)
-    }
-
-    /// Creates an instance of `Buttons` controller.
-    fn buttons<'a>(&'a mut self) -> Buttons<'a, impl ButtonsHardware + 'a, S> {
-        Buttons::new(self.hw.buttons(), &mut self.systick)
-    }
-
-    /// Creates an instance of `RTC` controller.
-    fn rtc<'a>(&'a mut self) -> RTC<impl RTCHardware + 'a> {
-        RTC::new(self.hw.rtc())
-    }
-
-    /// Creates an instance of `SystemControl` controller.
-    fn system_control<'a>(&'a mut self) -> SystemControl<impl SystemControlHardware + 'a> {
-        SystemControl::new(self.hw.system_control())
-    }
-
-    /// Creates an instance of `USB` controller.
-    fn usb<'a>(&'a mut self) -> USB<impl USBHardware + 'a> {
-        USB::new(self.hw.usb(), &mut self.state.usb_state)
-    }
-
-    /// Creates an instance of `Flash` controller.
-    fn flash<'a>(&'a mut self) -> Flash<impl FlashHardware + 'a> {
-        Flash::new(self.hw.flash())
+    fn usb(&self) -> Self::U {
+        USBHardwareImpl::new(&self.p)
     }
 }

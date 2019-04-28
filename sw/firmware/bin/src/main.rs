@@ -7,26 +7,23 @@ extern crate panic_semihosting;
 mod beeper;
 mod buttons;
 mod flash;
+mod kroneum;
 mod rtc;
 mod system;
-mod system_control;
 mod systick;
 mod usb;
 
-use crate::{
-    system::{System, SystemHardwareImpl},
-    systick::SystickHardwareImpl,
-};
+use crate::{kroneum::Kroneum, system::SystemHardwareImpl, systick::SystickHardwareImpl};
 use core::cell::RefCell;
 use cortex_m::{
     interrupt::{free, Mutex},
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
-use kroneum_api::systick::SysTick;
+use kroneum_api::{system::System, systick::SysTick};
 use stm32f0::stm32f0x2::{interrupt, Interrupt, Peripherals as DevicePeripherals};
 
-static SYSTEM: Mutex<RefCell<Option<System<SystickHardwareImpl>>>> = Mutex::new(RefCell::new(None));
+static SYSTEM: Mutex<RefCell<Option<Kroneum>>> = Mutex::new(RefCell::new(None));
 
 // Read about interrupt setup sequence at:
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
@@ -36,12 +33,11 @@ fn main() -> ! {
     let device_peripherals = DevicePeripherals::take().expect("Can not take device peripherals");
 
     free(|cs| {
-        let mut system = System::new(
-            SystemHardwareImpl::new(device_peripherals, core_peripherals.SCB),
+        let system = Kroneum::create(
+            device_peripherals,
+            core_peripherals.SCB,
             SysTick::new(SystickHardwareImpl::new(core_peripherals.SYST)),
         );
-
-        system.setup();
 
         *SYSTEM.borrow(cs).borrow_mut() = Some(system);
 
@@ -65,22 +61,22 @@ fn main() -> ! {
 
 #[interrupt]
 fn EXTI2_3() {
-    interrupt_free(System::on_button_press);
+    interrupt_free(|mut s| s.handle_button_press());
 }
 
 #[interrupt]
 fn EXTI0_1() {
-    interrupt_free(System::on_button_press);
+    interrupt_free(|mut s| s.handle_button_press());
 }
 
 #[interrupt]
 fn RTC() {
-    interrupt_free(System::on_rtc_alarm);
+    interrupt_free(|mut s| s.handle_alarm());
 }
 
 #[interrupt]
 fn USB() {
-    interrupt_free(System::on_usb_packet);
+    interrupt_free(|mut s| s.handle_usb_packet());
 }
 
 #[exception]
@@ -95,11 +91,11 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
 
 fn interrupt_free<F>(f: F)
 where
-    F: FnOnce(&mut System<SystickHardwareImpl>),
+    F: FnOnce(System<SystemHardwareImpl, SystickHardwareImpl>),
 {
     free(|cs| {
         if let Some(s) = SYSTEM.borrow(cs).borrow_mut().as_mut() {
-            f(s);
+            f(s.system());
         } else {
             panic!("Can not borrow application state!");
         }
