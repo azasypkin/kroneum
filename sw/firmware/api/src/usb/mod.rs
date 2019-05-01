@@ -76,15 +76,15 @@ pub struct Transaction {
 
 #[derive(Copy, Clone)]
 pub struct UsbState {
-    pub device_status: DeviceStatus,
-    pub suspended_device_status: Option<DeviceStatus>,
-    pub control_endpoint_status: ControlEndpointStatus,
-    pub setup_data_length: u16,
-    pub address: u8,
-    pub configuration_index: u8,
-    pub protocol: u8,
-    pub idle_state: u8,
-    pub alt_setting: u8,
+    device_status: DeviceStatus,
+    suspended_device_status: Option<DeviceStatus>,
+    control_endpoint_status: ControlEndpointStatus,
+    setup_data_length: u16,
+    address: u8,
+    configuration_index: u8,
+    protocol: u8,
+    idle_state: u8,
+    alt_setting: u8,
     pub command: Option<CommandPacket>,
 }
 

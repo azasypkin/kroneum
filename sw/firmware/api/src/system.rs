@@ -10,7 +10,7 @@ use systick::{SysTick, SysTickHardware};
 use usb::UsbState;
 
 #[derive(Debug, Copy, Clone)]
-pub enum SystemMode {
+enum SystemMode {
     Idle,
     Setup(u32),
     Alarm(Time, Melody),
@@ -19,8 +19,8 @@ pub enum SystemMode {
 
 #[derive(Copy, Clone)]
 pub struct SystemState {
-    pub mode: SystemMode,
-    pub usb_state: UsbState,
+    mode: SystemMode,
+    usb_state: UsbState,
 }
 
 impl Default for SystemState {
@@ -86,85 +86,6 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         self.buttons().setup();
 
         self.set_mode(SystemMode::Idle);
-    }
-
-    /// Forces system to enter StandBy mode.
-    pub fn enter_standby_mode(&mut self) {
-        self.hw.enter_standby_mode();
-    }
-
-    /// Forces system to exit StandBy mode.
-    pub fn exit_standby_mode(&mut self) {
-        self.hw.exit_standby_mode();
-    }
-
-    /// Performs system software reset.
-    pub fn reset(&mut self) {
-        self.hw.reset();
-    }
-
-    /// Creates an instance of `RTC` controller.
-    pub fn rtc(&mut self) -> RTC<T::R> {
-        RTC::new(self.hw.rtc())
-    }
-
-    /// Creates an instance of `Beeper` controller.
-    pub fn beeper(&mut self) -> PWMBeeper<T::P, S> {
-        PWMBeeper::new(self.hw.beeper(), &mut self.systick)
-    }
-
-    /// Creates an instance of `Buttons` controller.
-    pub fn buttons(&mut self) -> Buttons<T::B, S> {
-        Buttons::new(self.hw.buttons(), &mut self.systick)
-    }
-
-    /// Creates an instance of `Flash` controller.
-    fn flash(&mut self) -> Flash<T::F> {
-        Flash::new(self.hw.flash())
-    }
-
-    /// Creates an instance of `USB` controller.
-    pub fn usb(&mut self) -> USB<T::U> {
-        USB::new(self.hw.usb(), &mut self.state.usb_state)
-    }
-
-    /// Switches system to a new mode.
-    pub fn set_mode(&mut self, mode: SystemMode) {
-        match &mode {
-            SystemMode::Idle => {
-                self.enter_standby_mode();
-
-                self.usb().teardown();
-                self.rtc().teardown();
-
-                // If we are exiting `Config` or `Alarm` mode let's play special signal.
-                if let SystemMode::Setup(_) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                }
-            }
-            SystemMode::Config => {
-                self.beeper().play(Melody::Reset);
-
-                self.exit_standby_mode();
-
-                self.usb().setup();
-            }
-            SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
-            SystemMode::Setup(c) if *c > 0 => self.beeper().beep(),
-            SystemMode::Alarm(time, _) => {
-                self.beeper().play(Melody::Setup);
-
-                let rtc = self.rtc();
-                rtc.setup();
-                rtc.set_time(Time::default());
-                rtc.set_alarm(*time);
-            }
-            _ => {}
-        }
-
-        self.state.mode = mode;
     }
 
     pub fn handle_alarm(&mut self) {
@@ -260,6 +181,85 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         }
 
         self.state.usb_state.command = None;
+    }
+
+    /// Forces system to enter StandBy mode.
+    fn enter_standby_mode(&mut self) {
+        self.hw.enter_standby_mode();
+    }
+
+    /// Forces system to exit StandBy mode.
+    fn exit_standby_mode(&mut self) {
+        self.hw.exit_standby_mode();
+    }
+
+    /// Performs system software reset.
+    fn reset(&mut self) {
+        self.hw.reset();
+    }
+
+    /// Creates an instance of `RTC` controller.
+    fn rtc(&mut self) -> RTC<T::R> {
+        RTC::new(self.hw.rtc())
+    }
+
+    /// Creates an instance of `Beeper` controller.
+    fn beeper(&mut self) -> PWMBeeper<T::P, S> {
+        PWMBeeper::new(self.hw.beeper(), &mut self.systick)
+    }
+
+    /// Creates an instance of `Buttons` controller.
+    fn buttons(&mut self) -> Buttons<T::B, S> {
+        Buttons::new(self.hw.buttons(), &mut self.systick)
+    }
+
+    /// Creates an instance of `Flash` controller.
+    fn flash(&mut self) -> Flash<T::F> {
+        Flash::new(self.hw.flash())
+    }
+
+    /// Creates an instance of `USB` controller.
+    fn usb(&mut self) -> USB<T::U> {
+        USB::new(self.hw.usb(), &mut self.state.usb_state)
+    }
+
+    /// Switches system to a new mode.
+    fn set_mode(&mut self, mode: SystemMode) {
+        match &mode {
+            SystemMode::Idle => {
+                self.enter_standby_mode();
+
+                self.usb().teardown();
+                self.rtc().teardown();
+
+                // If we are exiting `Config` or `Alarm` mode let's play special signal.
+                if let SystemMode::Setup(_) = self.state.mode {
+                    self.beeper().play(Melody::Reset);
+                } else if let SystemMode::Alarm(_, _) = self.state.mode {
+                    self.beeper().play(Melody::Reset);
+                }
+            }
+            SystemMode::Config => {
+                self.beeper().play(Melody::Reset);
+
+                self.exit_standby_mode();
+
+                self.usb().setup();
+            }
+            SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
+            SystemMode::Setup(c) if *c > 0 => self.beeper().beep(),
+            SystemMode::Alarm(time, _) => {
+                self.beeper().play(Melody::Setup);
+
+                let rtc = self.rtc();
+                rtc.setup();
+                rtc.set_time(Time::default());
+                rtc.set_alarm(*time);
+            }
+            _ => {}
+        }
+
+        self.state.mode = mode;
     }
 }
 

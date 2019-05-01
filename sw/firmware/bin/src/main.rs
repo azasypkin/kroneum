@@ -42,7 +42,7 @@ where
 #[entry]
 fn main() -> ! {
     free(|cs| {
-        *KRONEUM.borrow(cs).borrow_mut() = Some(Kroneum::create(
+        *KRONEUM.borrow(cs).borrow_mut() = Some(Kroneum::run(
             DevicePeripherals::take().expect("Can not take device peripherals"),
             CorePeripherals::take().expect("Can not take core peripherals"),
         ));

@@ -17,7 +17,7 @@ impl<T: SysTickHardware> SysTick<T> {
         SysTick { hw }
     }
 
-    pub fn delay_us(&mut self, us: u32) {
+    fn delay_us(&mut self, us: u32) {
         let rvr = us * (config::CLOCK_SPEED / 1_000_000);
 
         assert!(rvr < (1 << 24), "timeout is too large");

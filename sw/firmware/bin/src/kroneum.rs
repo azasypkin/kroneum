@@ -20,7 +20,7 @@ pub struct Kroneum {
 }
 
 impl Kroneum {
-    pub fn create(device: DevicePeripherals, mut core: CorePeripherals) -> Self {
+    pub fn run(device: DevicePeripherals, mut core: CorePeripherals) -> Self {
         let mut kroneum = Kroneum {
             device,
             core_scb: core.SCB,
