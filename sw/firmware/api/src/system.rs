@@ -71,11 +71,11 @@ pub trait SystemHardware {
 pub struct System<'a, T: SystemHardware, S: SysTickHardware> {
     hw: T,
     state: &'a mut SystemState,
-    systick: &'a mut SysTick<S>,
+    systick: SysTick<S>,
 }
 
 impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
-    pub fn new(hw: T, state: &'a mut SystemState, systick: &'a mut SysTick<S>) -> Self {
+    pub fn new(hw: T, state: &'a mut SystemState, systick: SysTick<S>) -> Self {
         System { state, hw, systick }
     }
 
