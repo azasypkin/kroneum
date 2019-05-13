@@ -46,15 +46,15 @@ pub const DEV_DESC: [u8; 18] = [
     0x12, // bLength
     0x01, // bDescriptorType (Device)
     0x00,
-    0x02,                               // bcdUSB 2.00
-    0x00, // bDeviceClass (Use class information in the Interface Descriptors)
-    0x00, // bDeviceSubClass
-    0x00, // bDeviceProtocol
-    0x40, // bMaxPacketSize0 64
-    ((DEVICE_VID & 0xff00) >> 8) as u8, // idVendor 0xFFFF (split u16 into two u8)
-    (DEVICE_VID & 0xff) as u8,
-    ((DEVICE_PID & 0xff00) >> 8) as u8, // idProduct 0xFFFF (split u16 into two u8)
-    (DEVICE_PID & 0xff) as u8,
+    0x02,                      // bcdUSB 2.00
+    0x00,                      // bDeviceClass (Use class information in the Interface Descriptors)
+    0x00,                      // bDeviceSubClass
+    0x00,                      // bDeviceProtocol
+    0x40,                      // bMaxPacketSize0 64
+    (DEVICE_VID & 0xff) as u8, // idVendor 0xFFFF (split u16 into two u8)
+    ((DEVICE_VID & 0xff00) >> 8) as u8,
+    (DEVICE_PID & 0xff) as u8, // idProduct 0xFFFF (split u16 into two u8)
+    ((DEVICE_PID & 0xff00) >> 8) as u8,
     0x01,
     0x00, // bcdDevice 0.01
     0x01, // iManufacturer (String Index)

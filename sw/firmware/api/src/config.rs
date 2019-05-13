@@ -1,6 +1,6 @@
 pub const CLOCK_SPEED: u32 = 8_000_000;
-pub const DEVICE_VID: u16 = 0x0912;
-pub const DEVICE_PID: u16 = 0xedde;
+pub const DEVICE_VID: u16 = 0x1209;
+pub const DEVICE_PID: u16 = 0xdeed;
 
 #[cfg(test)]
 mod tests {
