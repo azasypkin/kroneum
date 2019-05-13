@@ -51,6 +51,18 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
 
     /// Tears down USB hardware.
     fn teardown(&self) {
+        // Disable all interrupts and force the USB reset.
+        self.p.USB.cntr.write(|w| w.fres().set_bit());
+
+        // Clear the interrupt status register.
+        self.p.USB.istr.reset();
+
+        // Switch-off the USB device.
+        self.p
+            .USB
+            .cntr
+            .write(|w| w.pdwn().set_bit().fres().set_bit());
+
         // Tell the host that we're gone by disabling pull-up on DP.
         self.p.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
 
