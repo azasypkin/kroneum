@@ -18,17 +18,16 @@ impl<'a> SystemHardwareImpl<'a> {
 }
 
 impl<'a> SystemHardwareImpl<'a> {
-    fn toggle_standby_mode(&mut self, on: bool) {
-        // Toggle STANDBY mode.
-        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
-
+    fn toggle_deep_sleep(&mut self, on: bool) {
         self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
 
         // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
         if on {
             self.scb.set_sleepdeep();
+            self.scb.set_sleeponexit();
         } else {
             self.scb.clear_sleepdeep();
+            self.scb.clear_sleeponexit();
         }
     }
 }
@@ -144,14 +143,17 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .GPIOA
             .afrh
             .modify(|_, w| w.afrh11().af2().afrh12().af2());
+
+        // Enter Standby mode when the CPU enters Deep Sleep.
+        self.p.PWR.cr.modify(|_, w| w.pdds().set_bit());
     }
 
-    fn enter_standby_mode(&mut self) {
-        self.toggle_standby_mode(true);
+    fn enter_deep_sleep(&mut self) {
+        self.toggle_deep_sleep(true);
     }
 
-    fn exit_standby_mode(&mut self) {
-        self.toggle_standby_mode(false);
+    fn exit_deep_sleep(&mut self) {
+        self.toggle_deep_sleep(false);
     }
 
     fn reset(&mut self) {

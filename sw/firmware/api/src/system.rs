@@ -44,10 +44,10 @@ pub trait SystemHardware {
     fn setup(&self);
 
     /// Forces system to enter StandBy mode.
-    fn enter_standby_mode(&mut self);
+    fn enter_deep_sleep(&mut self);
 
     /// Forces system to exit StandBy mode.
-    fn exit_standby_mode(&mut self);
+    fn exit_deep_sleep(&mut self);
 
     /// Performs system software reset.
     fn reset(&mut self);
@@ -125,10 +125,12 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
                 }
             }
             (SystemMode::Idle, ButtonPressType::Long, _)
-            | (SystemMode::Idle, _, ButtonPressType::Long)
-            | (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
+            | (SystemMode::Idle, _, ButtonPressType::Long) => {
+                self.set_mode(SystemMode::Setup(0));
+            }
+            (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
             | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
-                self.set_mode(SystemMode::Setup(0))
+                self.set_mode(SystemMode::Idle);
             }
             (SystemMode::Setup(counter), ButtonPressType::Long, _)
             | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
@@ -183,16 +185,6 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         self.state.usb_state.command = None;
     }
 
-    /// Forces system to enter StandBy mode.
-    fn enter_standby_mode(&mut self) {
-        self.hw.enter_standby_mode();
-    }
-
-    /// Forces system to exit StandBy mode.
-    fn exit_standby_mode(&mut self) {
-        self.hw.exit_standby_mode();
-    }
-
     /// Performs system software reset.
     fn reset(&mut self) {
         self.hw.reset();
@@ -227,8 +219,6 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
     fn set_mode(&mut self, mode: SystemMode) {
         match &mode {
             SystemMode::Idle => {
-                self.enter_standby_mode();
-
                 self.usb().teardown();
                 self.rtc().teardown();
 
@@ -237,12 +227,16 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
                     self.beeper().play(Melody::Reset);
                 } else if let SystemMode::Alarm(_, _) = self.state.mode {
                     self.beeper().play(Melody::Reset);
+                } else if let SystemMode::Config = self.state.mode {
+                    self.beeper().play(Melody::Reset);
                 }
+
+                self.hw.enter_deep_sleep();
             }
             SystemMode::Config => {
-                self.beeper().play(Melody::Reset);
+                self.hw.exit_deep_sleep();
 
-                self.exit_standby_mode();
+                self.beeper().play(Melody::Reset);
 
                 self.usb().setup();
             }
