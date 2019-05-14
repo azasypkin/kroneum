@@ -19,16 +19,17 @@ impl<'a> SystemHardwareImpl<'a> {
 
 impl<'a> SystemHardwareImpl<'a> {
     fn toggle_deep_sleep(&mut self, on: bool) {
-        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
-
         // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
         if on {
             self.scb.set_sleepdeep();
-            self.scb.set_sleeponexit();
         } else {
             self.scb.clear_sleepdeep();
-            self.scb.clear_sleeponexit();
         }
+
+        // Enter Standby mode when the CPU enters Deep Sleep.
+        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
+
+        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
     }
 }
 
@@ -95,10 +96,18 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
                 .analog()
                 .moder7()
                 .alternate()
+                .moder9()
+                .analog()
+                .moder10()
+                .analog()
                 .moder11()
                 .alternate()
                 .moder12()
                 .alternate()
+                .moder13()
+                .analog()
+                .moder14()
+                .analog()
         });
 
         // Enable AIN for GPIO B and F to reduce power consumption.
@@ -137,15 +146,6 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .GPIOA
             .afrl
             .modify(|_, w| w.afrl0().af2().afrl2().af2().afrl7().af2());
-
-        // Set alternative function #2 (USB) for PA11 and PA12.
-        self.p
-            .GPIOA
-            .afrh
-            .modify(|_, w| w.afrh11().af2().afrh12().af2());
-
-        // Enter Standby mode when the CPU enters Deep Sleep.
-        self.p.PWR.cr.modify(|_, w| w.pdds().set_bit());
     }
 
     fn enter_deep_sleep(&mut self) {

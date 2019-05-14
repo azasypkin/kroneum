@@ -26,6 +26,12 @@ impl<'a> USBHardwareImpl<'a> {
 impl<'a> USBHardware for USBHardwareImpl<'a> {
     /// Setups USB hardware, but doesn't activate it.
     fn setup(&self) {
+        // Set alternative function #2 (USB) for PA11 and PA12.
+        self.p
+            .GPIOA
+            .afrh
+            .modify(|_, w| w.afrh11().af2().afrh12().af2());
+
         start_clock(self.p);
 
         self.p.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
@@ -70,6 +76,12 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         self.p.RCC.apb1enr.modify(|_, w| w.usben().clear_bit());
 
         stop_clock(self.p);
+
+        // Set alternative function #0 (USB) for PA11 and PA12.
+        self.p
+            .GPIOA
+            .afrh
+            .modify(|_, w| w.afrh11().af0().afrh12().af0());
     }
 
     fn enable(&self) {
