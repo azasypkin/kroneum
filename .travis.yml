@@ -7,10 +7,7 @@ os:
   - linux
   - osx
 
-cache:
-  directories:
-  - "$HOME/.cargo"
-  - "$TRAVIS_BUILD_DIR/target"
+cache: cargo
 
 addons:
   apt:
