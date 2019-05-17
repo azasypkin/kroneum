@@ -1,9 +1,9 @@
 use systick::{SysTick, SysTickHardware};
 
 /// Note durations based on `200 b/m` (beats per minute), see https://msu.edu/course/asc/232/song_project/dectalk_pages/note_to_%20ms.html.
-const EIGHTH_NOTE: u32 = 150;
-const QUARTER_DOT_NOTE: u32 = 450;
-const QUARTER_NOTE: u32 = 300;
+const EIGHTH_NOTE: u32 = 50;
+const QUARTER_DOT_NOTE: u32 = 150;
+const QUARTER_NOTE: u32 = 100;
 
 /// Note frequencies, see http://pages.mtu.edu/~suits/notefreqs.html.
 const NOTE_FREQUENCIES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988];
@@ -37,7 +37,7 @@ const ALARM_MELODY: [(u32, u32); 15] = [
 ];
 
 /// Melody to be used as beep (e.g. when setting alarm).
-const BEEP_MELODY: [(u32, u32); 1] = [(NOTE_FREQUENCIES[7], EIGHTH_NOTE)];
+const BEEP_MELODY: [(u32, u32); 1] = [(NOTE_FREQUENCIES[7], QUARTER_NOTE)];
 
 /// Melody that is played when alarm is reset.
 const RESET_MELODY: [(u32, u32); 6] = [

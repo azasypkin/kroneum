@@ -80,7 +80,7 @@ impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
         };
 
         if !button_one_state.is_none() || !button_ten_state.is_none() {
-            for i in 1u8..8u8 {
+            for i in 1u8..4u8 {
                 self.systick.delay_ms(250);
 
                 let button_one_pressed = self.hw.is_button_pressed(ButtonType::One);
@@ -90,8 +90,8 @@ impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
                 }
 
                 let (new_state, works_for_none) = match i {
-                    0...4 => (ButtonPressType::Short, true),
-                    5...8 => (ButtonPressType::Long, false),
+                    0...2 => (ButtonPressType::Short, true),
+                    3...4 => (ButtonPressType::Long, false),
                     _ => break,
                 };
 
