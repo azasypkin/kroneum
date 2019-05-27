@@ -20,6 +20,10 @@ use cortex_m::{
     Peripherals as CorePeripherals,
 };
 use cortex_m_rt::{entry, exception, ExceptionFrame};
+use ed25519_dalek::Keypair;
+use ed25519_dalek::Signature;
+use rand_core::SeedableRng;
+use sha2::Sha512;
 use stm32f0::stm32f0x2::{interrupt, Peripherals as DevicePeripherals};
 
 static KRONEUM: Mutex<RefCell<Option<Kroneum>>> = Mutex::new(RefCell::new(None));
@@ -41,6 +45,12 @@ where
 // http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
 #[entry]
 fn main() -> ! {
+    let core = rand_chacha::ChaChaCore::from_seed([123; 32]);
+    let mut block = rand_core::block::BlockRng::new(core);
+    let keypair: Keypair = Keypair::generate::<Sha512, _>(&mut block);
+    let message: &[u8] = b"This is a test of the tsunami alert system.";
+    let signature: Signature = keypair.sign::<Sha512>(message);
+    assert!(keypair.verify::<Sha512>(message, &signature).is_ok());
     free(|cs| {
         *KRONEUM.borrow(cs).borrow_mut() = Some(Kroneum::run(
             DevicePeripherals::take().expect("Can not take device peripherals"),
