@@ -1,6 +1,8 @@
 MEMORY
 {
   /* NOTE K = KiBi = 1024 bytes */
+  /* Impossible to fit into 32k because of https://github.com/dalek-cryptography/curve25519-dalek/issues/79 and
+   https://doc-internal.dalek.rs/curve25519_dalek/edwards/struct.EdwardsBasepointTable.html */
   FLASH : ORIGIN = 0x08000000, LENGTH = 128K
   RAM : ORIGIN = 0x20000000, LENGTH = 6K
 }

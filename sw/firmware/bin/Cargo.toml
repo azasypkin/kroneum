@@ -21,9 +21,9 @@ vcell = "0.1.2"
 rand_core = "0.4.0"
 rand_chacha = "0.1.1"
 
-[dev-dependencies.stm32f0]
-version = "0.8.0"
-features = ["stm32f0x2", "rt"]
+[dev-dependencies.sha3]
+version = "0.8.2"
+default-features = false
 
 [dev-dependencies.sha2]
 version = "0.8.0"
@@ -38,6 +38,10 @@ features = ["nightly"]
 version = "0.9.1"
 default-features = false
 features = ["u32_backend", "nightly"]
+
+[dev-dependencies.stm32f0]
+version = "0.8.0"
+features = ["stm32f0x2", "rt"]
 
 [dev-dependencies.stm32f0xx-hal]
 version = "0.15.1"
