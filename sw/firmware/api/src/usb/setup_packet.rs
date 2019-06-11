@@ -95,7 +95,7 @@ impl From<(u16, u16, u16, u16)> for SetupPacket {
                 0x01 => RequestRecipient::Interface,
                 0x02 => RequestRecipient::Endpoint,
                 0x03 => RequestRecipient::Other,
-                0x04...0x1f => RequestRecipient::Reserved,
+                0x04..=0x1f => RequestRecipient::Reserved,
                 _ => unreachable!(),
             },
             value,

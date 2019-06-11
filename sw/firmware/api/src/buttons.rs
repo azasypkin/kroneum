@@ -90,8 +90,8 @@ impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
                 }
 
                 let (new_state, works_for_none) = match i {
-                    0...2 => (ButtonPressType::Short, true),
-                    3...4 => (ButtonPressType::Long, false),
+                    0..=2 => (ButtonPressType::Short, true),
+                    3..=4 => (ButtonPressType::Long, false),
                     _ => break,
                 };
 
