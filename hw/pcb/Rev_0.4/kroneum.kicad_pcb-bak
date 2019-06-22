@@ -2,7 +2,7 @@
 
   (general
     (thickness 1.6)
-    (drawings 4)
+    (drawings 8)
     (tracks 165)
     (zones 0)
     (modules 23)
@@ -34,7 +34,7 @@
   )
 
   (setup
-    (last_trace_width 0.762)
+    (last_trace_width 0.25)
     (user_trace_width 0.4064)
     (user_trace_width 0.4572)
     (user_trace_width 0.508)
@@ -62,11 +62,12 @@
     (mod_edge_width 0.15)
     (mod_text_size 1 1)
     (mod_text_width 0.15)
-    (pad_size 15.6 15.6)
+    (pad_size 15.55 15.55)
     (pad_drill 0)
     (pad_to_mask_clearance 0.051)
     (solder_mask_min_width 0.25)
-    (aux_axis_origin 165 133)
+    (aux_axis_origin 166.39 132.94)
+    (grid_origin 166.39 132.94)
     (visible_elements FFFFFF7F)
     (pcbplotparams
       (layerselection 0x01000_7fffffff)
@@ -1169,7 +1170,7 @@
     )
   )
 
-  (module LINX_BAT-HLD-001:LINX_BAT-HLD-001_0 (layer F.Cu) (tedit 5D06BB6F) (tstamp 5C8FCBD5)
+  (module LINX_BAT-HLD-001:LINX_BAT-HLD-001_0 (layer F.Cu) (tedit 5D06BBC5) (tstamp 5C8FCBD5)
     (at 134.3 119.77 270)
     (descr "BATTERY HOLDER OUTLINE CR2032, CR2025 SURFACE MOUNT")
     (path /5C22C403)
@@ -1200,7 +1201,7 @@
     (pad 1 smd rect (at -11.45 0 270) (size 2.5 5.1) (layers F.Cu F.Paste F.Mask)
       (net 15 "Net-(BT1-Pad1)"))
     (pad 1 smd rect (at 11.45 0 270) (size 2.5 5.1) (layers F.Cu F.Paste F.Mask))
-    (pad 2 smd custom (at 0 0 270) (size 15.6 15.6) (layers F.Cu F.Paste F.Mask)
+    (pad 2 smd custom (at 0 0 270) (size 15.55 15.55) (layers F.Cu F.Paste F.Mask)
       (net 1 GND) (zone_connect 0)
       (options (clearance outline) (anchor circle))
       (primitives
@@ -1212,10 +1213,14 @@
     )
   )
 
-  (gr_line (start 166.4 132.95) (end 126.4 132.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C5640CE))
-  (gr_line (start 166.4 92.95) (end 166.4 132.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C7B90B5))
-  (gr_line (start 126.4 92.95) (end 166.4 92.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C47B47E))
-  (gr_line (start 126.4 132.95) (end 126.4 92.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C8FCECF))
+  (gr_arc (start 127.4 131.95) (end 126.4 131.95) (angle -89.4) (layer Edge.Cuts) (width 0.15))
+  (gr_arc (start 127.4 93.95) (end 127.4 92.95) (angle -91.8) (layer Edge.Cuts) (width 0.15))
+  (gr_arc (start 165.4 131.95) (end 165.4 132.95) (angle -90) (layer Edge.Cuts) (width 0.15))
+  (gr_arc (start 165.4 93.95) (end 165.4 92.95) (angle 90) (layer Edge.Cuts) (width 0.15))
+  (gr_line (start 165.4 132.95) (end 127.4 132.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C5640CE))
+  (gr_line (start 166.4 93.95) (end 166.4 131.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C7B90B5))
+  (gr_line (start 127.4 92.95) (end 165.4 92.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C47B47E))
+  (gr_line (start 126.4 131.95) (end 126.4 93.95) (layer Edge.Cuts) (width 0.15) (tstamp 5C8FCECF))
 
   (segment (start 129.4875 101.75) (end 129.9625 101.75) (width 0.4064) (layer F.Cu) (net 1) (tstamp 5C8FCEB4))
   (segment (start 129.785 95.62) (end 129.79 95.615) (width 0.762) (layer F.Cu) (net 1) (tstamp 5C8FCF23))
