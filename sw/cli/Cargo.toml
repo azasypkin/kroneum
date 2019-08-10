@@ -5,8 +5,8 @@ authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.32.0"
-hidapi = "0.5.0"
+clap = "2.33.0"
+hidapi = "1.0.1"
 humantime = "1.2.0"
-libusb = "0.3"
+libusb = "0.3.0"
 kroneum-api = { path="../firmware/api" }
