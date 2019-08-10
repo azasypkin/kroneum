@@ -55,8 +55,8 @@ impl<'a> BeeperHardwareImpl<'a> {
         //inactive.
         self.p
             .TIM1
-            .ccmr1_output
-            .modify(|_, w| unsafe { w.oc1m().bits(0b111) });
+            .ccmr1_output()
+            .modify(|_, w| w.oc1m().bits(0b111));
 
         // Configure capture/compare enable register.
         self.p.TIM1.ccer.modify(|_, w| {
