@@ -60,6 +60,18 @@ $ cargo run -- reset
 
 Run `cargo run -- help` for more details.
 
+**NOTE:** To use CLI tool without `root` privilege you may need to add the following `udev` rule:
+```
+/etc/udev/rules.d/50-kroneum.rules
+----------
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="deed", GROUP="users", MODE="0660"
+```
+
+And then manually force `udev` to trigger this rule:
+```bash
+# udevadm trigger
+``` 
+
 ## Prototype or DIY
 
 Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.3). PCB includes SWD, I2C and CR2032 connectors and may look a bit
