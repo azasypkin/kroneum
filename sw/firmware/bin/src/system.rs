@@ -157,7 +157,7 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
     }
 
     fn reset(&mut self) {
-        self.scb.system_reset();
+        SCB::sys_reset();
     }
 
     fn beeper(&self) -> Self::P {

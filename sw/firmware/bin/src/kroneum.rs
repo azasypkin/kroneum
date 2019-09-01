@@ -1,6 +1,6 @@
 use crate::system;
 
-use cortex_m::peripheral::{Peripherals as CorePeripherals, SCB, SYST};
+use cortex_m::peripheral::{Peripherals as CorePeripherals, NVIC, SCB, SYST};
 use stm32f0::stm32f0x2::{Interrupt, Peripherals as DevicePeripherals};
 
 use crate::system::SystemHardwareImpl;
@@ -35,12 +35,12 @@ impl Kroneum {
             core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
             core.NVIC.set_priority(Interrupt::EXTI2_3, 1);
             core.NVIC.set_priority(Interrupt::RTC, 1);
-        }
 
-        core.NVIC.enable(Interrupt::EXTI0_1);
-        core.NVIC.enable(Interrupt::EXTI2_3);
-        core.NVIC.enable(Interrupt::RTC);
-        core.NVIC.enable(Interrupt::USB);
+            NVIC::unmask(Interrupt::EXTI0_1);
+            NVIC::unmask(Interrupt::EXTI2_3);
+            NVIC::unmask(Interrupt::RTC);
+            NVIC::unmask(Interrupt::USB);
+        }
 
         kroneum
     }
