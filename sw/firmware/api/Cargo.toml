@@ -5,4 +5,4 @@ authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 categories = ["embedded", "no-std"]
 
 [dependencies]
-vcell = "0.1.0"
+vcell = "0.1.2"
