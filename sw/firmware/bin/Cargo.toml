@@ -21,6 +21,13 @@ vcell = "0.1.2"
 version = "0.8.0"
 features = ["stm32f0x2", "rt"]
 
+[dev-dependencies.stm32f0xx-hal]
+version = "0.15.1"
+features = [ "rt", "stm32f042" ]
+
+[dev-dependencies]
+panic-halt = "0.2.0"
+
 # this lets you use `cargo fix`!
 [[bin]]
 name = "kroneum-bin"
