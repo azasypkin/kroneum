@@ -72,6 +72,23 @@ And then manually force `udev` to trigger this rule:
 # udevadm trigger
 ``` 
 
+## Building custom firmware
+
+If you feel adventurous you can easily build and flash custom firmware to Kroneum. You can use `./scripts/flash.sh` script 
+from [fw](./sw/firmware) folder to build and flash default firmware or few custom [examples](./sw/firmware/bin/examples):
+
+Default firmware:
+```bash
+# Default firmware
+$ ./scripts/flash.sh 
+
+# Example: blinking through TP1/SDA pad exposed on the back side of Kroneum PCB
+$ ./script/flash.sh blinky
+
+# Example: interfacing with SSD1306 LCD via TP1/SDA and TP2/SCL pads exposed on the back side of Kroneum PCB
+$ ./script/flash i2c_ssd1306 
+``` 
+
 ## Prototype or DIY
 
 Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.5). PCB includes SWD, I2C and CR2032 connectors and may look a bit
