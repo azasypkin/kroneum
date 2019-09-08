@@ -74,14 +74,28 @@ And then manually force `udev` to trigger this rule:
 
 ## Prototype or DIY
 
-Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.3). PCB includes SWD, I2C and CR2032 connectors and may look a bit
+Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.5). PCB includes SWD, I2C and CR2032 connectors and may look a bit
 oversized because of that, but on the bright side hand soldering and [CNC engraving](./hw/pcb/Rev_0.3/cnc) was a breeze.
 
-Enclosure was machined from 7mm Plexiglas, G-Code can be found [here](./hw/pcb/Rev_0.3/cnc).
+Enclosure was machined from 5mm Plexiglas (walls and buttons) and 2mm Delrin (base and cap). G-Code can be found [here](./hw/enclosure/Rev_0.5/cnc).
 
-#### Rendered vs machined [PCB](./hw/pcb/Rev_0.3/demo) and [enclosure](./hw/enclosure/Rev_0.3/demo):
+See [PCB](./hw/pcb/Rev_0.5/demo) and [enclosure](./hw/enclosure/Rev_0.5/demo) renders and photos of how it turned in real:
 
-![enclosure](./hw/enclosure/Rev_0.3/demo/full.png)
+#### PCB (rendered)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-render.png)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back-render.png)
+
+#### PCB (real)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb.png)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back.png)
+
+#### Enclosure (rendered)
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-render.png)
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-open-render.png)
+
+#### Enclosure (real)
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure.png)
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-open.png)
 
 -.- .-. --- -. . ..- --
 
