@@ -531,12 +531,56 @@ Text GLabel 2300 2850 1    50   Input ~ 0
 SCL
 Text GLabel 2400 2850 1    50   Input ~ 0
 SDA
+$Comp
+L Connector:TestPoint SDA
+U 1 1 5C6F2C19
+P 3750 2350
+F 0 "SDA" H 3700 2550 50  0000 L CNN
+F 1 "TestPoint" H 3600 2650 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 3950 2350 50  0001 C CNN
+F 3 "~" H 3950 2350 50  0001 C CNN
+	1    3750 2350
+	1    0    0    -1  
+$EndComp
 Text GLabel 3750 2350 3    50   Input ~ 0
 SDA
+$Comp
+L Connector:TestPoint SCL
+U 1 1 5C6F8355
+P 4150 2350
+F 0 "SCL" H 4100 2550 50  0000 L CNN
+F 1 "TestPoint" H 4000 2650 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4350 2350 50  0001 C CNN
+F 3 "~" H 4350 2350 50  0001 C CNN
+	1    4150 2350
+	1    0    0    -1  
+$EndComp
 Text GLabel 4150 2350 3    50   Input ~ 0
 SCL
+$Comp
+L Connector:TestPoint SWCLK
+U 1 1 5C6F8CE1
+P 4550 2350
+F 0 "SWCLK" H 4450 2550 50  0000 L CNN
+F 1 "TestPoint" H 4400 2650 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4750 2350 50  0001 C CNN
+F 3 "~" H 4750 2350 50  0001 C CNN
+	1    4550 2350
+	1    0    0    -1  
+$EndComp
 Text GLabel 4550 2350 3    50   Input ~ 0
 SWCLK
+$Comp
+L Connector:TestPoint SWDIO
+U 1 1 5C6F9685
+P 4950 2350
+F 0 "SWDIO" H 4850 2550 50  0000 L CNN
+F 1 "TestPoint" H 4800 2650 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5150 2350 50  0001 C CNN
+F 3 "~" H 5150 2350 50  0001 C CNN
+	1    4950 2350
+	1    0    0    -1  
+$EndComp
 Text GLabel 4950 2350 3    50   Input ~ 0
 SWDIO
 Wire Wire Line
@@ -561,48 +605,4 @@ Wire Wire Line
 	4200 4650 4200 5150
 Wire Wire Line
 	4200 4650 4500 4650
-$Comp
-L Connector:TestPoint TP4
-U 1 1 5C6F9685
-P 4950 2350
-F 0 "TP4" H 4900 2550 50  0000 L CNN
-F 1 "TestPoint" H 4800 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5150 2350 50  0001 C CNN
-F 3 "~" H 5150 2350 50  0001 C CNN
-	1    4950 2350
-	1    0    0    -1  
-$EndComp
-$Comp
-L Connector:TestPoint TP3
-U 1 1 5C6F8CE1
-P 4550 2350
-F 0 "TP3" H 4500 2550 50  0000 L CNN
-F 1 "TestPoint" H 4400 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4750 2350 50  0001 C CNN
-F 3 "~" H 4750 2350 50  0001 C CNN
-	1    4550 2350
-	1    0    0    -1  
-$EndComp
-$Comp
-L Connector:TestPoint TP2
-U 1 1 5C6F8355
-P 4150 2350
-F 0 "TP2" H 4100 2550 50  0000 L CNN
-F 1 "TestPoint" H 4000 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4350 2350 50  0001 C CNN
-F 3 "~" H 4350 2350 50  0001 C CNN
-	1    4150 2350
-	1    0    0    -1  
-$EndComp
-$Comp
-L Connector:TestPoint TP1
-U 1 1 5C6F2C19
-P 3750 2350
-F 0 "TP1" H 3700 2550 50  0000 L CNN
-F 1 "TestPoint" H 3600 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 3950 2350 50  0001 C CNN
-F 3 "~" H 3950 2350 50  0001 C CNN
-	1    3750 2350
-	1    0    0    -1  
-$EndComp
 $EndSCHEMATC
