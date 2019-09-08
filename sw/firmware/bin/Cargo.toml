@@ -27,6 +27,11 @@ features = [ "rt", "stm32f042" ]
 
 [dev-dependencies]
 panic-halt = "0.2.0"
+ssd1306 = "0.3.0-alpha.1"
+
+[dev-dependencies.embedded-graphics]
+version = "0.6.0-alpha.2"
+features = ["bmp"]
 
 # this lets you use `cargo fix`!
 [[bin]]

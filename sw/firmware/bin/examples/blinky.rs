@@ -3,32 +3,30 @@
 
 extern crate panic_halt;
 
-use stm32f0xx_hal as hal;
-use crate::hal::{prelude::*, stm32};
+use crate::hal::{delay::Delay, prelude::*, stm32};
+use cortex_m::peripheral::Peripherals;
 use cortex_m_rt::entry;
+use stm32f0xx_hal as hal;
 
 #[entry]
 fn main() -> ! {
-    if let Some(mut p) = stm32::Peripherals::take() {
-        let mut led = cortex_m::interrupt::free(|cs| {
+    if let (Some(mut p), Some(cp)) = (stm32::Peripherals::take(), Peripherals::take()) {
+        cortex_m::interrupt::free(move |cs| {
             let mut rcc = p.RCC.configure().sysclk(8.mhz()).freeze(&mut p.FLASH);
 
-            let gpiof = p.GPIOF.split(&mut rcc);
+            let gpio = p.GPIOF.split(&mut rcc);
 
             // (Re-)configure PF0 as output
-            gpiof.pf0.into_push_pull_output(cs)
-        });
+            let mut led = gpio.pf0.into_push_pull_output(cs);
 
-        loop {
-            // Turn PF0 on 10000 times in a row
-            for _ in 0..1_000_0 {
-                led.set_high();
+            // Get delay provider
+            let mut delay = Delay::new(cp.SYST, &rcc);
+
+            loop {
+                led.toggle();
+                delay.delay_ms(1_000_u16);
             }
-            // Then turn PF0 off 10000 times in a row
-            for _ in 0..1_000_0 {
-                led.set_low();
-            }
-        }
+        });
     }
 
     loop {
