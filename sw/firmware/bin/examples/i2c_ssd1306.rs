@@ -10,6 +10,7 @@ use cortex_m_rt::entry;
 use embedded_graphics::fonts::Font6x8;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
+use embedded_graphics::primitives::Line;
 use embedded_graphics::Drawing;
 use ssd1306::prelude::*;
 use ssd1306::Builder;
@@ -40,10 +41,10 @@ fn main() -> ! {
                     .stroke(Some(BinaryColor::On))
                     .into_iter(),
             );
+
             disp.draw(
-                Font6x8::render_str("Hello Rust!")
+                Line::new(Point::new(0, 16), Point::new(16, 16))
                     .stroke(Some(BinaryColor::On))
-                    .translate(Point::new(0, 16))
                     .into_iter(),
             );
 
