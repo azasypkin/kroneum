@@ -31,6 +31,7 @@ $ sudo udevadm trigger
 $ cargo build
 $ cargo build --target=thumbv6m-none-eabi
 $ cargo build --target=thumbv6m-none-eabi --release
+$ cargo +nightly build --target=thumbv6m-none-eabi --release --features nightly
 ```
 2. Run `openocd -f openocd.cfg`
 3. In another terminal run `arm-none-eabi-gdb  -x openocd.gdb target/thumbv6m-none-eabi/release/kroneum-bin`
@@ -69,7 +70,7 @@ $ dfu-util -U fw-from-device.bin -a 0 -d 0483:df11
 
 ## Notes
 
-1. Steps 1-2 above can be replaced with just `$ ./scripts/flash.sh`.
+1. Steps 1-3 above can be replaced with just `$ ./scripts/flash.sh`.
 
 2. If binary is too large GDB may fail so try to use `--release` flag with `cargo build`.
 

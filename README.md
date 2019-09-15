@@ -89,6 +89,8 @@ $ ./script/flash.sh blinky
 $ ./script/flash i2c_ssd1306 
 ``` 
 
+The `flash.sh` script is essentially consequent calls of `cargo build --release ...`, `cargo objcopy --release ...` and `dfu-util ...`.
+
 ## Prototype or DIY
 
 Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.5). PCB includes SWD, I2C and CR2032 connectors and may look a bit

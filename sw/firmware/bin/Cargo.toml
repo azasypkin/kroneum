@@ -10,12 +10,15 @@ license = "MIT"
 repository = "https://github.com/azasypkin/kroneum"
 
 [dependencies]
-cortex-m = "0.6.1"
 cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.5"
 kroneum-api = { version = "0.1.0", path = "../api" }
 panic-semihosting = "0.5.2"
 vcell = "0.1.2"
+
+[dependencies.cortex-m]
+version = "0.6.1"
+features = ["const-fn"]
 
 [dependencies.stm32f0]
 version = "0.8.0"
@@ -23,7 +26,7 @@ features = ["stm32f0x2", "rt"]
 
 [dev-dependencies.stm32f0xx-hal]
 version = "0.15.1"
-features = [ "rt", "stm32f042" ]
+features = ["stm32f042", "rt"]
 
 [dev-dependencies]
 panic-halt = "0.2.0"
@@ -40,5 +43,4 @@ test = false
 bench = false
 
 [features]
-default = ["nightly"]
-nightly = ["cortex-m/inline-asm", "cortex-m/const-fn"]
+nightly = ["cortex-m/inline-asm"]
