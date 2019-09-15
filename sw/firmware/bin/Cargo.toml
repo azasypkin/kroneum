@@ -18,8 +18,16 @@ panic-semihosting = "0.5.2"
 vcell = "0.1.2"
 
 [dev-dependencies]
-rand_core = "0.4.0"
-rand_chacha = "0.1.1"
+panic-halt = "0.2.0"
+ssd1306 = "0.3.0-alpha.1"
+
+[dev-dependencies.rand_core]
+version = "0.5.1"
+default-features = false
+
+[dev-dependencies.rand_chacha]
+version = "0.1.1"
+default-features = false
 
 [dev-dependencies.sha3]
 version = "0.8.2"
@@ -46,10 +54,6 @@ features = ["stm32f0x2", "rt"]
 [dev-dependencies.stm32f0xx-hal]
 version = "0.15.1"
 features = [ "rt", "stm32f042" ]
-
-[dev-dependencies]
-panic-halt = "0.2.0"
-ssd1306 = "0.3.0-alpha.1"
 
 [dev-dependencies.embedded-graphics]
 version = "0.6.0-alpha.2"
