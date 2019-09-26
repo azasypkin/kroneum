@@ -203,7 +203,7 @@ F 3 "~" V 7275 4450 50  0001 C CNN
 	1    7300 4350
 	1    0    0    -1  
 $EndComp
-Text GLabel 2400 4050 3    50   Input ~ 0
+Text GLabel 2100 2850 1    50   Input ~ 0
 Buzzer
 Text GLabel 2300 4050 3    50   Input ~ 0
 USB_D-
@@ -249,12 +249,6 @@ Text GLabel 3100 4050 3    50   Input ~ 0
 Ctrl_One
 Text GLabel 2900 4050 3    50   Input ~ 0
 Ctrl_Ten
-NoConn ~ 2500 4050
-NoConn ~ 2600 4050
-NoConn ~ 3000 4050
-NoConn ~ 2800 4050
-NoConn ~ 2700 4050
-NoConn ~ 2100 2850
 $Comp
 L Device:C C8
 U 1 1 5C20FD6A
@@ -401,7 +395,7 @@ F 1 "BAT54C" V 5355 4388 50  0000 L CNN
 F 2 "Package_TO_SOT_SMD:SOT-23" H 5475 4425 50  0001 L CNN
 F 3 "http://www.diodes.com/_files/datasheets/ds11005.pdf" H 5320 4300 50  0001 C CNN
 	1    5400 4300
-	0    -1   -1   0   
+	0    -1   1    0   
 $EndComp
 Wire Wire Line
 	5700 4150 5700 4300
@@ -531,13 +525,13 @@ Text GLabel 2300 2850 1    50   Input ~ 0
 SCL
 Text GLabel 2400 2850 1    50   Input ~ 0
 SDA
-Text GLabel 3650 2350 3    50   Input ~ 0
+Text GLabel 3950 1850 3    50   Input ~ 0
 SDA
-Text GLabel 4200 2350 3    50   Input ~ 0
+Text GLabel 4500 1850 3    50   Input ~ 0
 SCL
-Text GLabel 4700 2350 3    50   Input ~ 0
+Text GLabel 5000 1850 3    50   Input ~ 0
 SWCLK
-Text GLabel 5200 2350 3    50   Input ~ 0
+Text GLabel 5500 1850 3    50   Input ~ 0
 SWDIO
 Wire Wire Line
 	7350 2700 7450 2700
@@ -564,71 +558,161 @@ Wire Wire Line
 $Comp
 L Connector:TestPoint SWDIO1
 U 1 1 5C6F9685
-P 5200 2350
-F 0 "SWDIO1" H 5100 2550 50  0000 L CNN
-F 1 "Peripherals" H 5000 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5400 2350 50  0001 C CNN
-F 3 "~" H 5400 2350 50  0001 C CNN
-	1    5200 2350
+P 5500 1850
+F 0 "SWDIO1" H 5400 2050 50  0000 L CNN
+F 1 "Peripherals" H 5300 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5700 1850 50  0001 C CNN
+F 3 "~" H 5700 1850 50  0001 C CNN
+	1    5500 1850
 	1    0    0    -1  
 $EndComp
 $Comp
 L Connector:TestPoint SWCLK1
 U 1 1 5C6F8CE1
-P 4700 2350
-F 0 "SWCLK1" H 4550 2550 50  0000 L CNN
-F 1 "Peripherals" H 4500 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4900 2350 50  0001 C CNN
-F 3 "~" H 4900 2350 50  0001 C CNN
-	1    4700 2350
+P 5000 1850
+F 0 "SWCLK1" H 4850 2050 50  0000 L CNN
+F 1 "Peripherals" H 4800 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5200 1850 50  0001 C CNN
+F 3 "~" H 5200 1850 50  0001 C CNN
+	1    5000 1850
 	1    0    0    -1  
 $EndComp
 $Comp
 L Connector:TestPoint SCL1
 U 1 1 5C6F8355
-P 4200 2350
-F 0 "SCL1" H 4150 2550 50  0000 L CNN
-F 1 "Peripherals" H 4000 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4400 2350 50  0001 C CNN
-F 3 "~" H 4400 2350 50  0001 C CNN
-	1    4200 2350
+P 4500 1850
+F 0 "SCL1" H 4450 2050 50  0000 L CNN
+F 1 "Peripherals" H 4300 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4700 1850 50  0001 C CNN
+F 3 "~" H 4700 1850 50  0001 C CNN
+	1    4500 1850
 	1    0    0    -1  
 $EndComp
 $Comp
 L Connector:TestPoint SDA1
 U 1 1 5C6F2C19
-P 3650 2350
-F 0 "SDA1" H 3600 2550 50  0000 L CNN
-F 1 "Peripherals" H 3500 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 3850 2350 50  0001 C CNN
-F 3 "~" H 3850 2350 50  0001 C CNN
-	1    3650 2350
+P 3950 1850
+F 0 "SDA1" H 3900 2050 50  0000 L CNN
+F 1 "Peripherals" H 3800 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4150 1850 50  0001 C CNN
+F 3 "~" H 4150 1850 50  0001 C CNN
+	1    3950 1850
 	1    0    0    -1  
 $EndComp
-Text GLabel 5700 2350 3    50   Input ~ 0
+Text GLabel 6000 1850 3    50   Input ~ 0
 GND
 $Comp
 L Connector:TestPoint GND1
 U 1 1 5D81E1ED
-P 5700 2350
-F 0 "GND1" H 5600 2550 50  0000 L CNN
-F 1 "Peripherals" H 5500 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5900 2350 50  0001 C CNN
-F 3 "~" H 5900 2350 50  0001 C CNN
-	1    5700 2350
+P 6000 1850
+F 0 "GND1" H 5900 2050 50  0000 L CNN
+F 1 "Peripherals" H 5800 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 6200 1850 50  0001 C CNN
+F 3 "~" H 6200 1850 50  0001 C CNN
+	1    6000 1850
 	1    0    0    -1  
 $EndComp
-Text GLabel 6200 2350 3    50   Input ~ 0
+Text GLabel 6500 1850 3    50   Input ~ 0
 VDD
 $Comp
 L Connector:TestPoint VDD1
 U 1 1 5D81EFFF
-P 6200 2350
-F 0 "VDD1" H 6100 2550 50  0000 L CNN
-F 1 "Peripherals" H 6000 2650 50  0000 L CNN
-F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 6400 2350 50  0001 C CNN
-F 3 "~" H 6400 2350 50  0001 C CNN
-	1    6200 2350
+P 6500 1850
+F 0 "VDD1" H 6400 2050 50  0000 L CNN
+F 1 "Peripherals" H 6300 2150 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 6700 1850 50  0001 C CNN
+F 3 "~" H 6700 1850 50  0001 C CNN
+	1    6500 1850
+	1    0    0    -1  
+$EndComp
+Text GLabel 2400 4050 3    50   Input ~ 0
+MOSI
+Text GLabel 2500 4050 3    50   Input ~ 0
+MISO
+Text GLabel 2600 4050 3    50   Input ~ 0
+SCK
+Text GLabel 2700 4050 3    50   Input ~ 0
+NSS
+Text GLabel 2800 4050 3    50   Input ~ 0
+ADC3
+Text GLabel 3000 4050 3    50   Input ~ 0
+ADC1
+Text GLabel 3950 2650 3    50   Input ~ 0
+MOSI
+Text GLabel 4500 2650 3    50   Input ~ 0
+MISO
+Text GLabel 5000 2650 3    50   Input ~ 0
+SCK
+Text GLabel 5500 2650 3    50   Input ~ 0
+NSS
+$Comp
+L Connector:TestPoint NSS1
+U 1 1 5D94D78C
+P 5500 2650
+F 0 "NSS1" H 5400 2850 50  0000 L CNN
+F 1 "Peripherals" H 5300 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5700 2650 50  0001 C CNN
+F 3 "~" H 5700 2650 50  0001 C CNN
+	1    5500 2650
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:TestPoint SCK1
+U 1 1 5D94D792
+P 5000 2650
+F 0 "SCK1" H 4850 2850 50  0000 L CNN
+F 1 "Peripherals" H 4800 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 5200 2650 50  0001 C CNN
+F 3 "~" H 5200 2650 50  0001 C CNN
+	1    5000 2650
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:TestPoint MISO1
+U 1 1 5D94D798
+P 4500 2650
+F 0 "MISO1" H 4450 2850 50  0000 L CNN
+F 1 "Peripherals" H 4300 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4700 2650 50  0001 C CNN
+F 3 "~" H 4700 2650 50  0001 C CNN
+	1    4500 2650
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:TestPoint MOSI1
+U 1 1 5D94D79E
+P 3950 2650
+F 0 "MOSI1" H 3900 2850 50  0000 L CNN
+F 1 "Peripherals" H 3800 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 4150 2650 50  0001 C CNN
+F 3 "~" H 4150 2650 50  0001 C CNN
+	1    3950 2650
+	1    0    0    -1  
+$EndComp
+Text GLabel 6000 2650 3    50   Input ~ 0
+ADC1
+$Comp
+L Connector:TestPoint ADC1
+U 1 1 5D94D7A5
+P 6000 2650
+F 0 "ADC1" H 5900 2850 50  0000 L CNN
+F 1 "Peripherals" H 5800 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 6200 2650 50  0001 C CNN
+F 3 "~" H 6200 2650 50  0001 C CNN
+	1    6000 2650
+	1    0    0    -1  
+$EndComp
+Text GLabel 6500 2650 3    50   Input ~ 0
+ADC3
+$Comp
+L Connector:TestPoint ADC3
+U 1 1 5D94D7AC
+P 6500 2650
+F 0 "ADC3" H 6400 2850 50  0000 L CNN
+F 1 "Peripherals" H 6300 2950 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_2.0x2.0mm_Drill1.0mm" H 6700 2650 50  0001 C CNN
+F 3 "~" H 6700 2650 50  0001 C CNN
+	1    6500 2650
 	1    0    0    -1  
 $EndComp
 $EndSCHEMATC
