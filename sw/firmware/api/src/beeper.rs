@@ -1,12 +1,58 @@
 use systick::{SysTick, SysTickHardware};
 
 /// Note durations based on `200 b/m` (beats per minute), see https://msu.edu/course/asc/232/song_project/dectalk_pages/note_to_%20ms.html.
-const EIGHTH_NOTE: u32 = 50;
-const QUARTER_DOT_NOTE: u32 = 150;
-const QUARTER_NOTE: u32 = 100;
+const BEATS_PER_MINUTE_BASE: u32 = 50;
+const NOTE_1_8_DURATION: u32 = BEATS_PER_MINUTE_BASE;
+const NOTE_1_4_DURATION: u32 = BEATS_PER_MINUTE_BASE * 2;
+const NOTE_3_8_DURATION: u32 = BEATS_PER_MINUTE_BASE * 3;
+const NOTE_1_2_DURATION: u32 = BEATS_PER_MINUTE_BASE * 4;
 
-/// Note frequencies, see http://pages.mtu.edu/~suits/notefreqs.html.
-const NOTE_FREQUENCIES: [u32; 12] = [523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988];
+const ROOT: f32 = 1.059_463_1;
+
+#[allow(dead_code)]
+enum Note {
+    C(u8),
+    CSharp(u8),
+    D(u8),
+    DSharp(u8),
+    E(u8),
+    F(u8),
+    FSharp(u8),
+    G(u8),
+    GSharp(u8),
+    A(u8),
+    ASharp(u8),
+    B(u8),
+    Silence,
+}
+
+impl Note {
+    /// Note frequencies, see http://pages.mtu.edu/~suits/notefreqs.html.
+    /// https://pages.mtu.edu/~suits/NoteFreqCalcs.html
+    fn calculate_frequency(n: u8, order: i8) -> u32 {
+        let power = (n as i8 - 4) * 12 - order;
+        let root_power =  libm::powf(ROOT, power.into());
+        libm::roundf(440_f32 * root_power) as u32
+    }
+
+    pub fn frequency(&self) -> u32 {
+        match self {
+            Note::C(n) => Note::calculate_frequency(*n, 9),
+            Note::CSharp(n) => Note::calculate_frequency(*n, 8),
+            Note::D(n) => Note::calculate_frequency(*n, 7),
+            Note::DSharp(n) => Note::calculate_frequency(*n, 6),
+            Note::E(n) => Note::calculate_frequency(*n, 5),
+            Note::F(n) => Note::calculate_frequency(*n, 4),
+            Note::FSharp(n) => Note::calculate_frequency(*n, 3),
+            Note::G(n) => Note::calculate_frequency(*n, 2),
+            Note::GSharp(n) => Note::calculate_frequency(*n, 1),
+            Note::A(n) => Note::calculate_frequency(*n, 0),
+            Note::ASharp(n) => Note::calculate_frequency(*n, -1),
+            Note::B(n) => Note::calculate_frequency(*n, -2),
+            Note::Silence => 0,
+        }
+    }
+}
 
 /// Defines a predefined melody to play.
 #[derive(Debug, Copy, Clone)]
@@ -18,41 +64,50 @@ pub enum Melody {
 }
 
 /// Melody that is being played when alarm triggers.
-const ALARM_MELODY: [(u32, u32); 15] = [
-    (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
-    (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
-    (NOTE_FREQUENCIES[8], QUARTER_NOTE),     // A
-    (NOTE_FREQUENCIES[10], QUARTER_NOTE),    // B
-    (NOTE_FREQUENCIES[10], QUARTER_NOTE),    // B
-    (NOTE_FREQUENCIES[8], QUARTER_NOTE),     // A
-    (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
-    (NOTE_FREQUENCIES[5], QUARTER_NOTE),     // F
-    (NOTE_FREQUENCIES[3], QUARTER_NOTE),     // D#
-    (NOTE_FREQUENCIES[3], QUARTER_NOTE),     // E
-    (NOTE_FREQUENCIES[5], QUARTER_NOTE),     // F
-    (NOTE_FREQUENCIES[7], QUARTER_NOTE),     // G
-    (NOTE_FREQUENCIES[7], QUARTER_DOT_NOTE), // G.
-    (NOTE_FREQUENCIES[5], EIGHTH_NOTE),      // F
-    (NOTE_FREQUENCIES[5], QUARTER_DOT_NOTE),
+const ALARM_MELODY: [(Note, u32); 24] = [
+    (Note::B(7), NOTE_1_4_DURATION),
+    (Note::GSharp(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_2_DURATION),
+    (Note::GSharp(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_4_DURATION),
+    (Note::FSharp(7), NOTE_1_2_DURATION),
+    (Note::DSharp(7), NOTE_1_4_DURATION),
+    (Note::FSharp(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_2_DURATION),
+    (Note::Silence, NOTE_1_2_DURATION),
+    (Note::DSharp(7), NOTE_1_2_DURATION),
+    (Note::FSharp(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_4_DURATION),
+    (Note::F(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_4_DURATION),
+    (Note::F(7), NOTE_1_4_DURATION),
+    (Note::DSharp(7), NOTE_1_4_DURATION),
+    (Note::D(7), NOTE_1_4_DURATION),
+    (Note::F(7), NOTE_1_4_DURATION),
+    (Note::CSharp(7), NOTE_1_4_DURATION),
+    (Note::F(7), NOTE_1_4_DURATION),
+    (Note::FSharp(7), NOTE_1_2_DURATION),
+    (Note::DSharp(7), NOTE_1_2_DURATION),
+    (Note::Silence, NOTE_1_2_DURATION),
 ];
 
 /// Melody to be used as beep (e.g. when setting alarm).
-const BEEP_MELODY: [(u32, u32); 1] = [(NOTE_FREQUENCIES[7], QUARTER_NOTE)];
+const BEEP_MELODY: [(Note, u32); 1] = [(Note::G(5), NOTE_1_4_DURATION)];
 
 /// Melody that is played when alarm is reset.
-const RESET_MELODY: [(u32, u32); 6] = [
-    (NOTE_FREQUENCIES[5], QUARTER_NOTE),     // F
-    (NOTE_FREQUENCIES[5], EIGHTH_NOTE),      // F
-    (NOTE_FREQUENCIES[7], QUARTER_DOT_NOTE), // G.
-    (NOTE_FREQUENCIES[5], QUARTER_NOTE),     // F
-    (NOTE_FREQUENCIES[5], EIGHTH_NOTE),      // F
-    (NOTE_FREQUENCIES[7], QUARTER_DOT_NOTE), // G.
+const RESET_MELODY: [(Note, u32); 6] = [
+    (Note::F(5), NOTE_1_4_DURATION),
+    (Note::F(5), NOTE_1_8_DURATION),
+    (Note::G(5), NOTE_3_8_DURATION),
+    (Note::F(5), NOTE_1_4_DURATION),
+    (Note::F(5), NOTE_1_8_DURATION),
+    (Note::G(5), NOTE_3_8_DURATION),
 ];
 
 /// Melody that is played when user enters setup mode.
-const SETUP_MELODY: [(u32, u32); 2] = [
-    (NOTE_FREQUENCIES[3], QUARTER_NOTE), // D#
-    (NOTE_FREQUENCIES[3], QUARTER_NOTE), // E
+const SETUP_MELODY: [(Note, u32); 2] = [
+    (Note::DSharp(5), NOTE_1_4_DURATION),
+    (Note::DSharp(5), NOTE_1_4_DURATION),
 ];
 
 /// Describes the Beeper hardware management interface.
@@ -78,15 +133,15 @@ impl<'a, T: PWMBeeperHardware, S: SysTickHardware> PWMBeeper<'a, T, S> {
     pub fn play(&mut self, melody: Melody) {
         self.hw.toggle_pwm(true);
 
-        let notes: &[(u32, u32)] = match melody {
+        let notes: &[(Note, u32)] = match melody {
             Melody::Alarm => &ALARM_MELODY,
             Melody::Beep => &BEEP_MELODY,
             Melody::Reset => &RESET_MELODY,
             Melody::Setup => &SETUP_MELODY,
         };
 
-        notes.iter().for_each(|(frequency, delay)| {
-            self.hw.pulse(*frequency);
+        notes.iter().for_each(|(note, delay)| {
+            self.hw.pulse(note.frequency());
             self.systick.delay_ms(*delay);
         });
 
@@ -175,7 +230,7 @@ mod tests {
         assert_eq!(
             [
                 Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(BEEP_MELODY[0].0), 1)),
+                Some((Call::Pulse(BEEP_MELODY[0].0.frequency()), 1)),
                 // Delay (order 2)
                 Some((Call::DisablePWM, 3))
             ],
@@ -206,17 +261,17 @@ mod tests {
         assert_eq!(
             [
                 Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(BEEP_MELODY[0].0), 1)),
+                Some((Call::Pulse(BEEP_MELODY[0].0.frequency()), 1)),
                 // Delay (2)
                 Some((Call::DisablePWM, 3)),
                 // Delay 100ms (4)
                 Some((Call::EnablePWM, 5)),
-                Some((Call::Pulse(BEEP_MELODY[0].0), 6)),
+                Some((Call::Pulse(BEEP_MELODY[0].0.frequency()), 6)),
                 // Delay (7)
                 Some((Call::DisablePWM, 8)),
                 // Delay 100ms (9)
                 Some((Call::EnablePWM, 10)),
-                Some((Call::Pulse(BEEP_MELODY[0].0), 11)),
+                Some((Call::Pulse(BEEP_MELODY[0].0.frequency()), 11)),
                 // Delay (12)
                 Some((Call::DisablePWM, 13))
             ],
@@ -244,13 +299,23 @@ mod tests {
         assert_eq!(
             [
                 Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(SETUP_MELODY[0].0), 1)),
+                Some((Call::Pulse(SETUP_MELODY[0].0.frequency()), 1)),
                 // Delay (2)
-                Some((Call::Pulse(SETUP_MELODY[1].0), 3)),
+                Some((Call::Pulse(SETUP_MELODY[1].0.frequency()), 3)),
                 // Delay (4)
                 Some((Call::DisablePWM, 5))
             ],
             beeper_mock.calls.ordered_logs(),
         );
+    }
+
+    #[test]
+    fn properly_calculates_notes_frequency() {
+        assert_eq!(Note::C(0).frequency(), 16);
+        assert_eq!(Note::E(3).frequency(), 165);
+        assert_eq!(Note::A(4).frequency(), 440);
+        assert_eq!(Note::C(5).frequency(), 523);
+        assert_eq!(Note::DSharp(7).frequency(), 2489);
+        assert_eq!(Note::B(7).frequency(), 3951);
     }
 }

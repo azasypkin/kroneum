@@ -5,4 +5,5 @@ authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 categories = ["embedded", "no-std"]
 
 [dependencies]
+libm = "0.1.4"
 vcell = "0.1.2"

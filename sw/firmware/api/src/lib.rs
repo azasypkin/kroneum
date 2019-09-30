@@ -2,6 +2,8 @@
 #![deny(warnings)]
 #![no_std]
 
+extern crate libm;
+
 pub mod beeper;
 pub mod buttons;
 pub mod config;

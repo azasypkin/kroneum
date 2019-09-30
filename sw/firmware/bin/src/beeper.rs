@@ -25,10 +25,13 @@ impl<'a> PWMBeeperHardware for BeeperHardwareImpl<'a> {
     }
 
     fn pulse(&self, note_frequency: u32) {
-        self.p
-            .TIM1
-            .arr
-            .write(|w| unsafe { w.bits((config::CLOCK_SPEED / note_frequency) - 1) });
+        let frequency = if note_frequency == 0 || note_frequency > config::CLOCK_SPEED {
+            0
+        } else {
+            (config::CLOCK_SPEED / note_frequency) - 1
+        };
+
+        self.p.TIM1.arr.write(|w| unsafe { w.bits(frequency) });
     }
 }
 

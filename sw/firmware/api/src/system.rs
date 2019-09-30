@@ -91,6 +91,7 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
     pub fn handle_alarm(&mut self) {
         if let SystemMode::Alarm(_, melody) = self.state.mode {
             self.beeper().play(melody);
+            self.beeper().play(melody);
 
             self.rtc().teardown();
 
