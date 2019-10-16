@@ -31,7 +31,7 @@ impl Note {
     /// https://pages.mtu.edu/~suits/NoteFreqCalcs.html
     fn calculate_frequency(n: u8, order: i8) -> u32 {
         let power = (n as i8 - 4) * 12 - order;
-        let root_power =  libm::powf(ROOT, power.into());
+        let root_power = libm::powf(ROOT, power.into());
         libm::roundf(440_f32 * root_power) as u32
     }
 

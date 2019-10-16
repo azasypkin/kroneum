@@ -58,22 +58,22 @@ impl<'a> BeeperHardwareImpl<'a> {
         //inactive.
         self.p
             .TIM1
-            .ccmr1_output()
-            .modify(|_, w| w.oc1m().bits(0b111));
+            .ccmr2_output()
+            .modify(|_, w| w.oc3m().bits(0b111));
 
         // Configure capture/compare enable register.
         self.p.TIM1.ccer.modify(|_, w| {
             // Enable Capture/Compare 1 output.
-            w.cc1e()
+            w.cc3e()
                 .set_bit()
                 // Enable Capture/Compare 1 complementary output.
-                .cc1ne()
+                .cc3ne()
                 .set_bit()
                 // Set low polarity for Capture/Compare 1 output.
-                .cc1p()
+                .cc3p()
                 .set_bit()
                 // Set high polarity for Capture/Compare complementary 1 output.
-                .cc1np()
+                .cc3np()
                 .clear_bit()
         });
 
@@ -82,13 +82,13 @@ impl<'a> BeeperHardwareImpl<'a> {
         let channel_one_pulse: u32 = (5 * (timer_period - 1)) / 10;
         self.p
             .TIM1
-            .ccr1
+            .ccr3
             .write(|w| unsafe { w.bits(channel_one_pulse) });
 
         // Configure control register 2.
         self.p.TIM1.cr2.modify(|_, w| {
             // Set output Idle state 1 (OC1 output and OC1N output).
-            w.ois1().set_bit().ois1n().clear_bit()
+            w.ois3().set_bit().ois3n().clear_bit()
         });
 
         // Enable counter.

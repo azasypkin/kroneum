@@ -77,8 +77,8 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .ahbenr
             .modify(|_, w| w.iopaen().set_bit().iopben().set_bit().iopfen().set_bit());
 
-        // Switch PA0 (button), PA2 (button), PA7 (beeper), PA11 and PA12 (usb) to alternate function
-        // mode and PA1, PA3-6 to AIN to reduce power consumption.
+        // Switch PA0 (button), PA11 and PA12 (usb) to alternate function mode and
+        // PA1, PA3-7 to AIN to reduce power consumption.
         self.p.GPIOA.moder.modify(|_, w| {
             w.moder0()
                 .alternate()
@@ -95,7 +95,7 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
                 .moder6()
                 .analog()
                 .moder7()
-                .alternate()
+                .analog()
                 .moder9()
                 .analog()
                 .moder10()
@@ -110,20 +110,19 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
                 .analog()
         });
 
-        // Enable AIN for GPIO B and F to reduce power consumption.
+        // Switch PB1 (beeper) to alternate function mode and PB8 to AIN to reduce power consumption.
         self.p
             .GPIOB
             .moder
-            .modify(|_, w| w.moder1().analog().moder8().analog());
+            .modify(|_, w| w.moder1().alternate().moder8().analog());
+
+        // Enable AIN for GPIO F to reduce power consumption.
         self.p
             .GPIOF
             .moder
             .modify(|_, w| w.moder0().analog().moder1().analog());
 
-        self.p
-            .RCC
-            .ahbenr
-            .modify(|_, w| w.iopben().clear_bit().iopfen().clear_bit());
+        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().clear_bit());
 
         // Enable pull-down for PA0 and PA2.
         self.p
@@ -131,21 +130,28 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .pupdr
             .modify(|_, w| w.pupdr0().pull_down().pupdr2().pull_down());
 
-        // Set "high" output speed for PA7, PA11 and PA12.
+        // Set "high" output speed for PA11 and PA12.
         self.p.GPIOA.ospeedr.modify(|_, w| {
-            w.ospeedr7()
-                .very_high_speed()
-                .ospeedr11()
+            w.ospeedr11()
                 .very_high_speed()
                 .ospeedr12()
                 .very_high_speed()
         });
 
-        // Set alternative function #2 for PA0 (WKUP1), PA2 (WKUP4) and PA7 (TIM1_CH1N).
+        // Set "high" output speed for PB1.
+        self.p
+            .GPIOB
+            .ospeedr
+            .modify(|_, w| w.ospeedr1().very_high_speed());
+
+        // Set alternative function #2 for PA0 (WKUP1) and PA2 (WKUP4).
         self.p
             .GPIOA
             .afrl
-            .modify(|_, w| w.afrl0().af2().afrl2().af2().afrl7().af2());
+            .modify(|_, w| w.afrl0().af2().afrl2().af2());
+
+        // Set alternative function #2 for PB1 (TIM1_CH3N).
+        self.p.GPIOB.afrl.modify(|_, w| w.afrl1().af2());
     }
 
     fn enter_deep_sleep(&mut self) {
