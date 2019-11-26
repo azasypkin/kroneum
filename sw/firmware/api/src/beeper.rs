@@ -1,15 +1,12 @@
 use systick::{SysTick, SysTickHardware};
 
 /// Note durations based on `200 b/m` (beats per minute), see https://msu.edu/course/asc/232/song_project/dectalk_pages/note_to_%20ms.html.
-const BEATS_PER_MINUTE_BASE: u32 = 50;
-const NOTE_1_8_DURATION: u32 = BEATS_PER_MINUTE_BASE;
-const NOTE_1_4_DURATION: u32 = BEATS_PER_MINUTE_BASE * 2;
-const NOTE_3_8_DURATION: u32 = BEATS_PER_MINUTE_BASE * 3;
-const NOTE_1_2_DURATION: u32 = BEATS_PER_MINUTE_BASE * 4;
+const NOTE_1_8_DURATION: u32 = 50;
+const NOTE_1_4_DURATION: u32 = NOTE_1_8_DURATION * 2;
+const NOTE_1_2_DURATION: u32 = NOTE_1_4_DURATION * 2;
 
 const ROOT: f32 = 1.059_463_1;
 
-#[allow(dead_code)]
 enum Note {
     C(u8),
     CSharp(u8),
@@ -64,6 +61,7 @@ pub enum Melody {
 }
 
 /// Melody that is being played when alarm triggers.
+/// Can be generated at https://onlinesequencer.net/
 const ALARM_MELODY: [(Note, u32); 24] = [
     (Note::B(7), NOTE_1_4_DURATION),
     (Note::GSharp(7), NOTE_1_4_DURATION),
@@ -95,13 +93,20 @@ const ALARM_MELODY: [(Note, u32); 24] = [
 const BEEP_MELODY: [(Note, u32); 1] = [(Note::G(5), NOTE_1_4_DURATION)];
 
 /// Melody that is played when alarm is reset.
-const RESET_MELODY: [(Note, u32); 6] = [
-    (Note::F(5), NOTE_1_4_DURATION),
-    (Note::F(5), NOTE_1_8_DURATION),
-    (Note::G(5), NOTE_3_8_DURATION),
-    (Note::F(5), NOTE_1_4_DURATION),
-    (Note::F(5), NOTE_1_8_DURATION),
-    (Note::G(5), NOTE_3_8_DURATION),
+const RESET_MELODY: [(Note, u32); 13] = [
+    (Note::A(5), NOTE_1_4_DURATION),
+    (Note::ASharp(5), NOTE_1_4_DURATION),
+    (Note::B(5), NOTE_1_4_DURATION),
+    (Note::C(6), NOTE_1_4_DURATION),
+    (Note::CSharp(6), NOTE_1_4_DURATION),
+    (Note::D(6), NOTE_1_4_DURATION),
+    (Note::DSharp(6), NOTE_1_4_DURATION),
+    (Note::E(6), NOTE_1_4_DURATION),
+    (Note::F(6), NOTE_1_4_DURATION),
+    (Note::FSharp(6), NOTE_1_4_DURATION),
+    (Note::G(6), NOTE_1_4_DURATION),
+    (Note::GSharp(6), NOTE_1_4_DURATION),
+    (Note::A(6), NOTE_1_4_DURATION),
 ];
 
 /// Melody that is played when user enters setup mode.
