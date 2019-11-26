@@ -32,7 +32,7 @@ script:
 - cd sw/cli
 - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig LD_LIBRARY_PATH=$HOME/local/lib:$LD_LIBRARY_PATH cargo build; fi
 - if [[ $TRAVIS_OS_NAME == 'osx' ]]; then cargo build; fi
-- cd ../firmware
+- cd ../firmware/bin
 - if [[ "$TRAVIS_RUST_VERSION" == "nightly" ]]; then cargo build --target thumbv6m-none-eabi --release --features nightly; fi
 - if [[ "$TRAVIS_RUST_VERSION" == "stable" ]]; then cargo build --target thumbv6m-none-eabi --release; fi
 - cargo test --package kroneum-api
