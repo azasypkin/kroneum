@@ -13,7 +13,7 @@ repository = "https://github.com/azasypkin/kroneum"
 cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.5"
 kroneum-api = { version = "0.1.0", path = "../api" }
-panic-semihosting = "0.5.2"
+panic-semihosting = "0.5.3"
 vcell = "0.1.2"
 
 [dependencies.cortex-m]
@@ -21,16 +21,16 @@ version = "0.6.1"
 features = ["const-fn"]
 
 [dependencies.stm32f0]
-version = "0.8.0"
+version = "0.9.0"
 features = ["stm32f0x2", "rt"]
 
 [dev-dependencies.stm32f0xx-hal]
-version = "0.15.1"
+version = "0.15.2"
 features = ["stm32f042", "rt"]
 
 [dev-dependencies]
 panic-halt = "0.2.0"
-ssd1306 = "0.3.0-alpha.1"
+ssd1306 = "0.3.0-alpha.2"
 
 [dev-dependencies.embedded-graphics]
 version = "0.6.0-alpha.2"
@@ -43,4 +43,4 @@ test = false
 bench = false
 
 [features]
-nightly = ["cortex-m/inline-asm"]
+nightly = ["cortex-m/inline-asm", "kroneum-api/nightly"]
