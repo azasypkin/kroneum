@@ -37,8 +37,6 @@ where
     });
 }
 
-// Read about interrupt setup sequence at:
-// http://www.hertaville.com/external-interrupts-on-the-stm32f0.html
 #[entry]
 fn main() -> ! {
     free(|cs| {
