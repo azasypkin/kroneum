@@ -74,7 +74,7 @@ pub trait Device {
         if self
             .write(CommandPacket::FlashWrite(slot, value))
             .and_then(|_| self.read())
-            .map(|(_, data)| if data[0] == 1 { true } else { false })?
+            .map(|(_, data)| data[0] == 1)?
         {
             Ok(())
         } else {

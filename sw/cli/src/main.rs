@@ -65,7 +65,7 @@ fn run_command<'a, T: Device>(
                 device.erase_flash()?;
                 println!("Flash is erased");
             }
-            operation @ _ => {
+            operation => {
                 let slot: StorageSlot = matches
                     .value_of("SLOT")
                     .ok_or_else(|| "<SLOT> argument is not provided.".to_string())
