@@ -7,11 +7,9 @@ use kroneum_api::flash::storage_slot::StorageSlot;
 use std::time::Duration;
 
 fn process_command(matches: ArgMatches) -> Result<(), String> {
-    let device = Device::create()?;
-
     match matches.subcommand() {
         ("beep", Some(matches)) => {
-            device.beep(
+            Device::create()?.beep(
                 matches
                     .value_of("NUMBER")
                     .ok_or_else(|| "<NUMBER> argument is not provided.".to_string())
@@ -23,6 +21,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
             )?;
         }
         ("info", _) => {
+            let device = Device::create()?;
             println!(
                 "Kroneum ({}):\nManufacturer: {}",
                 device.get_identifier(),
@@ -31,7 +30,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
         }
         ("alarm", Some(matches)) => match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {
-                device.set_alarm(
+                Device::create()?.set_alarm(
                     matches
                         .value_of("ALARM")
                         .ok_or_else(|| "<ALARM> argument is not provided.".to_string())
@@ -49,17 +48,18 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
             "get" => {
                 println!(
                     "Current alarm is set to: {}",
-                    humantime::Duration::from(device.get_alarm()?)
+                    humantime::Duration::from(Device::create()?.get_alarm()?)
                 );
             }
             _ => {}
         },
         ("flash", Some(matches)) => match matches.value_of("ACTION").unwrap() {
             "erase" => {
-                device.erase_flash()?;
+                Device::create()?.erase_flash()?;
                 println!("Flash is erased");
             }
             operation => {
+                let device = Device::create()?;
                 let slot: StorageSlot = matches
                     .value_of("SLOT")
                     .ok_or_else(|| "<SLOT> argument is not provided.".to_string())
@@ -95,11 +95,10 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
 
         ("reset", _) => {
             println!("Device is being reset...");
-            device.reset()?
+            Device::create()?.reset()?
         }
 
-        ("ui", Some(matches)) => ui::start(
-            device,
+        ("ui", Some(matches)) => ui::start_server(
             matches
                 .value_of("PORT")
                 .ok_or_else(|| "<PORT> argument is not provided.".to_string())
