@@ -1,20 +1,13 @@
 mod device;
-mod device_hidapi;
-mod device_libusb;
 mod ui;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use device::{Device, DeviceContext};
-use device_hidapi::DeviceContextHIDAPI;
-use device_libusb::DeviceContextLibUSB;
+use device::Device;
 use kroneum_api::flash::storage_slot::StorageSlot;
 use std::time::Duration;
 
-fn run_command<'a, T: Device>(
-    matches: ArgMatches,
-    context: &'a impl DeviceContext<'a, T>,
-) -> Result<(), String> {
-    let device = context.open()?;
+fn process_command(matches: ArgMatches) -> Result<(), String> {
+    let device = Device::create()?;
 
     match matches.subcommand() {
         ("beep", Some(matches)) => {
@@ -106,6 +99,7 @@ fn run_command<'a, T: Device>(
         }
 
         ("ui", Some(matches)) => ui::start(
+            device,
             matches
                 .value_of("PORT")
                 .ok_or_else(|| "<PORT> argument is not provided.".to_string())
@@ -116,9 +110,9 @@ fn run_command<'a, T: Device>(
                 })?,
         )?,
         _ => return Err("Unknown sub-command!".to_string()),
-    }
+    };
 
-    context.close(device)
+    Ok(())
 }
 
 fn main() -> Result<(), String> {
@@ -126,13 +120,6 @@ fn main() -> Result<(), String> {
         .version("0.1.0")
         .author("Aleh Zasypkin <aleh.zasypkin@gmail.com>")
         .about("Allows to manage and configure Kroneum devices.")
-        .arg(
-            Arg::with_name("libusb")
-                .long("libusb")
-                .short("l")
-                .help("Uses LibUSB instead of HIDAPI.")
-                .takes_value(false),
-        )
         .subcommand(
             SubCommand::with_name("beep")
                 .about("Makes Kroneum beep <NUMBER> of times")
@@ -202,9 +189,5 @@ fn main() -> Result<(), String> {
         )
         .get_matches();
 
-    if matches.is_present("libusb") {
-        run_command(matches, &DeviceContextLibUSB::create()?)
-    } else {
-        run_command(matches, &DeviceContextHIDAPI::create()?)
-    }
+    process_command(matches)
 }

@@ -9,5 +9,4 @@ actix-web = "1.0.9"
 clap = "2.33.0"
 hidapi = "1.1.0"
 humantime = "1.3.0"
-libusb = "0.3.0"
 kroneum-api = { path="../firmware/api" }
