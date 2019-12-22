@@ -1,6 +1,7 @@
 mod device;
 mod device_hidapi;
 mod device_libusb;
+mod ui;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use device::{Device, DeviceContext};
@@ -103,6 +104,17 @@ fn run_command<'a, T: Device>(
             println!("Device is being reset...");
             device.reset()?
         }
+
+        ("ui", Some(matches)) => ui::start(
+            matches
+                .value_of("PORT")
+                .ok_or_else(|| "<PORT> argument is not provided.".to_string())
+                .and_then(|number_str| {
+                    number_str
+                        .parse::<u16>()
+                        .or_else(|err| Err(format!("Failed to parse <PORT> argument: {:?}", err)))
+                })?,
+        )?,
         _ => return Err("Unknown sub-command!".to_string()),
     }
 
@@ -176,6 +188,18 @@ fn main() -> Result<(), String> {
                 ),
         )
         .subcommand(SubCommand::with_name("reset").about("Resets Kroneum device"))
+        .subcommand(
+            SubCommand::with_name("ui")
+                .about("Starts a web server with UI to manage Kroneum")
+                .arg(
+                    Arg::with_name("PORT")
+                        .short("p")
+                        .long("port")
+                        .takes_value(true)
+                        .default_value("8080")
+                        .help("Defines a TCP port to listen on"),
+                ),
+        )
         .get_matches();
 
     if matches.is_present("libusb") {
