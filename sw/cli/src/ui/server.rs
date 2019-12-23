@@ -3,9 +3,14 @@ use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 
 fn beep() -> impl Responder {
-    println!("Route `/beep` is called");
-    Device::create().unwrap().beep(1).unwrap();
-    HttpResponse::Ok().body("beep")
+    let device = Device::create().unwrap();
+    device.beep(1).unwrap();
+    HttpResponse::NoContent()
+}
+
+fn get_info() -> impl Responder {
+    let device = Device::create().unwrap();
+    HttpResponse::Ok().json(device.get_identifier().unwrap())
 }
 
 pub fn start(port: u16) -> Result<(), String> {
@@ -13,6 +18,7 @@ pub fn start(port: u16) -> Result<(), String> {
     let http_server = HttpServer::new(|| {
         App::new()
             .route("/api/beep", web::get().to(beep))
+            .route("/api/info", web::get().to(get_info))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })
     .bind(&ui_url)

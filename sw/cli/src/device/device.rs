@@ -37,20 +37,18 @@ impl Device {
 }
 
 impl Device {
-    pub fn get_identifier(&self) -> DeviceIdentifier {
-        DeviceIdentifier {
-            bus: 0,
-            address: 0,
-            vendor_id: self.device_info.vendor_id,
-            product_id: self.device_info.product_id,
-        }
-    }
-
-    pub fn get_manufacturer(&self) -> Result<String, String> {
+    pub fn get_identifier(&self) -> Result<DeviceIdentifier, String> {
         self.device_info
             .manufacturer_string
             .clone()
             .ok_or_else(|| "Failed to retrieve device manufacturer.".to_string())
+            .map(|manufacturer| DeviceIdentifier {
+                bus: 0,
+                address: 0,
+                vendor_id: self.device_info.vendor_id,
+                product_id: self.device_info.product_id,
+                manufacturer,
+            })
     }
 
     pub fn write(&self, packet: CommandPacket) -> Result<(), String> {

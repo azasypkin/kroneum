@@ -22,11 +22,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
         }
         ("info", _) => {
             let device = Device::create()?;
-            println!(
-                "Kroneum ({}):\nManufacturer: {}",
-                device.get_identifier(),
-                device.get_manufacturer()?
-            );
+            println!("Kroneum ({})", device.get_identifier()?,);
         }
         ("alarm", Some(matches)) => match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {
