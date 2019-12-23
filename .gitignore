@@ -16,3 +16,7 @@ Cargo.lock
 
 # FW downloaded from device
 fw-from-device.bin
+
+**/node_modules
+**/.cache
+**/dist

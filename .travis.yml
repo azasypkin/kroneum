@@ -8,7 +8,9 @@ os:
   - linux
   - osx
 
-cache: cargo
+cache: 
+  cargo: true
+  yarn: true
 
 addons:
   apt:
@@ -24,6 +26,8 @@ before_install:
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig pkg-config --libs libusb-1.0; fi
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig pkg-config --modversion libusb-1.0; fi
   - if [[ $TRAVIS_OS_NAME == 'linux' ]]; then cd ..; fi
+  - curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --version 1.21.1
+  - export PATH="$HOME/.yarn/bin:$PATH"
 
 before_script:
   - rustup target add thumbv6m-none-eabi

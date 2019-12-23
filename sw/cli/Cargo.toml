@@ -3,8 +3,10 @@ name = "kroneum-cli"
 version = "0.1.0"
 authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
+actix-files = "0.1.7"
 actix-web = "1.0.9"
 clap = "2.33.0"
 hidapi = "1.1.0"
