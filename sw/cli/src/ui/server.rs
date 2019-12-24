@@ -1,6 +1,8 @@
-use crate::device::Device;
+use crate::device::{Device, DeviceIdentifier};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use kroneum_api::flash::storage_slot::StorageSlot;
+use serde_derive::{Deserialize, Serialize};
 
 fn beep() -> impl Responder {
     let device = Device::create().unwrap();
@@ -8,9 +10,24 @@ fn beep() -> impl Responder {
     HttpResponse::NoContent()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct DeviceInfo {
+    identifier: DeviceIdentifier,
+    flash: Vec<u8>,
+}
+
 fn get_info() -> impl Responder {
     let device = Device::create().unwrap();
-    HttpResponse::Ok().json(device.get_identifier().unwrap())
+    HttpResponse::Ok().json(DeviceInfo {
+        identifier: device.get_identifier().unwrap(),
+        flash: vec![
+            device.read_flash(StorageSlot::One).unwrap(),
+            device.read_flash(StorageSlot::Two).unwrap(),
+            device.read_flash(StorageSlot::Three).unwrap(),
+            device.read_flash(StorageSlot::Four).unwrap(),
+            device.read_flash(StorageSlot::Five).unwrap(),
+        ],
+    })
 }
 
 pub fn start(port: u16) -> Result<(), String> {

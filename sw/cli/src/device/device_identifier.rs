@@ -6,7 +6,9 @@ use std::fmt;
 pub struct DeviceIdentifier {
     pub bus: u8,
     pub address: u8,
+    #[serde(rename(serialize = "vendorID"))]
     pub vendor_id: u16,
+    #[serde(rename(serialize = "productID"))]
     pub product_id: u16,
     pub manufacturer: String,
 }

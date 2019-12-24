@@ -17,5 +17,6 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/ui/static/src/index.html");
     println!("cargo:rerun-if-changed=src/ui/static/src/index.tsx");
+    println!("cargo:rerun-if-changed=src/ui/static/src/index.scss");
     println!("cargo:rerun-if-changed=src/ui/static/package.json");
 }

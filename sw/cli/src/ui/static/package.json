@@ -7,7 +7,10 @@
   },
   "version": "1.0.0",
   "dependencies": {
+    "@elastic/datemath": "^5.0.2",
+    "@elastic/eui": "^17.3.1",
     "axios": "^0.19.0",
+    "moment": "^2.24.0",
     "react": "^16.12.0",
     "react-dom": "^16.12.0"
   },
@@ -20,10 +23,12 @@
     "eslint-plugin-react": "^7.17.0",
     "parcel-bundler": "^1.12.4",
     "prettier": "^1.19.1",
+    "sass": "^1.24.0",
     "typescript": "^3.7.4"
   },
   "scripts": {
     "prebuild": "rm -rf dist",
-    "build": "parcel build src/index.html"
+    "build": "parcel build src/index.html",
+    "watch": "parcel watch src/index.html"
   }
 }
