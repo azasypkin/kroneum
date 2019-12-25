@@ -1,10 +1,12 @@
 use crate::device::device_identifier::DeviceIdentifier;
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
 use kroneum_api::{
+    array::Array,
+    beeper::Tone,
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,
-    usb::command_packet::{CommandBytes, CommandPacket, MAX_PACKET_SIZE},
+    usb::command_packet::{CommandPacket, MAX_PACKET_SIZE},
 };
 use std::time::Duration;
 
@@ -53,7 +55,7 @@ impl Device {
 
     pub fn write(&self, packet: CommandPacket) -> Result<(), String> {
         self.device
-            .write(CommandBytes::from(packet).as_ref())
+            .write(Array::from(packet).as_ref())
             .map(|_| ())
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
@@ -68,6 +70,10 @@ impl Device {
 
     pub fn beep(&self, beeps_n: u8) -> Result<(), String> {
         self.write(CommandPacket::Beep(beeps_n))
+    }
+
+    pub fn play_melody(&self, tones: Array<Tone>) -> Result<(), String> {
+        self.write(CommandPacket::Melody(tones))
     }
 
     pub fn get_alarm(&self) -> Result<Duration, String> {

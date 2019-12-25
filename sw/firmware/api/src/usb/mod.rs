@@ -7,7 +7,7 @@ use self::command_packet::CommandPacket;
 use self::descriptors::*;
 use self::pma::PacketMemoryArea;
 use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
-use usb::command_packet::CommandBytes;
+use array::Array;
 
 #[derive(Copy, Clone)]
 pub enum EndpointType {
@@ -307,14 +307,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
             .mark_transaction_as_handled(transaction.endpoint, transaction.direction);
 
         let command_packet_length = self.pma.rx_count(transaction.endpoint) as usize;
-        let mut command_bytes = CommandBytes::new();
+        let mut command_byte_array = Array::new();
         for index in (0..command_packet_length).step_by(2) {
             let half_word = self.pma.read(transaction.endpoint, index as u16);
-            command_bytes.push((half_word & 0x00ff) as u8);
-            command_bytes.push(((half_word & 0xff00) >> 8) as u8);
+            command_byte_array.push((half_word & 0x00ff) as u8);
+            command_byte_array.push(((half_word & 0xff00) >> 8) as u8);
         }
 
-        self.state.command = Some(command_bytes.into());
+        self.state.command = Some(command_byte_array.into());
 
         self.pma.set_rx_count(transaction.endpoint, 0);
         self.hw.set_endpoint_status(

@@ -160,24 +160,26 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
                 self.beeper().beep_n(num);
+            } else if let CommandPacket::Melody(tones) = command_packet {
+                self.beeper().play(Melody::Custom(tones));
             } else if let CommandPacket::AlarmSet(time) = command_packet {
                 self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
             } else if let CommandPacket::AlarmGet = command_packet {
                 let alarm = self.rtc().alarm();
                 self.usb()
-                    .send(&[alarm.hours, alarm.minutes, alarm.seconds, 0, 0, 0]);
+                    .send(&[alarm.hours, alarm.minutes, alarm.seconds]);
             } else if let CommandPacket::Reset = command_packet {
                 self.reset();
             } else if let CommandPacket::FlashRead(slot) = command_packet {
                 let value = self.flash().read(slot).unwrap_or_else(|| 0);
-                self.usb().send(&[value, 0, 0, 0, 0, 0]);
+                self.usb().send(&[value]);
             } else if let CommandPacket::FlashWrite(slot, value) = command_packet {
                 let status = if self.flash().write(slot, value).is_ok() {
                     1
                 } else {
                     0
                 };
-                self.usb().send(&[status, 0, 0, 0, 0, 0]);
+                self.usb().send(&[status]);
             } else if let CommandPacket::FlashEraseAll = command_packet {
                 self.flash().erase_all();
             }

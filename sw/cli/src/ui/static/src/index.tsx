@@ -136,6 +136,9 @@ const IndexPage = () => {
               <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
                 <EuiButton onClick={() => axios.get('/api/beep')}>Beep</EuiButton>
               </EuiFormRow>
+              <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
+                <EuiButton onClick={() => axios.get('/api/melody')}>Play melody</EuiButton>
+              </EuiFormRow>
             </EuiPanel>
           </EuiPageContentBody>
         </EuiPageContent>
