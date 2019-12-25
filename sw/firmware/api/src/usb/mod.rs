@@ -306,12 +306,12 @@ impl<'a, T: USBHardware> USB<'a, T> {
         self.hw
             .mark_transaction_as_handled(transaction.endpoint, transaction.direction);
 
-        let mut command_bytes = CommandBytes::new(
-            [0; MAX_PACKET_SIZE],
-            self.pma.rx_count(transaction.endpoint) as usize,
-        );
-        for index in (0..command_bytes.len()).step_by(2) {
-            command_bytes.write_u16(index, self.pma.read(transaction.endpoint, index as u16));
+        let command_packet_length = self.pma.rx_count(transaction.endpoint) as usize;
+        let mut command_bytes = CommandBytes::new();
+        for index in (0..command_packet_length).step_by(2) {
+            let half_word = self.pma.read(transaction.endpoint, index as u16);
+            command_bytes.push((half_word & 0x00ff) as u8);
+            command_bytes.push(((half_word & 0xff00) >> 8) as u8);
         }
 
         self.state.command = Some(command_bytes.into());

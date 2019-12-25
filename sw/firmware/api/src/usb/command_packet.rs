@@ -20,15 +20,20 @@ impl Index<usize> for CommandBytes {
 impl CommandBytes {
     /// Creates `CommandBytes` structure with empty buffer of `MAX_PACKET_SIZE` size and the length
     /// of the actual data.
-    pub fn new(buffer: [u8; MAX_PACKET_SIZE], len: usize) -> Self {
-        CommandBytes { buffer, len }
+    pub fn new() -> Self {
+        CommandBytes {
+            buffer: [0; MAX_PACKET_SIZE],
+            len: 0,
+        }
     }
 
-    /// Splits `u16` into two `u8` and writes them into two consequent data cells starting from the
-    /// specified `index`.
-    pub fn write_u16(&mut self, index: usize, half_word: u16) {
-        self.buffer[index] = (half_word & 0x00ff) as u8;
-        self.buffer[index + 1] = ((half_word & 0xff00) >> 8) as u8;
+    /// Pushes `u8` value into `CommandBytes`. Note that if internal buffer is full, no more data
+    /// will be written effectively making it read-only.
+    pub fn push(&mut self, byte: u8) {
+        if self.len < MAX_PACKET_SIZE {
+            self.buffer[self.len] = byte;
+            self.len += 1;
+        }
     }
 
     /// Returns the length of the actual data stored in the structure.
@@ -45,12 +50,13 @@ impl AsRef<[u8]> for CommandBytes {
 
 impl From<&[u8]> for CommandBytes {
     fn from(slice: &[u8]) -> Self {
-        let mut command_packet_bytes: [u8; MAX_PACKET_SIZE] = [0; MAX_PACKET_SIZE];
-        for (index, n) in slice.iter().enumerate() {
-            command_packet_bytes[index] = *n;
-        }
-
-        CommandBytes::new(command_packet_bytes, slice.len())
+        let mut command_bytes = CommandBytes::new();
+        command_bytes.buffer;
+        slice
+            .iter()
+            .enumerate()
+            .for_each(|(_, n)| command_bytes.push(*n));
+        command_bytes
     }
 }
 
