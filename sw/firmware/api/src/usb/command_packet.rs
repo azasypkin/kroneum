@@ -1,8 +1,95 @@
 use crate::flash::storage_slot::StorageSlot;
 use crate::time::Time;
+use core::ops::Index;
+pub use usb::descriptors::MAX_PACKET_SIZE;
 
-const COMMAND_BYTE_SEQUENCE_LENGTH: usize = 6;
-pub type CommandByteSequence = [u8; COMMAND_BYTE_SEQUENCE_LENGTH];
+/// Byte representation of the `CommandPacket`.
+pub struct CommandBytes {
+    buffer: [u8; MAX_PACKET_SIZE],
+    len: usize,
+}
+
+impl Index<usize> for CommandBytes {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.buffer[index]
+    }
+}
+
+impl CommandBytes {
+    /// Creates `CommandBytes` structure with empty buffer of `MAX_PACKET_SIZE` size and the length
+    /// of the actual data.
+    pub fn new(buffer: [u8; MAX_PACKET_SIZE], len: usize) -> Self {
+        CommandBytes { buffer, len }
+    }
+
+    /// Splits `u16` into two `u8` and writes them into two consequent data cells starting from the
+    /// specified `index`.
+    pub fn write_u16(&mut self, index: usize, half_word: u16) {
+        self.buffer[index] = (half_word & 0x00ff) as u8;
+        self.buffer[index + 1] = ((half_word & 0xff00) >> 8) as u8;
+    }
+
+    /// Returns the length of the actual data stored in the structure.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl AsRef<[u8]> for CommandBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.buffer[..self.len]
+    }
+}
+
+impl From<&[u8]> for CommandBytes {
+    fn from(slice: &[u8]) -> Self {
+        let mut command_packet_bytes: [u8; MAX_PACKET_SIZE] = [0; MAX_PACKET_SIZE];
+        for (index, n) in slice.iter().enumerate() {
+            command_packet_bytes[index] = *n;
+        }
+
+        CommandBytes::new(command_packet_bytes, slice.len())
+    }
+}
+
+impl From<CommandPacket> for CommandBytes {
+    fn from(packet: CommandPacket) -> Self {
+        match packet {
+            CommandPacket::Beep(n_beeps) => [1, n_beeps].as_ref().into(),
+            CommandPacket::AlarmSet(time) => {
+                [2, time.hours, time.minutes, time.seconds].as_ref().into()
+            }
+            CommandPacket::AlarmGet => [3].as_ref().into(),
+            CommandPacket::Reset => [4].as_ref().into(),
+            CommandPacket::FlashRead(slot) => [5, slot.into()].as_ref().into(),
+            CommandPacket::FlashWrite(slot, value) => [6, slot.into(), value].as_ref().into(),
+            CommandPacket::FlashEraseAll => [7].as_ref().into(),
+            CommandPacket::Unknown => [0].as_ref().into(),
+        }
+    }
+}
+
+impl Into<CommandPacket> for CommandBytes {
+    fn into(self) -> CommandPacket {
+        let command_type_byte = self[0];
+        match command_type_byte {
+            1 => CommandPacket::Beep(self[1]),
+            2 => CommandPacket::AlarmSet(Time {
+                hours: self[1],
+                minutes: self[2],
+                seconds: self[3],
+            }),
+            3 => CommandPacket::AlarmGet,
+            4 => CommandPacket::Reset,
+            5 => CommandPacket::FlashRead(StorageSlot::from(self[1])),
+            6 => CommandPacket::FlashWrite(StorageSlot::from(self[1]), self[2]),
+            7 => CommandPacket::FlashEraseAll,
+            _ => CommandPacket::Unknown,
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub enum CommandPacket {
@@ -16,41 +103,9 @@ pub enum CommandPacket {
     Unknown,
 }
 
-impl CommandPacket {
-    pub fn to_bytes(self) -> CommandByteSequence {
-        match self {
-            CommandPacket::Beep(n_beeps) => [1, 0, n_beeps, 0, 0, 0],
-            CommandPacket::AlarmSet(time) => [2, 0, time.hours, time.minutes, time.seconds, 0],
-            CommandPacket::AlarmGet => [3, 0, 0, 0, 0, 0],
-            CommandPacket::Reset => [4, 0, 0, 0, 0, 0],
-            CommandPacket::FlashRead(slot) => [5, 0, slot.into(), 0, 0, 0],
-            CommandPacket::FlashWrite(slot, value) => [6, 0, slot.into(), value, 0, 0],
-            CommandPacket::FlashEraseAll => [7, 0, 0, 0, 0, 0],
-            CommandPacket::Unknown => [0; COMMAND_BYTE_SEQUENCE_LENGTH],
-        }
-    }
-}
-
-impl From<(u16, u16, u16)> for CommandPacket {
-    fn from((header, data_1, data_2): (u16, u16, u16)) -> Self {
-        let command_type_byte = header & 0xff;
-        match command_type_byte {
-            1 => CommandPacket::Beep((data_1 & 0xff) as u8),
-            2 => CommandPacket::AlarmSet(Time {
-                hours: (data_1 & 0xff) as u8,
-                minutes: ((data_1 & 0xff00) >> 8) as u8,
-                seconds: (data_2 & 0xff) as u8,
-            }),
-            3 => CommandPacket::AlarmGet,
-            4 => CommandPacket::Reset,
-            5 => CommandPacket::FlashRead(StorageSlot::from((data_1 & 0xff) as u8)),
-            6 => CommandPacket::FlashWrite(
-                StorageSlot::from((data_1 & 0xff) as u8),
-                ((data_1 & 0xff00) >> 8) as u8,
-            ),
-            7 => CommandPacket::FlashEraseAll,
-            _ => CommandPacket::Unknown,
-        }
+impl From<&[u8]> for CommandPacket {
+    fn from(slice: &[u8]) -> Self {
+        CommandBytes::from(slice).into()
     }
 }
 
@@ -59,26 +114,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_command_bytes() {
-        assert_eq!(
-            CommandByteSequence::default(),
-            [0; COMMAND_BYTE_SEQUENCE_LENGTH]
-        );
-    }
-
-    #[test]
     fn beep_command() {
-        assert_eq!(CommandPacket::from((1, 1, 0)), CommandPacket::Beep(1));
-        assert_eq!(CommandPacket::from((1, 15, 0)), CommandPacket::Beep(15));
+        assert_eq!(CommandPacket::from([1, 1].as_ref()), CommandPacket::Beep(1));
+        assert_eq!(
+            CommandPacket::from([1, 15].as_ref()),
+            CommandPacket::Beep(15)
+        );
 
-        assert_eq!(CommandPacket::Beep(1).to_bytes(), [1, 0, 1, 0, 0, 0]);
-        assert_eq!(CommandPacket::Beep(15).to_bytes(), [1, 0, 15, 0, 0, 0]);
+        assert_eq!(CommandBytes::from(CommandPacket::Beep(1)).as_ref(), [1, 1]);
+        assert_eq!(
+            CommandBytes::from(CommandPacket::Beep(15)).as_ref(),
+            [1, 15]
+        );
     }
 
     #[test]
     fn alarm_set_command() {
         assert_eq!(
-            CommandPacket::from((2, 0x2112, 17)),
+            CommandPacket::from([2, 18, 33, 17].as_ref()),
             CommandPacket::AlarmSet(Time {
                 hours: 18,
                 minutes: 33,
@@ -87,7 +140,7 @@ mod tests {
         );
 
         assert_eq!(
-            CommandPacket::from((2, 0x1221, 1)),
+            CommandPacket::from([2, 33, 18, 1].as_ref()),
             CommandPacket::AlarmSet(Time {
                 hours: 33,
                 minutes: 18,
@@ -96,81 +149,92 @@ mod tests {
         );
 
         assert_eq!(
-            CommandPacket::AlarmSet(Time {
+            CommandBytes::from(CommandPacket::AlarmSet(Time {
                 hours: 18,
                 minutes: 33,
                 seconds: 17,
-            })
-            .to_bytes(),
-            [2, 0, 18, 33, 17, 0]
+            }))
+            .as_ref(),
+            [2, 18, 33, 17]
         );
+
         assert_eq!(
-            CommandPacket::AlarmSet(Time {
+            CommandBytes::from(CommandPacket::AlarmSet(Time {
                 hours: 33,
                 minutes: 18,
                 seconds: 1,
-            })
-            .to_bytes(),
-            [2, 0, 33, 18, 1, 0]
+            }))
+            .as_ref(),
+            [2, 33, 18, 1]
         );
     }
 
     #[test]
     fn alarm_get_command() {
-        assert_eq!(CommandPacket::from((3, 0, 0)), CommandPacket::AlarmGet);
-        assert_eq!(CommandPacket::from((3, 11, 22)), CommandPacket::AlarmGet);
+        assert_eq!(CommandPacket::from([3].as_ref()), CommandPacket::AlarmGet);
+        assert_eq!(
+            CommandPacket::from([3, 11, 22].as_ref()),
+            CommandPacket::AlarmGet
+        );
 
-        assert_eq!(CommandPacket::AlarmGet.to_bytes(), [3, 0, 0, 0, 0, 0]);
+        assert_eq!(CommandBytes::from(CommandPacket::AlarmGet).as_ref(), [3]);
     }
 
     #[test]
     fn reset_command() {
-        assert_eq!(CommandPacket::from((4, 0, 0)), CommandPacket::Reset);
+        assert_eq!(CommandPacket::from([4].as_ref()), CommandPacket::Reset);
 
-        assert_eq!(CommandPacket::Reset.to_bytes(), [4, 0, 0, 0, 0, 0]);
+        assert_eq!(CommandBytes::from(CommandPacket::Reset).as_ref(), [4]);
     }
 
     #[test]
     fn flash_read_command() {
         assert_eq!(
-            CommandPacket::from((5, 0x1f, 0)),
+            CommandPacket::from([5, 0x1f].as_ref()),
             CommandPacket::FlashRead(StorageSlot::One)
         );
 
         assert_eq!(
-            CommandPacket::FlashRead(StorageSlot::One).to_bytes(),
-            [5, 0, 0x1f, 0, 0, 0]
+            CommandBytes::from(CommandPacket::FlashRead(StorageSlot::One)).as_ref(),
+            [5, 0x1f]
         );
     }
 
     #[test]
     fn flash_write_command() {
         assert_eq!(
-            CommandPacket::from((6, 0x051f, 0)),
+            CommandPacket::from([6, 0x1f, 5].as_ref()),
             CommandPacket::FlashWrite(StorageSlot::One, 5)
         );
 
         assert_eq!(
-            CommandPacket::FlashWrite(StorageSlot::One, 5).to_bytes(),
-            [6, 0, 0x1f, 5, 0, 0]
+            CommandBytes::from(CommandPacket::FlashWrite(StorageSlot::One, 5)).as_ref(),
+            [6, 0x1f, 5]
         );
     }
 
     #[test]
     fn flash_erase_all_command() {
-        assert_eq!(CommandPacket::from((7, 0, 0)), CommandPacket::FlashEraseAll);
-        assert_eq!(CommandPacket::FlashEraseAll.to_bytes(), [7, 0, 0, 0, 0, 0]);
+        assert_eq!(
+            CommandPacket::from([7].as_ref()),
+            CommandPacket::FlashEraseAll
+        );
+
+        assert_eq!(
+            CommandBytes::from(CommandPacket::FlashEraseAll).as_ref(),
+            [7]
+        );
     }
 
     #[test]
     fn unknown_command() {
-        assert_eq!(CommandPacket::from((0, 0, 0)), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from((8, 0, 0)), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from((10, 11, 22)), CommandPacket::Unknown);
-
+        assert_eq!(CommandPacket::from([0].as_ref()), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from([8].as_ref()), CommandPacket::Unknown);
         assert_eq!(
-            CommandPacket::Unknown.to_bytes(),
-            [0; COMMAND_BYTE_SEQUENCE_LENGTH]
+            CommandPacket::from([10, 11, 12].as_ref()),
+            CommandPacket::Unknown
         );
+
+        assert_eq!(CommandBytes::from(CommandPacket::Unknown).as_ref(), [0]);
     }
 }

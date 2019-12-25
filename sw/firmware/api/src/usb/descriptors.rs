@@ -8,6 +8,9 @@ use crate::config::{DEVICE_PID, DEVICE_VID};
  * in the configuration class.
  */
 
+// Maximum size of the USB packet (64 bytes).
+pub const MAX_PACKET_SIZE: usize = 0x40;
+
 pub const LANG_ID_DESCRIPTOR: [u8; 4] = [
     0x04, 0x03, // 4 (length)
     0x09, 0x04, // English - US
@@ -50,7 +53,7 @@ pub const DEV_DESC: [u8; 18] = [
     0x00,                      // bDeviceClass (Use class information in the Interface Descriptors)
     0x00,                      // bDeviceSubClass
     0x00,                      // bDeviceProtocol
-    0x40,                      // bMaxPacketSize0 64
+    MAX_PACKET_SIZE as u8,     // bMaxPacketSize0 64
     (DEVICE_VID & 0xff) as u8, // idVendor 0xFFFF (split u16 into two u8)
     ((DEVICE_VID & 0xff00) >> 8) as u8,
     (DEVICE_PID & 0xff) as u8, // idProduct 0xFFFF (split u16 into two u8)
@@ -66,7 +69,8 @@ pub const DEV_DESC: [u8; 18] = [
 pub const CONF_DESC: [u8; 41] = [
     0x09, // bLength
     0x02, // bDescriptorType (Configuration)
-    0x29, 0x00, // wTotalLength
+    0x29,
+    0x00, // wTotalLength
     0x01, // bNumInterfaces
     0x01, // bConfigurationValue
     0x04, // iConfiguration (String Index)
@@ -84,24 +88,28 @@ pub const CONF_DESC: [u8; 41] = [
     // HID descriptor
     0x09, // bLength
     0x21, // bDescriptorType (HID)
-    0x11, 0x01, // bcdHID 1.11
+    0x11,
+    0x01, // bcdHID 1.11
     0x00, // bCountryCode
     0x01, // bNumDescriptors
     0x22, // bDescriptorType[0] (HID)
-    0x20, 0x00, // wDescriptorLength[0] 32
+    0x20,
+    0x00, // wDescriptorLength[0] 32
     // IN endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
     0x81, // bEndpointAddress (IN/D2H)
     0x03, // bmAttributes (Interrupt)
-    0x40, 0x00, // wMaxPacketSize 64
+    MAX_PACKET_SIZE as u8,
+    0x00, // wMaxPacketSize 64
     0x20, // bInterval 1 (unit depends on device speed)
     // OUT endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
     0x01, // bEndpointAddress (OUT/H2D)
     0x03, // bmAttributes (Interrupt)
-    0x40, 0x00, // wMaxPacketSize 64
+    MAX_PACKET_SIZE as u8,
+    0x00, // wMaxPacketSize 64
     0x20, // bInterval 1 (unit depends on device speed)
 ];
 
