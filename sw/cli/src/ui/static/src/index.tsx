@@ -85,7 +85,7 @@ const IndexPage = () => {
               <EuiPageContentHeader>
                 <EuiPageContentHeaderSection>
                   <EuiTitle>
-                    <h2>Current Alarm</h2>
+                    <h2>Current alarm</h2>
                   </EuiTitle>
                 </EuiPageContentHeaderSection>
               </EuiPageContentHeader>
@@ -101,7 +101,7 @@ const IndexPage = () => {
               <EuiPageContentHeader>
                 <EuiPageContentHeaderSection>
                   <EuiTitle>
-                    <h2>Flash Slots</h2>
+                    <h2>Flash slots</h2>
                   </EuiTitle>
                 </EuiPageContentHeaderSection>
               </EuiPageContentHeader>

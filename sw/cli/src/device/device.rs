@@ -4,7 +4,7 @@ use kroneum_api::{
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,
-    usb::command_packet::{CommandByteSequence, CommandPacket},
+    usb::command_packet::{CommandBytes, CommandPacket, MAX_PACKET_SIZE},
 };
 use std::time::Duration;
 
@@ -53,13 +53,13 @@ impl Device {
 
     pub fn write(&self, packet: CommandPacket) -> Result<(), String> {
         self.device
-            .write(&packet.to_bytes())
+            .write(CommandBytes::from(packet).as_ref())
             .map(|_| ())
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    pub fn read(&self) -> Result<(usize, CommandByteSequence), String> {
-        let mut data = CommandByteSequence::default();
+    pub fn read(&self) -> Result<(usize, [u8; MAX_PACKET_SIZE]), String> {
+        let mut data = [0; MAX_PACKET_SIZE];
         self.device
             .read_timeout(&mut data, 5000)
             .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
