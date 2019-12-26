@@ -220,11 +220,25 @@ mod tests {
     }
 
     #[test]
+    fn echo_command() {
+        let array = Array::from([1, 2, 3, 10].as_ref());
+        assert_eq!(
+            CommandPacket::from([9, 1, 2, 3, 10].as_ref()),
+            CommandPacket::Echo(array)
+        );
+
+        assert_eq!(
+            Array::from(CommandPacket::Echo(array)).as_ref(),
+            [9, 1, 2, 3, 10]
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         assert_eq!(CommandPacket::from([0].as_ref()), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from([9].as_ref()), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from([10].as_ref()), CommandPacket::Unknown);
         assert_eq!(
-            CommandPacket::from([10, 11, 12].as_ref()),
+            CommandPacket::from([11, 12, 13].as_ref()),
             CommandPacket::Unknown
         );
 
