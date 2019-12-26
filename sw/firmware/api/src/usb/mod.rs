@@ -311,7 +311,11 @@ impl<'a, T: USBHardware> USB<'a, T> {
         for index in (0..command_packet_length).step_by(2) {
             let half_word = self.pma.read(transaction.endpoint, index as u16);
             command_byte_array.push((half_word & 0x00ff) as u8);
-            command_byte_array.push(((half_word & 0xff00) >> 8) as u8);
+            // It's possible to receive odd number of bytes, and second part of `u16` will contain
+            // some garbage value we don't want to pick up.
+            if command_byte_array.len() < command_packet_length {
+                command_byte_array.push(((half_word & 0xff00) >> 8) as u8);
+            }
         }
 
         self.state.command = Some(command_byte_array.into());
