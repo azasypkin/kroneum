@@ -17,6 +17,8 @@ import {
   EuiText,
   EuiFlexGroup,
   EuiFlexItem,
+  EuiPopover,
+  EuiComboBox,
 } from '@elastic/eui';
 import axios from 'axios';
 
@@ -36,6 +38,11 @@ const IndexPage = () => {
   useEffect(() => {
     axios.get('/api/info').then(({ data }) => setInfo(data));
   }, []);
+
+  const [echo, setEcho] = useState<number[]>([0]);
+  const [isEchoPopOverOpen, setIsEchoPopOverOpen] = useState<boolean>(false);
+
+  const echoButton = <EuiButton onClick={() => setIsEchoPopOverOpen(true)}>Send Echo</EuiButton>;
 
   return (
     <EuiPage>
@@ -139,6 +146,36 @@ const IndexPage = () => {
               <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
                 <EuiButton onClick={() => axios.get('/api/melody')}>Play melody</EuiButton>
               </EuiFormRow>
+              <EuiSpacer />
+              <EuiPopover
+                id="trapFocus"
+                ownFocus
+                button={echoButton}
+                isOpen={isEchoPopOverOpen}
+                closePopover={() => {
+                  setIsEchoPopOverOpen(false);
+                  setEcho([0]);
+                }}
+              >
+                <EuiComboBox
+                  style={{ minWidth: 300 }}
+                  placeholder="Choose echo content"
+                  options={Array.from({ length: 256 }).map((_, index) => ({ label: index.toString() }))}
+                  selectedOptions={echo.map(value => ({ label: value.toString() }))}
+                  onChange={selectedOptions => setEcho(selectedOptions.map(({ label }) => parseInt(label)))}
+                  isClearable={true}
+                />
+
+                <EuiSpacer />
+
+                <EuiButton
+                  isDisabled={echo.length === 0}
+                  fill
+                  onClick={() => axios.post('/api/echo', echo).then(({ data }) => console.log(`Echo result: ${data}`))}
+                >
+                  Send
+                </EuiButton>
+              </EuiPopover>
             </EuiPanel>
           </EuiPageContentBody>
         </EuiPageContent>

@@ -6,7 +6,7 @@ use kroneum_api::{
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,
-    usb::command_packet::{CommandPacket, MAX_PACKET_SIZE},
+    usb::command_packet::CommandPacket,
 };
 use std::time::Duration;
 
@@ -60,12 +60,12 @@ impl Device {
             .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    pub fn read(&self) -> Result<(usize, [u8; MAX_PACKET_SIZE]), String> {
-        let mut data = [0; MAX_PACKET_SIZE];
+    pub fn read(&self) -> Result<Vec<u8>, String> {
+        let mut data = [0; 100];
         self.device
             .read_timeout(&mut data, 5000)
             .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
-            .map(|count| (count, data))
+            .map(|count| data[..count].to_vec())
     }
 
     pub fn beep(&self, beeps_n: u8) -> Result<(), String> {
@@ -79,7 +79,7 @@ impl Device {
     pub fn get_alarm(&self) -> Result<Duration, String> {
         self.write(CommandPacket::AlarmGet)
             .and_then(|_| self.read())
-            .map(|(_, data)| {
+            .map(|data| {
                 Duration::from_secs(
                     u64::from(data[0]) * 3600 + u64::from(data[1]) * 60 + u64::from(data[2]),
                 )
@@ -104,7 +104,7 @@ impl Device {
 
         self.write(CommandPacket::FlashRead(slot))
             .and_then(|_| self.read())
-            .map(|(_, data)| data[0])
+            .map(|data| data[0])
     }
 
     pub fn write_flash(&self, slot: StorageSlot, value: u8) -> Result<(), String> {
@@ -115,7 +115,7 @@ impl Device {
         if self
             .write(CommandPacket::FlashWrite(slot, value))
             .and_then(|_| self.read())
-            .map(|(_, data)| data[0] == 1)?
+            .map(|data| data[0] == 1)?
         {
             Ok(())
         } else {
@@ -133,5 +133,10 @@ impl Device {
 
     pub fn reset(&self) -> Result<(), String> {
         self.write(CommandPacket::Reset)
+    }
+
+    pub fn echo(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+        self.write(CommandPacket::Echo(Array::from(data)))
+            .and_then(|_| self.read())
     }
 }

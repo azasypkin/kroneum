@@ -39,6 +39,10 @@ fn melody() -> impl Responder {
     HttpResponse::NoContent()
 }
 
+fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
+    HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct DeviceInfo {
     identifier: DeviceIdentifier,
@@ -66,6 +70,7 @@ pub fn start(port: u16) -> Result<(), String> {
             .route("/api/beep", web::get().to(beep))
             .route("/api/melody", web::get().to(melody))
             .route("/api/info", web::get().to(get_info))
+            .route("/api/echo", web::post().to(echo))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })
     .bind(&ui_url)
