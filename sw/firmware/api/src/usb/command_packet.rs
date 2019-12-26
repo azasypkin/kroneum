@@ -2,7 +2,6 @@ use crate::flash::storage_slot::StorageSlot;
 use crate::time::Time;
 use array::Array;
 use beeper::Tone;
-pub use usb::descriptors::MAX_PACKET_SIZE;
 
 impl From<CommandPacket> for Array<u8> {
     fn from(packet: CommandPacket) -> Self {
@@ -22,6 +21,14 @@ impl From<CommandPacket> for Array<u8> {
                 tones.as_ref().iter().for_each(|tone| {
                     array.push(tone.note);
                     array.push(tone.duration);
+                });
+                array.as_ref().into()
+            }
+            CommandPacket::Echo(echo_array) => {
+                let mut array = Array::new();
+                array.push(9);
+                echo_array.as_ref().iter().for_each(|echo_value| {
+                    array.push(*echo_value);
                 });
                 array.as_ref().into()
             }
@@ -52,6 +59,13 @@ impl Into<CommandPacket> for Array<u8> {
                 }
                 CommandPacket::Melody(array)
             }
+            9 => {
+                let mut echo_array = Array::new();
+                self.as_ref()[1..]
+                    .iter()
+                    .for_each(|echo_value| echo_array.push(*echo_value));
+                CommandPacket::Echo(echo_array)
+            }
             _ => CommandPacket::Unknown,
         }
     }
@@ -67,6 +81,7 @@ pub enum CommandPacket {
     FlashEraseAll,
     Reset,
     Melody(Array<Tone>),
+    Echo(Array<u8>),
     Unknown,
 }
 

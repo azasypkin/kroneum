@@ -182,6 +182,8 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
                 self.usb().send(&[status]);
             } else if let CommandPacket::FlashEraseAll = command_packet {
                 self.flash().erase_all();
+            } else if let CommandPacket::Echo(array) = command_packet {
+                self.usb().send(array.as_ref());
             }
         }
 
