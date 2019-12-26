@@ -18,8 +18,8 @@ import {
   EuiFlexGroup,
   EuiFlexItem,
   EuiPopover,
-  EuiComboBox,
   EuiLoadingContent,
+  EuiFieldText,
 } from '@elastic/eui';
 import axios from 'axios';
 
@@ -135,10 +135,23 @@ const DeviceAlarmSection = () => {
   );
 };
 
+interface EchoStatus {
+  isInProgress: boolean;
+  bytesString: string;
+  isValid: boolean;
+  response: number[] | null;
+}
 const DeviceDiagnosticsSection = () => {
-  const [echoByteSequence, setEchoByteSequence] = useState<number[]>([0]);
-  const [isEchoPopOverOpen, setIsEchoPopOverOpen] = useState<boolean>(false);
+  const [echoStatus, setEchoStatus] = useState<EchoStatus>({
+    isInProgress: false,
+    bytesString: '',
+    isValid: false,
+    response: null,
+  });
 
+  const showError = !echoStatus.isValid && echoStatus.bytesString.length > 0;
+
+  const [isEchoPopOverOpen, setIsEchoPopOverOpen] = useState<boolean>(false);
   const echoButton = <EuiButton onClick={() => setIsEchoPopOverOpen(true)}>Send echo</EuiButton>;
 
   return (
@@ -166,26 +179,65 @@ const DeviceDiagnosticsSection = () => {
               isOpen={isEchoPopOverOpen}
               closePopover={() => {
                 setIsEchoPopOverOpen(false);
-                setEchoByteSequence([0]);
+                setEchoStatus({
+                  isInProgress: false,
+                  bytesString: '',
+                  isValid: false,
+                  response: null,
+                });
               }}
             >
-              <EuiComboBox
+              <EuiFormRow
                 style={{ minWidth: 300 }}
-                placeholder="Choose echo content"
-                options={Array.from({ length: 256 }).map((_, index) => ({ label: index.toString() }))}
-                selectedOptions={echoByteSequence.map(value => ({ label: value.toString() }))}
-                onChange={selectedOptions => setEchoByteSequence(selectedOptions.map(({ label }) => parseInt(label)))}
-                isClearable={true}
-              />
-
+                label="Bytes sequence to send"
+                helpText={echoStatus.response ? `Response: [${echoStatus.response.join(', ')}]` : ''}
+                isInvalid={showError}
+                error={['Bytes should be a comma separated list of `u8` values.']}
+              >
+                <EuiFieldText
+                  placeholder="Enter comma separated `u8` numbers..."
+                  value={echoStatus.bytesString}
+                  name="text"
+                  isInvalid={showError}
+                  onChange={ev =>
+                    setEchoStatus({
+                      ...echoStatus,
+                      response: null,
+                      isValid:
+                        ev.target.value &&
+                        ev.target.value.split(',').every(value => {
+                          const intValue = parseInt(value.trim());
+                          return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
+                        }),
+                      bytesString: ev.target.value,
+                    })
+                  }
+                />
+              </EuiFormRow>
               <EuiSpacer />
-
               <EuiButton
-                isDisabled={echoByteSequence.length === 0}
+                isDisabled={!echoStatus.isValid}
+                isLoading={echoStatus.isInProgress}
                 fill
-                onClick={() =>
-                  axios.post('/api/echo', echoByteSequence).then(({ data }) => console.log(`Echo result: ${data}`))
-                }
+                onClick={() => {
+                  setEchoStatus({
+                    ...echoStatus,
+                    isInProgress: true,
+                  });
+
+                  axios
+                    .post(
+                      '/api/echo',
+                      echoStatus.bytesString.split(',').map(value => parseInt(value.trim())),
+                    )
+                    .then(({ data }) => {
+                      setEchoStatus({
+                        ...echoStatus,
+                        isInProgress: false,
+                        response: data,
+                      });
+                    });
+                }}
               >
                 Send
               </EuiButton>
