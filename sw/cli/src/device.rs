@@ -1,4 +1,7 @@
-use crate::device::device_identifier::DeviceIdentifier;
+mod device_identifier;
+
+pub use self::device_identifier::DeviceIdentifier;
+
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
 use kroneum_api::{
     array::Array,

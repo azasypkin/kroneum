@@ -94,7 +94,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
             Device::create()?.reset()?
         }
 
-        ("ui", Some(matches)) => ui::start_server(
+        ("ui", Some(matches)) => ui::run_server(
             matches
                 .value_of("PORT")
                 .ok_or_else(|| "<PORT> argument is not provided.".to_string())

@@ -8,13 +8,13 @@ use kroneum_api::{
 };
 use serde_derive::{Deserialize, Serialize};
 
-fn beep() -> impl Responder {
+async fn beep() -> impl Responder {
     let device = Device::create().unwrap();
     device.beep(1).unwrap();
     HttpResponse::NoContent()
 }
 
-fn melody() -> impl Responder {
+async fn melody() -> impl Responder {
     let device = Device::create().unwrap();
     device
         .play_melody(Array::<Tone>::from(
@@ -39,7 +39,7 @@ fn melody() -> impl Responder {
     HttpResponse::NoContent()
 }
 
-fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
+async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
     HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
 }
 
@@ -49,7 +49,7 @@ struct DeviceInfo {
     flash: Vec<u8>,
 }
 
-fn get_info() -> impl Responder {
+async fn get_info() -> impl Responder {
     let device = Device::create().unwrap();
     HttpResponse::Ok().json(DeviceInfo {
         identifier: device.get_identifier().unwrap(),
@@ -63,7 +63,8 @@ fn get_info() -> impl Responder {
     })
 }
 
-pub fn start(port: u16) -> Result<(), String> {
+#[actix_rt::main]
+pub async fn run_server(port: u16) -> Result<(), String> {
     let ui_url = format!("127.0.0.1:{}", port);
     let http_server = HttpServer::new(|| {
         App::new()
@@ -80,5 +81,6 @@ pub fn start(port: u16) -> Result<(), String> {
 
     http_server
         .run()
+        .await
         .or_else(|err| Err(format!("Failed to run Web Server {:?}", err)))
 }
