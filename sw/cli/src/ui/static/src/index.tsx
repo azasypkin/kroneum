@@ -22,6 +22,7 @@ import {
   EuiFieldText,
 } from '@elastic/eui';
 import axios from 'axios';
+import { Player } from './audio';
 
 interface DeviceInfo {
   identifier: {
@@ -169,7 +170,29 @@ const DeviceDiagnosticsSection = () => {
             <EuiButton onClick={() => axios.get('/api/beep')}>Send beep</EuiButton>
           </EuiFormRow>
           <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
-            <EuiButton onClick={() => axios.get('/api/melody')}>Play melody</EuiButton>
+            <EuiButton
+              onClick={async () => {
+                Player.play([
+                  ['A5', 0.25],
+                  ['A#5', 0.25],
+                  ['B5', 0.25],
+                  ['B5', 0.25],
+                  ['C6', 0.25],
+                  ['C#6', 0.25],
+                  ['D6', 0.25],
+                  ['D#6', 0.25],
+                  ['E6', 0.25],
+                  ['F6', 0.25],
+                  ['F#6', 0.25],
+                  ['G6', 0.25],
+                  ['G#6', 0.25],
+                  ['A6', 0.25],
+                ]);
+                await axios.get('/api/melody');
+              }}
+            >
+              Play melody
+            </EuiButton>
           </EuiFormRow>
           <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
             <EuiPopover
