@@ -144,6 +144,11 @@ impl Tone {
     /// Note frequencies, see http://pages.mtu.edu/~suits/notefreqs.html.
     /// https://pages.mtu.edu/~suits/NoteFreqCalcs.html
     pub fn frequency(self) -> u32 {
+        // Check whether tone's note means silence.
+        if self.note == Note::Silence as u8 {
+            return 0;
+        }
+
         let power = ((self.note & 0x0f) as i8 - 4) * 12 - (10 - ((self.note & 0xf0) >> 4) as i8);
         let root_power = libm::powf(ROOT, power.into());
         libm::roundf(440_f32 * root_power) as u32
@@ -422,6 +427,7 @@ mod tests {
 
     #[test]
     fn properly_calculates_notes_frequency() {
+        assert_eq!(Tone::new(Note::Silence as u8, 0).frequency(), 0);
         assert_eq!(Tone::new(Note::C0 as u8, 0).frequency(), 16);
         assert_eq!(Tone::new(Note::E3 as u8, 0).frequency(), 165);
         assert_eq!(Tone::new(Note::A4 as u8, 0).frequency(), 440);
