@@ -2,27 +2,27 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import {
   EuiButton,
-  EuiPage,
-  EuiPageBody,
-  EuiPageHeader,
-  EuiPageHeaderSection,
-  EuiTitle,
-  EuiPageContent,
-  EuiPageContentHeader,
-  EuiPageContentHeaderSection,
-  EuiPageContentBody,
-  EuiPanel,
-  EuiFormRow,
-  EuiSpacer,
-  EuiText,
+  EuiFieldText,
   EuiFlexGroup,
   EuiFlexItem,
-  EuiPopover,
+  EuiFormRow,
   EuiLoadingContent,
-  EuiFieldText,
+  EuiPage,
+  EuiPageBody,
+  EuiPageContent,
+  EuiPageContentBody,
+  EuiPageContentHeader,
+  EuiPageContentHeaderSection,
+  EuiPageHeader,
+  EuiPageHeaderSection,
+  EuiPanel,
+  EuiPopover,
+  EuiSpacer,
+  EuiText,
+  EuiTitle,
 } from '@elastic/eui';
 import axios from 'axios';
-import { Player } from './audio';
+import { Note, Player } from './audio';
 
 interface DeviceInfo {
   identifier: {
@@ -172,23 +172,28 @@ const DeviceDiagnosticsSection = () => {
           <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
             <EuiButton
               onClick={async () => {
-                Player.play([
-                  ['A5', 0.25],
-                  ['A#5', 0.25],
-                  ['B5', 0.25],
-                  ['B5', 0.25],
-                  ['C6', 0.25],
-                  ['C#6', 0.25],
-                  ['D6', 0.25],
-                  ['D#6', 0.25],
-                  ['E6', 0.25],
-                  ['F6', 0.25],
-                  ['F#6', 0.25],
-                  ['G6', 0.25],
-                  ['G#6', 0.25],
-                  ['A6', 0.25],
-                ]);
-                await axios.get('/api/melody');
+                const melody: Array<[Note, number]> = [
+                  [Note.A5, 0.25],
+                  [Note.ASharp5, 0.25],
+                  [Note.B5, 0.25],
+                  [Note.C6, 0.25],
+                  [Note.CSharp6, 0.25],
+                  [Note.D6, 0.25],
+                  [Note.DSharp6, 0.25],
+                  [Note.E6, 0.25],
+                  [Note.F6, 0.25],
+                  [Note.FSharp6, 0.25],
+                  [Note.G6, 0.25],
+                  [Note.GSharp6, 0.25],
+                  [Note.A6, 0.25],
+                ];
+
+                Player.play(melody);
+
+                await axios.post(
+                  '/api/play',
+                  melody.map(([note, duration]) => [note, duration * 400]),
+                );
               }}
             >
               Play melody

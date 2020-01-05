@@ -1,11 +1,7 @@
 use crate::device::{Device, DeviceIdentifier};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use kroneum_api::{
-    array::Array,
-    beeper::{Note, Tone, NOTE_1_4_DURATION},
-    flash::storage_slot::StorageSlot,
-};
+use kroneum_api::{array::Array, beeper::Tone, flash::storage_slot::StorageSlot};
 use serde_derive::{Deserialize, Serialize};
 
 async fn beep() -> impl Responder {
@@ -14,33 +10,22 @@ async fn beep() -> impl Responder {
     HttpResponse::NoContent()
 }
 
-async fn melody() -> impl Responder {
+async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
+    HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
+}
+
+async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
     let device = Device::create().unwrap();
     device
         .play_melody(Array::<Tone>::from(
-            [
-                Tone::new(Note::A5 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::ASharp5 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::B5 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::C6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::CSharp6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::D6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::DSharp6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::E6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::F6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::FSharp6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::G6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::GSharp6 as u8, NOTE_1_4_DURATION),
-                Tone::new(Note::A6 as u8, NOTE_1_4_DURATION),
-            ]
-            .as_ref(),
+            tones
+                .iter()
+                .map(|(note, duration)| Tone::new(*note, *duration))
+                .collect::<Vec<Tone>>()
+                .as_ref(),
         ))
         .unwrap();
     HttpResponse::NoContent()
-}
-
-async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
-    HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -69,7 +54,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
     let http_server = HttpServer::new(|| {
         App::new()
             .route("/api/beep", web::get().to(beep))
-            .route("/api/melody", web::get().to(melody))
+            .route("/api/play", web::post().to(play))
             .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
