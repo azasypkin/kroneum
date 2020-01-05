@@ -1,7 +1,7 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_halt;
+extern crate panic_reset;
 
 use crate::hal::{i2c::I2c, prelude::*, stm32};
 use stm32f0xx_hal as hal;

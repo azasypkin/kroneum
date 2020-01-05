@@ -1,7 +1,7 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_halt;
+extern crate panic_reset;
 
 use crate::hal::{delay::Delay, prelude::*, stm32};
 use cortex_m::peripheral::Peripherals;

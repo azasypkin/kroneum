@@ -3,7 +3,7 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_semihosting;
+extern crate panic_reset;
 
 mod beeper;
 mod buttons;
