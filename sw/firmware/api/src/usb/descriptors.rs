@@ -1,4 +1,4 @@
-use crate::config::{DEVICE_PID, DEVICE_VID};
+use config::{DEVICE_PID, DEVICE_VID};
 
 /*
  * These are the USB device strings in the format required for a USB string descriptor.

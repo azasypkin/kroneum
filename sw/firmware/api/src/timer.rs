@@ -1,54 +1,28 @@
-use config;
+/// Describes the Timer hardware management interface.
+pub trait TimerHardware {
+    /// Initializes hardware if needed.
+    fn setup(&self, frequency_hz: u32, reload_value: u32);
 
-/// Describes the SysTick hardware management interface.
-pub trait SysTickHardware {
-    fn configure(&mut self, reload_value: u32);
-    fn enable_counter(&mut self);
-    fn disable_counter(&mut self);
-    fn has_wrapped(&mut self) -> bool;
-    fn enable_interrupt(&mut self);
-    fn disable_interrupt(&mut self);
+    /// Releases hardware if needed.
+    fn teardown(&self);
 }
 
-pub struct SysTick<T: SysTickHardware> {
+pub struct Timer<T: TimerHardware> {
     hw: T,
 }
 
-impl<T: SysTickHardware> SysTick<T> {
+impl<T: TimerHardware> Timer<T> {
     pub fn new(hw: T) -> Self {
-        SysTick { hw }
+        Timer { hw }
     }
 
-    /// Blocks execution for the specified number of milliseconds.
-    pub fn delay(&mut self, ms: u32) {
-        self.hw.configure(Self::get_reload_value(ms));
-        self.hw.enable_counter();
-
-        while !self.hw.has_wrapped() {}
-
-        self.hw.disable_counter();
-    }
-
-    /// Starts asynchronous counter that will trigger SysTick interrupt whenever it's ready.
     pub fn start(&mut self, ms: u32) {
-        self.hw.configure(Self::get_reload_value(ms));
-        self.hw.enable_interrupt();
-        self.hw.enable_counter();
+        // 1000 is 1kHz frequency of the timer (counts every 1ms).
+        self.hw.setup(1_000, ms);
     }
 
-    /// Stops asynchronous counting.
     pub fn stop(&mut self) {
-        self.hw.disable_interrupt();
-        self.hw.disable_counter();
-    }
-
-    fn get_reload_value(ms: u32) -> u32 {
-        let us = ms * 1000;
-
-        let rvr = us * (config::CLOCK_SPEED / 1_000_000);
-        assert!(rvr < (1 << 24), "timeout is too large");
-
-        rvr
+        self.hw.teardown();
     }
 }
 
@@ -126,14 +100,14 @@ pub(crate) mod tests {
     #[should_panic(expected = "timeout is too large")]
     fn fails_for_large_timeout() {
         let mut systick_mock = MockData::new(AssociatedData::default());
-        create_systick(&mut systick_mock).delay(5000);
+        create_systick(&mut systick_mock).delay_ms(5000);
     }
 
     #[test]
     fn handles_timeout() {
         let mut systick_mock = MockData::new(AssociatedData::default());
 
-        create_systick(&mut systick_mock).delay(1234);
+        create_systick(&mut systick_mock).delay_ms(1234);
         assert_eq!(systick_mock.data.reload_value, 9872000);
         assert_eq!(systick_mock.data.ticks, 5);
 

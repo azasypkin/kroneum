@@ -1,6 +1,6 @@
 use crate::{
     beeper::BeeperHardwareImpl, buttons::ButtonsHardwareImpl, flash::FlashHardwareImpl,
-    rtc::RTCHardwareImpl, usb::USBHardwareImpl,
+    rtc::RTCHardwareImpl, timer::TimerHardwareImpl, usb::USBHardwareImpl,
 };
 use cortex_m::peripheral::SCB;
 use kroneum_api::system::SystemHardware;
@@ -39,6 +39,7 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
     type P = BeeperHardwareImpl<'a>;
     type R = RTCHardwareImpl<'a>;
     type U = USBHardwareImpl<'a>;
+    type T = TimerHardwareImpl<'a>;
 
     fn setup(&self) {
         // Remap PA9-10 to PA11-12 for USB.
@@ -180,6 +181,10 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
 
     fn rtc(&self) -> Self::R {
         RTCHardwareImpl::new(&self.p)
+    }
+
+    fn timer(&self) -> Self::T {
+        TimerHardwareImpl::new(&self.p)
     }
 
     fn usb(&self) -> Self::U {

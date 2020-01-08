@@ -29,4 +29,12 @@ impl<'a> SysTickHardware for SystickHardwareImpl<'a> {
     fn has_wrapped(&mut self) -> bool {
         self.syst.has_wrapped()
     }
+
+    fn enable_interrupt(&mut self) {
+        self.syst.enable_interrupt();
+    }
+
+    fn disable_interrupt(&mut self) {
+        self.syst.disable_interrupt();
+    }
 }

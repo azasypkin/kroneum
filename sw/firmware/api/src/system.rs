@@ -1,13 +1,11 @@
-use crate::{
-    beeper::{Melody, PWMBeeper, PWMBeeperHardware},
-    buttons::{ButtonPressType, Buttons, ButtonsHardware},
-    flash::{Flash, FlashHardware},
-    rtc::{RTCHardware, RTC},
-    time::Time,
-    usb::{command_packet::CommandPacket, USBHardware, USB},
-};
+use beeper::{melody::Melody, BeeperState, PWMBeeper, PWMBeeperHardware};
+use buttons::{ButtonPressType, Buttons, ButtonsHardware, ButtonsPoll, ButtonsState};
+use flash::{Flash, FlashHardware};
+use rtc::{RTCHardware, RTC};
 use systick::{SysTick, SysTickHardware};
-use usb::UsbState;
+use time::Time;
+use timer::{Timer, TimerHardware};
+use usb::{command_packet::CommandPacket, USBHardware, UsbState, USB};
 
 #[derive(Debug, Copy, Clone)]
 enum SystemMode {
@@ -21,6 +19,8 @@ enum SystemMode {
 pub struct SystemState {
     mode: SystemMode,
     usb_state: UsbState,
+    beeper_state: BeeperState,
+    buttons_state: ButtonsState,
 }
 
 impl Default for SystemState {
@@ -28,6 +28,8 @@ impl Default for SystemState {
         SystemState {
             mode: SystemMode::Idle,
             usb_state: UsbState::default(),
+            beeper_state: BeeperState::default(),
+            buttons_state: ButtonsState::default(),
         }
     }
 }
@@ -39,6 +41,7 @@ pub trait SystemHardware {
     type P: PWMBeeperHardware;
     type R: RTCHardware;
     type U: USBHardware;
+    type T: TimerHardware;
 
     /// Initializes hardware if needed.
     fn setup(&self);
@@ -63,6 +66,9 @@ pub trait SystemHardware {
 
     /// Returns the `RTCHardware` used to create `RTC` component.
     fn rtc(&self) -> Self::R;
+
+    /// Returns the `TimerHardware` used to create `Timer` component.
+    fn timer(&self) -> Self::T;
 
     /// Returns the `USBHardware` used to create `USB` component.
     fn usb(&self) -> Self::U;
@@ -90,8 +96,7 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
 
     pub fn handle_alarm(&mut self) {
         if let SystemMode::Alarm(_, melody) = self.state.mode {
-            self.beeper().play(melody);
-            self.beeper().play(melody);
+            self.beeper().play_and_repeat(melody, 2);
 
             self.rtc().teardown();
 
@@ -101,57 +106,19 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
     }
 
     pub fn handle_button_press(&mut self) {
-        if !self.buttons().triggered() {
+        // If buttons weren't activated, don't do anything.
+        let buttons = self.buttons();
+        if !buttons.triggered() {
             return;
         }
 
-        let (button_i, button_x) = self.buttons().interrupt();
-
-        match (self.state.mode, button_i, button_x) {
-            (mode, ButtonPressType::Long, ButtonPressType::Long) => {
-                let (button_i, button_x) = self.buttons().interrupt();
-
-                match (mode, button_i, button_x) {
-                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
-                    | (SystemMode::Alarm(_, _), ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Idle)
-                    }
-                    (_, ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Config)
-                    }
-                    (SystemMode::Setup(counter), _, _) => {
-                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
-                    }
-                    _ => {}
-                }
-            }
-            (SystemMode::Idle, ButtonPressType::Long, _)
-            | (SystemMode::Idle, _, ButtonPressType::Long) => {
-                self.set_mode(SystemMode::Setup(0));
-            }
-            (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
-            | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
-                self.set_mode(SystemMode::Idle);
-            }
-            (SystemMode::Setup(counter), ButtonPressType::Long, _)
-            | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
-                let time = match button_i {
-                    ButtonPressType::Long => Time::from_seconds(counter as u32),
-                    _ => Time::from_minutes(counter as u32),
-                };
-
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
-            }
-            (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
-                self.set_mode(SystemMode::Setup(counter + 1))
-            }
-            (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
-                self.set_mode(SystemMode::Setup(counter + 10))
-            }
-            _ => {}
+        // If buttons are in the middle of the polling, reactivate them and let current polling complete.
+        if buttons.is_polling() {
+            buttons.reactivate();
+            return;
         }
 
-        self.buttons().reactivate();
+        self.poll_buttons();
     }
 
     pub fn handle_usb_packet(&mut self) {
@@ -159,7 +126,7 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
 
         if let Some(command_packet) = self.state.usb_state.command {
             if let CommandPacket::Beep(num) = command_packet {
-                self.beeper().beep_n(num);
+                self.beeper().play_and_repeat(Melody::Beep, num as usize);
             } else if let CommandPacket::Melody(tones) = command_packet {
                 self.beeper().play(Melody::Custom(tones));
             } else if let CommandPacket::AlarmSet(time) = command_packet {
@@ -190,34 +157,88 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         self.state.usb_state.command = None;
     }
 
+    /// Handles SysTick event and stops the counter.
+    pub fn handle_systick(&mut self) {
+        self.systick.stop();
+
+        let mut beeper = self.beeper();
+        if beeper.is_playing() {
+            beeper.resume();
+        }
+    }
+
+    /// Handles timer event: stops the timer and pols the buttons.
+    pub fn handle_timer(&mut self) {
+        self.timer().stop();
+
+        let buttons = self.buttons();
+        if buttons.is_polling() {
+            self.poll_buttons();
+        }
+    }
+
+    /// Depending on the current mode and number of active asynchronous tasks system either enters
+    /// deep sleep mode or exit from it. E.g. if we have timer based tasks left we should exit deep
+    /// sleep to enable timers and enter it as soon as all tasks are completed.
+    pub fn sleep(&mut self) {
+        match (
+            self.state.mode,
+            self.beeper().is_playing() || self.buttons().is_polling(),
+        ) {
+            (SystemMode::Config, _) | (_, true) => self.hw.exit_deep_sleep(),
+            _ => self.hw.enter_deep_sleep(),
+        }
+    }
+
     /// Performs system software reset.
     fn reset(&mut self) {
         self.hw.reset();
     }
 
-    /// Creates an instance of `RTC` controller.
-    fn rtc(&mut self) -> RTC<T::R> {
-        RTC::new(self.hw.rtc())
-    }
+    fn poll_buttons(&mut self) {
+        match self.buttons().poll() {
+            ButtonsPoll::Ready((button_i, button_x, _)) => {
+                match (self.state.mode, button_i, button_x) {
+                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
+                    | (SystemMode::Alarm(_, _), ButtonPressType::Long, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Idle)
+                    }
+                    (SystemMode::Idle, ButtonPressType::Long, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Config)
+                    }
+                    (SystemMode::Setup(counter), ButtonPressType::Long, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
+                    }
+                    (SystemMode::Idle, ButtonPressType::Long, _)
+                    | (SystemMode::Idle, _, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Setup(0));
+                    }
+                    (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
+                    | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
+                        self.set_mode(SystemMode::Idle);
+                    }
+                    (SystemMode::Setup(counter), ButtonPressType::Long, _)
+                    | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
+                        let time = match button_i {
+                            ButtonPressType::Long => Time::from_seconds(counter as u32),
+                            _ => Time::from_minutes(counter as u32),
+                        };
 
-    /// Creates an instance of `Beeper` controller.
-    fn beeper(&mut self) -> PWMBeeper<T::P, S> {
-        PWMBeeper::new(self.hw.beeper(), &mut self.systick)
-    }
+                        self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                    }
+                    (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
+                        self.set_mode(SystemMode::Setup(counter + 1))
+                    }
+                    (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
+                        self.set_mode(SystemMode::Setup(counter + 10))
+                    }
+                    _ => {}
+                }
+            }
+            ButtonsPoll::Pending(pending_time) => self.timer().start(pending_time),
+        }
 
-    /// Creates an instance of `Buttons` controller.
-    fn buttons(&mut self) -> Buttons<T::B, S> {
-        Buttons::new(self.hw.buttons(), &mut self.systick)
-    }
-
-    /// Creates an instance of `Flash` controller.
-    fn flash(&mut self) -> Flash<T::F> {
-        Flash::new(self.hw.flash())
-    }
-
-    /// Creates an instance of `USB` controller.
-    fn usb(&mut self) -> USB<T::U> {
-        USB::new(self.hw.usb(), &mut self.state.usb_state)
+        self.buttons().reactivate();
     }
 
     /// Switches system to a new mode.
@@ -227,28 +248,26 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
                 self.usb().teardown();
                 self.rtc().teardown();
 
-                // If we are exiting `Config` or `Alarm` mode let's play special signal.
-                if let SystemMode::Setup(_) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                } else if let SystemMode::Alarm(_, _) = self.state.mode {
-                    self.beeper().play(Melody::Reset);
-                } else if let SystemMode::Config = self.state.mode {
-                    self.beeper().play(Melody::Reset);
+                // If we are exiting `Config`, `Setup` or `Alarm` mode let's play special signal.
+                if let SystemMode::Setup(_) | SystemMode::Alarm(_, _) | SystemMode::Config =
+                    self.state.mode
+                {
+                    self.beeper().play(Melody::Reset)
                 }
-
-                self.hw.enter_deep_sleep();
             }
             SystemMode::Config => {
-                self.hw.exit_deep_sleep();
-
                 self.beeper().play(Melody::Reset);
-
                 self.usb().setup();
             }
             SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
-            SystemMode::Setup(c) if *c > 0 => self.beeper().beep(),
+            SystemMode::Setup(c) if *c > 0 => self.beeper().play(Melody::Beep),
             SystemMode::Alarm(time, _) => {
-                self.beeper().play(Melody::Setup);
+                // We don't need to additionally beep if we transition from one Alarm mode to
+                // another that means we're in a Snooze mode.
+                match self.state.mode {
+                    SystemMode::Alarm(_, _) => {}
+                    _ => self.beeper().play(Melody::Setup),
+                }
 
                 let rtc = self.rtc();
                 rtc.setup();
@@ -259,6 +278,39 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
         }
 
         self.state.mode = mode;
+    }
+
+    /// Creates an instance of `RTC` controller.
+    fn rtc(&mut self) -> RTC<T::R> {
+        RTC::new(self.hw.rtc())
+    }
+
+    fn timer(&mut self) -> Timer<T::T> {
+        Timer::new(self.hw.timer())
+    }
+
+    /// Creates an instance of `Beeper` controller.
+    fn beeper(&mut self) -> PWMBeeper<T::P, S> {
+        PWMBeeper::new(
+            self.hw.beeper(),
+            &mut self.systick,
+            &mut self.state.beeper_state,
+        )
+    }
+
+    /// Creates an instance of `Buttons` controller.
+    fn buttons(&mut self) -> Buttons<T::B> {
+        Buttons::new(self.hw.buttons(), &mut self.state.buttons_state)
+    }
+
+    /// Creates an instance of `Flash` controller.
+    fn flash(&mut self) -> Flash<T::F> {
+        Flash::new(self.hw.flash())
+    }
+
+    /// Creates an instance of `USB` controller.
+    fn usb(&mut self) -> USB<T::U> {
+        USB::new(self.hw.usb(), &mut self.state.usb_state)
     }
 }
 

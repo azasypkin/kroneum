@@ -1,7 +1,7 @@
-use crate::flash::storage_slot::StorageSlot;
-use crate::time::Time;
 use array::Array;
-use beeper::Tone;
+use beeper::tone::Tone;
+use flash::storage_slot::StorageSlot;
+use time::Time;
 
 impl From<CommandPacket> for Array<u8> {
     fn from(packet: CommandPacket) -> Self {

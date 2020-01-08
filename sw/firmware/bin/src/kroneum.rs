@@ -35,11 +35,13 @@ impl Kroneum {
             core.NVIC.set_priority(Interrupt::EXTI0_1, 1);
             core.NVIC.set_priority(Interrupt::EXTI2_3, 1);
             core.NVIC.set_priority(Interrupt::RTC, 1);
+            core.NVIC.set_priority(Interrupt::TIM2, 1);
 
             NVIC::unmask(Interrupt::EXTI0_1);
             NVIC::unmask(Interrupt::EXTI2_3);
             NVIC::unmask(Interrupt::RTC);
             NVIC::unmask(Interrupt::USB);
+            NVIC::unmask(Interrupt::TIM2);
         }
 
         kroneum

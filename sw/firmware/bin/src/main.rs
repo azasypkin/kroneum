@@ -12,6 +12,7 @@ mod kroneum;
 mod rtc;
 mod system;
 mod systick;
+mod timer;
 mod usb;
 
 use crate::kroneum::{Kroneum, KroneumSystem};
@@ -48,6 +49,7 @@ fn main() -> ! {
     });
 
     loop {
+        get_system(|mut system| system.sleep());
         cortex_m::asm::wfi();
     }
 }
@@ -72,6 +74,11 @@ fn USB() {
     get_system(|mut system| system.handle_usb_packet());
 }
 
+#[interrupt]
+fn TIM2() {
+    get_system(|mut system| system.handle_timer());
+}
+
 #[exception]
 fn DefaultHandler(irqn: i16) {
     panic!("unhandled exception (IRQn={})", irqn);
@@ -80,4 +87,9 @@ fn DefaultHandler(irqn: i16) {
 #[exception]
 fn HardFault(_ef: &ExceptionFrame) -> ! {
     panic!("hard fault (PC={})", _ef.pc);
+}
+
+#[exception]
+fn SysTick() {
+    get_system(|mut system| system.handle_systick());
 }

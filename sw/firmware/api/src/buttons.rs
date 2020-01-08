@@ -1,5 +1,3 @@
-use systick::{SysTick, SysTickHardware};
-
 /// Defines known button types.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub enum ButtonType {
@@ -27,6 +25,19 @@ impl ButtonPressType {
     }
 }
 
+pub type ButtonsPollResult = (ButtonPressType, ButtonPressType, u32);
+
+#[derive(Copy, Clone, Debug)]
+pub enum ButtonsPoll {
+    Ready(ButtonsPollResult),
+    Pending(u32),
+}
+
+#[derive(Copy, Clone, Default)]
+pub struct ButtonsState {
+    pub poll_result: Option<ButtonsPollResult>,
+}
+
 /// Describes the Buttons hardware management interface.
 pub trait ButtonsHardware {
     /// Initializes hardware if needed.
@@ -47,14 +58,14 @@ pub trait ButtonsHardware {
     fn reactivate_button(&self, button_type: ButtonType);
 }
 
-pub struct Buttons<'a, T: ButtonsHardware, S: SysTickHardware> {
+pub struct Buttons<'a, T: ButtonsHardware> {
     hw: T,
-    systick: &'a mut SysTick<S>,
+    state: &'a mut ButtonsState,
 }
 
-impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
-    pub fn new(hw: T, systick: &'a mut SysTick<S>) -> Self {
-        Buttons { hw, systick }
+impl<'a, T: ButtonsHardware> Buttons<'a, T> {
+    pub fn new(hw: T, state: &'a mut ButtonsState) -> Self {
+        Buttons { hw, state }
     }
 
     /// Setups Buttons hardware.
@@ -67,45 +78,41 @@ impl<'a, T: ButtonsHardware, S: SysTickHardware> Buttons<'a, T, S> {
         self.hw.teardown()
     }
 
-    pub fn interrupt(&mut self) -> (ButtonPressType, ButtonPressType) {
-        let mut button_one_state = if self.hw.is_button_pressed(ButtonType::One) {
-            ButtonPressType::Short
+    pub fn poll(&mut self) -> ButtonsPoll {
+        let button_one_pressed = self.hw.is_button_pressed(ButtonType::One);
+        let button_ten_pressed = self.hw.is_button_pressed(ButtonType::Ten);
+        let get_button_state =
+            |previous_state: ButtonPressType, is_pressed: bool, pending_time: u32| {
+                if is_pressed && pending_time <= 500 {
+                    ButtonPressType::Short
+                } else if is_pressed && !previous_state.is_none() {
+                    ButtonPressType::Long
+                } else {
+                    previous_state
+                }
+            };
+
+        let (button_one_prev_state, button_ten_prev_state, pending_time) = self
+            .state
+            .poll_result
+            .unwrap_or_else(|| (ButtonPressType::None, ButtonPressType::None, 0));
+        let button_one_state =
+            get_button_state(button_one_prev_state, button_one_pressed, pending_time);
+        let button_ten_state =
+            get_button_state(button_ten_prev_state, button_ten_pressed, pending_time);
+
+        if (!button_one_pressed && !button_ten_pressed) || pending_time > 1000 {
+            self.state.poll_result = None;
+            ButtonsPoll::Ready((button_one_state, button_ten_state, pending_time))
         } else {
-            ButtonPressType::None
-        };
-        let mut button_ten_state = if self.hw.is_button_pressed(ButtonType::Ten) {
-            ButtonPressType::Short
-        } else {
-            ButtonPressType::None
-        };
-
-        if !button_one_state.is_none() || !button_ten_state.is_none() {
-            for i in 1u8..4u8 {
-                self.systick.delay_ms(250);
-
-                let button_one_pressed = self.hw.is_button_pressed(ButtonType::One);
-                let button_ten_pressed = self.hw.is_button_pressed(ButtonType::Ten);
-                if !button_one_pressed && !button_ten_pressed {
-                    break;
-                }
-
-                let (new_state, works_for_none) = match i {
-                    0..=2 => (ButtonPressType::Short, true),
-                    3..=4 => (ButtonPressType::Long, false),
-                    _ => break,
-                };
-
-                if button_one_pressed && (!button_one_state.is_none() || works_for_none) {
-                    button_one_state = new_state;
-                }
-
-                if button_ten_pressed && (!button_ten_state.is_none() || works_for_none) {
-                    button_ten_state = new_state;
-                }
-            }
+            self.state.poll_result = Some((button_one_state, button_ten_state, pending_time + 250));
+            ButtonsPoll::Pending(250)
         }
+    }
 
-        (button_one_state, button_ten_state)
+    /// Detects whether buttons are in the middle of the poll.
+    pub fn is_polling(&self) -> bool {
+        self.state.poll_result.is_some()
     }
 
     /// Detects whether any of the control buttons was triggered.
@@ -183,12 +190,9 @@ mod tests {
         mock_data: &'a mut MockData<'b, Call, AssociatedData<'b, F, FA>>,
         systick: &'a mut SysTick<SystickHardwareMock<'a, 'b>>,
     ) -> Buttons<'a, ButtonsHardwareMock<'a, 'b, F, FA>, SystickHardwareMock<'a, 'b>> {
-        Buttons::new(
-            ButtonsHardwareMock {
-                data: RefCell::new(mock_data),
-            },
-            systick,
-        )
+        Buttons::new(ButtonsHardwareMock {
+            data: RefCell::new(mock_data),
+        })
     }
 
     #[test]

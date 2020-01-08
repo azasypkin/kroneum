@@ -1,4 +1,4 @@
-use crate::time::{BCDTime, Time};
+use time::{BCDTime, Time};
 
 /// Describes the RTC hardware management interface.
 pub trait RTCHardware {

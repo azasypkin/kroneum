@@ -13,6 +13,7 @@ pub mod rtc;
 pub mod system;
 pub mod systick;
 pub mod time;
+pub mod timer;
 pub mod usb;
 
 #[cfg(test)]
