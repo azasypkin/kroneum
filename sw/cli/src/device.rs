@@ -5,7 +5,7 @@ pub use self::device_identifier::DeviceIdentifier;
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
 use kroneum_api::{
     array::Array,
-    beeper::Tone,
+    beeper::tone::Tone,
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,

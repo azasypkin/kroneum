@@ -1,7 +1,7 @@
 use crate::device::{Device, DeviceIdentifier};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use kroneum_api::{array::Array, beeper::Tone, flash::storage_slot::StorageSlot};
+use kroneum_api::{array::Array, beeper::tone::Tone, flash::storage_slot::StorageSlot};
 use serde_derive::{Deserialize, Serialize};
 
 async fn beep() -> impl Responder {
