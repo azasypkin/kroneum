@@ -115,21 +115,8 @@ The most recent enclosure was machined from 5mm (base and cap) and 2mm (buttons)
 
 See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) renders and photos of how it turned in real:
 
-#### PCB (rendered)
-![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-render.png)
-
-![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-back-render.png)
-
-#### PCB (real)
-![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb.png)
-
-![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-back.png)
-
-#### Enclosure (rendered)
-![enclosure](./hw/enclosure/Rev_0.6/demo/kroneum-enclosure-render.png)
-
-#### Enclosure (real)
-![enclosure](./hw/enclosure/Rev_0.6/demo/kroneum-enclosure.png)
+#### Demo PCB and enclosure (rendered vs real)
+![enclosure](./assets/hw-demo.png)
 
 <details>
   <summary><b>Older versions</b></summary>
