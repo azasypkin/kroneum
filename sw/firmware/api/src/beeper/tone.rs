@@ -26,3 +26,34 @@ impl Tone {
         libm::roundf(440_f32 * root_power) as u32
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn properly_calculates_frequency() {
+        assert_eq!(Tone::new(Note::Silence as u8, 0).frequency(), 0);
+        assert_eq!(Tone::new(Note::C0 as u8, 0).frequency(), 16);
+        assert_eq!(Tone::new(Note::E3 as u8, 0).frequency(), 165);
+        assert_eq!(Tone::new(Note::A4 as u8, 0).frequency(), 440);
+        assert_eq!(Tone::new(Note::C5 as u8, 0).frequency(), 523);
+        assert_eq!(Tone::new(Note::DSharp7 as u8, 0).frequency(), 2489);
+        assert_eq!(Tone::new(Note::B7 as u8, 0).frequency(), 3951)
+    }
+
+    #[test]
+    fn properly_keeps_note_and_duration() {
+        let tone = Tone::new(Note::Silence as u8, 0);
+        assert_eq!(tone.duration, 0);
+        assert_eq!(tone.note, Note::Silence as u8);
+
+        let tone = Tone::new(Note::C0 as u8, 100);
+        assert_eq!(tone.duration, 100);
+        assert_eq!(tone.note, Note::C0 as u8);
+
+        let tone = Tone::new(Note::B7 as u8, 250);
+        assert_eq!(tone.duration, 250);
+        assert_eq!(tone.note, Note::B7 as u8);
+    }
+}

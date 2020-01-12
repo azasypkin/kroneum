@@ -124,3 +124,20 @@ pub enum Note {
 
     Silence = 0x00,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn silence_note_evaluates_to_zero() {
+        assert_eq!(Note::Silence as u8, 0);
+    }
+
+    #[test]
+    fn durations_are_properly_calculated() {
+        assert_eq!(NOTE_1_8_DURATION, 50);
+        assert_eq!(NOTE_1_4_DURATION, 100);
+        assert_eq!(NOTE_1_2_DURATION, 200);
+    }
+}

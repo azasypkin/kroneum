@@ -94,7 +94,7 @@ impl From<&[u8]> for CommandPacket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use beeper::Note;
+    use beeper::note::Note;
 
     #[test]
     fn beep_command() {

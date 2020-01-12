@@ -154,121 +154,240 @@ mod tests {
     fn create_beeper<'a, 'b: 'a>(
         beeper_mock: &'a mut MockData<'b, Call>,
         systick: &'a mut SysTick<SystickHardwareMock<'a, 'b>>,
+        state: &'a mut BeeperState,
     ) -> PWMBeeper<'a, PWMBeeperHardwareMock<'a, 'b>, SystickHardwareMock<'a, 'b>> {
         PWMBeeper::new(
             PWMBeeperHardwareMock {
                 data: RefCell::new(beeper_mock),
             },
             systick,
+            state,
+        )
+    }
+
+    fn create_tones() -> Array<Tone> {
+        Array::from(
+            [
+                Tone::new(Note::C0 as u8, 100),
+                Tone::new(Note::B7 as u8, 250),
+            ]
+            .as_ref(),
         )
     }
 
     #[test]
-    fn handles_beep() {
+    fn play_start_pwm_sound() {
         let order = Order::default();
         let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
         let mut systick_mock =
             MockData::with_data_and_call_order(AssociatedData::default(), &order);
 
-        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep();
+        let mut systick = create_systick(&mut systick_mock);
+        let mut state = BeeperState::default();
+        let tones = create_tones();
 
-        assert_eq!(
-            [Some((
-                SystickCall::Delay(BEEP_MELODY[0].duration as u32),
-                2
-            ))],
-            systick_mock.calls.ordered_logs(),
-        );
+        let mut beeper = create_beeper(&mut beeper_mock, &mut systick, &mut state);
+
+        assert_eq!(beeper.is_playing(), false);
+        beeper.play(tones);
+        assert_eq!(beeper.is_playing(), true);
+
         assert_eq!(
             [
                 Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(BEEP_MELODY[0].frequency()), 1)),
-                // Delay (order 2)
-                Some((Call::DisablePWM, 3))
+                Some((Call::Pulse(tones[0].frequency()), 1))
             ],
             beeper_mock.calls.ordered_logs()
         );
-    }
-
-    #[test]
-    fn handles_beep_n() {
-        let order = Order::default();
-        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
-        let mut systick_mock =
-            MockData::with_data_and_call_order(AssociatedData::default(), &order);
-
-        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).beep_n(3);
-
         assert_eq!(
             [
-                Some((SystickCall::Delay(BEEP_MELODY[0].duration as u32), 2)),
-                Some((SystickCall::Delay(100), 4)),
-                Some((SystickCall::Delay(BEEP_MELODY[0].duration as u32), 7)),
-                Some((SystickCall::Delay(100), 9)),
-                Some((SystickCall::Delay(BEEP_MELODY[0].duration as u32), 12))
-            ],
-            systick_mock.calls.ordered_logs()
-        );
-
-        assert_eq!(
-            [
-                Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(BEEP_MELODY[0].frequency()), 1)),
-                // Delay (2)
-                Some((Call::DisablePWM, 3)),
-                // Delay 100ms (4)
-                Some((Call::EnablePWM, 5)),
-                Some((Call::Pulse(BEEP_MELODY[0].frequency()), 6)),
-                // Delay (7)
-                Some((Call::DisablePWM, 8)),
-                // Delay 100ms (9)
-                Some((Call::EnablePWM, 10)),
-                Some((Call::Pulse(BEEP_MELODY[0].frequency()), 11)),
-                // Delay (12)
-                Some((Call::DisablePWM, 13))
-            ],
-            beeper_mock.calls.ordered_logs()
-        );
-    }
-
-    #[test]
-    fn handles_play() {
-        let order = Order::default();
-        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
-        let mut systick_mock =
-            MockData::with_data_and_call_order(AssociatedData::default(), &order);
-
-        create_beeper(&mut beeper_mock, &mut create_systick(&mut systick_mock)).play(Melody::Setup);
-
-        assert_eq!(
-            [
-                Some((SystickCall::Delay(SETUP_MELODY[0].duration as u32), 2)),
-                Some((SystickCall::Delay(SETUP_MELODY[1].duration as u32), 4)),
+                Some((SystickCall::Delay(tones[0].duration as u32), 2)),
+                Some((SystickCall::EnableInterrupt, 3)),
+                Some((SystickCall::EnableCounter, 4))
             ],
             systick_mock.calls.ordered_logs(),
         );
+    }
+
+    #[test]
+    fn resume_continues_pwm_sound() {
+        let order = Order::default();
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
+
+        let mut systick = create_systick(&mut systick_mock);
+        let mut state = BeeperState::default();
+        let tones = create_tones();
+
+        let mut beeper = create_beeper(&mut beeper_mock, &mut systick, &mut state);
+        beeper.play(tones);
+
+        beeper.resume();
+        assert_eq!(beeper.is_playing(), true);
 
         assert_eq!(
             [
                 Some((Call::EnablePWM, 0)),
-                Some((Call::Pulse(SETUP_MELODY[0].frequency()), 1)),
-                // Delay (2)
-                Some((Call::Pulse(SETUP_MELODY[1].frequency()), 3)),
-                // Delay (4)
-                Some((Call::DisablePWM, 5))
+                Some((Call::Pulse(tones[0].frequency()), 1)),
+                Some((Call::Pulse(tones[1].frequency()), 5))
             ],
-            beeper_mock.calls.ordered_logs(),
+            beeper_mock.calls.ordered_logs()
+        );
+        assert_eq!(
+            [
+                Some((SystickCall::Delay(tones[0].duration as u32), 2)),
+                Some((SystickCall::EnableInterrupt, 3)),
+                Some((SystickCall::EnableCounter, 4)),
+                Some((SystickCall::Delay(tones[1].duration as u32), 6)),
+                Some((SystickCall::EnableInterrupt, 7)),
+                Some((SystickCall::EnableCounter, 8))
+            ],
+            systick_mock.calls.ordered_logs(),
         );
     }
 
     #[test]
-    fn properly_calculates_notes_frequency() {
-        assert_eq!(Tone::new(Note::Silence as u8, 0).frequency(), 0);
-        assert_eq!(Tone::new(Note::C0 as u8, 0).frequency(), 16);
-        assert_eq!(Tone::new(Note::E3 as u8, 0).frequency(), 165);
-        assert_eq!(Tone::new(Note::A4 as u8, 0).frequency(), 440);
-        assert_eq!(Tone::new(Note::C5 as u8, 0).frequency(), 523);
-        assert_eq!(Tone::new(Note::DSharp7 as u8, 0).frequency(), 2489);
-        assert_eq!(Tone::new(Note::B7 as u8, 0).frequency(), 3951)
+    fn resume_eventually_stops_pwm_sound() {
+        let order = Order::default();
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
+
+        let mut systick = create_systick(&mut systick_mock);
+        let mut state = BeeperState::default();
+        let tones = create_tones();
+
+        let mut beeper = create_beeper(&mut beeper_mock, &mut systick, &mut state);
+        beeper.play(tones);
+
+        beeper.resume();
+        beeper.resume();
+        assert_eq!(beeper.is_playing(), false);
+
+        assert_eq!(
+            [
+                Some((Call::EnablePWM, 0)),
+                Some((Call::Pulse(tones[0].frequency()), 1)),
+                Some((Call::Pulse(tones[1].frequency()), 5)),
+                Some((Call::DisablePWM, 9)),
+            ],
+            beeper_mock.calls.ordered_logs()
+        );
+        assert_eq!(
+            [
+                Some((SystickCall::Delay(tones[0].duration as u32), 2)),
+                Some((SystickCall::EnableInterrupt, 3)),
+                Some((SystickCall::EnableCounter, 4)),
+                Some((SystickCall::Delay(tones[1].duration as u32), 6)),
+                Some((SystickCall::EnableInterrupt, 7)),
+                Some((SystickCall::EnableCounter, 8))
+            ],
+            systick_mock.calls.ordered_logs(),
+        );
+    }
+
+    #[test]
+    fn stop_immediately_stops_pwm_sound() {
+        let order = Order::default();
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
+
+        let mut systick = create_systick(&mut systick_mock);
+        let mut state = BeeperState::default();
+        let tones = create_tones();
+
+        let mut beeper = create_beeper(&mut beeper_mock, &mut systick, &mut state);
+        beeper.play(tones);
+
+        beeper.stop();
+        assert_eq!(beeper.is_playing(), false);
+
+        assert_eq!(
+            [
+                Some((Call::EnablePWM, 0)),
+                Some((Call::Pulse(tones[0].frequency()), 1)),
+                Some((Call::DisablePWM, 5)),
+            ],
+            beeper_mock.calls.ordered_logs()
+        );
+        assert_eq!(
+            [
+                Some((SystickCall::Delay(tones[0].duration as u32), 2)),
+                Some((SystickCall::EnableInterrupt, 3)),
+                Some((SystickCall::EnableCounter, 4)),
+            ],
+            systick_mock.calls.ordered_logs(),
+        );
+    }
+
+    #[test]
+    fn play_and_repeat_repeats_pwm_sound() {
+        let order = Order::default();
+        let mut beeper_mock = MockData::<Call, ()>::with_call_order(&order);
+        let mut systick_mock =
+            MockData::with_data_and_call_order(AssociatedData::default(), &order);
+
+        let mut systick = create_systick(&mut systick_mock);
+        let mut state = BeeperState::default();
+        let tones = create_tones();
+
+        let mut beeper = create_beeper(&mut beeper_mock, &mut systick, &mut state);
+        beeper.play_and_repeat(tones, 2);
+
+        // First repetition.
+        beeper.resume();
+        beeper.resume();
+        assert_eq!(beeper.is_playing(), true);
+
+        // Second repetition (silence note).
+        beeper.resume();
+
+        // two consequent notes.
+        beeper.resume();
+        assert_eq!(beeper.is_playing(), true);
+
+        beeper.resume();
+        assert_eq!(beeper.is_playing(), false);
+
+        assert_eq!(
+            [
+                // First repetition.
+                Some((Call::EnablePWM, 0)),
+                Some((Call::Pulse(tones[0].frequency()), 1)),
+                Some((Call::Pulse(tones[1].frequency()), 5)),
+                // Silence
+                Some((Call::Pulse(0), 9)),
+                // Second repetition.
+                Some((Call::Pulse(tones[0].frequency()), 13)),
+                Some((Call::Pulse(tones[1].frequency()), 17)),
+                Some((Call::DisablePWM, 21)),
+            ],
+            beeper_mock.calls.ordered_logs()
+        );
+        assert_eq!(
+            [
+                // First repetition.
+                Some((SystickCall::Delay(tones[0].duration as u32), 2)),
+                Some((SystickCall::EnableInterrupt, 3)),
+                Some((SystickCall::EnableCounter, 4)),
+                Some((SystickCall::Delay(tones[1].duration as u32), 6)),
+                Some((SystickCall::EnableInterrupt, 7)),
+                Some((SystickCall::EnableCounter, 8)),
+                // Silence
+                Some((SystickCall::Delay(100), 10)),
+                Some((SystickCall::EnableInterrupt, 11)),
+                Some((SystickCall::EnableCounter, 12)),
+                // Second repetition.
+                Some((SystickCall::Delay(tones[0].duration as u32), 14)),
+                Some((SystickCall::EnableInterrupt, 15)),
+                Some((SystickCall::EnableCounter, 16)),
+                Some((SystickCall::Delay(tones[1].duration as u32), 18)),
+                Some((SystickCall::EnableInterrupt, 19)),
+                Some((SystickCall::EnableCounter, 20)),
+            ],
+            systick_mock.calls.ordered_logs(),
+        );
     }
 }

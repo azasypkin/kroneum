@@ -78,3 +78,30 @@ const SETUP_MELODY: [Tone; 2] = [
     Tone::new(Note::DSharp5 as u8, NOTE_1_4_DURATION),
     Tone::new(Note::DSharp5 as u8, NOTE_1_4_DURATION),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn properly_converts_into_tones_array() {
+        let melody_tones: Array<Tone> = Melody::Beep.into();
+        assert_eq!(melody_tones, Array::from(BEEP_MELODY.as_ref()));
+
+        let melody_tones: Array<Tone> = Melody::Alarm.into();
+        assert_eq!(melody_tones, Array::from(ALARM_MELODY.as_ref()));
+
+        let melody_tones: Array<Tone> = Melody::Reset.into();
+        assert_eq!(melody_tones, Array::from(RESET_MELODY.as_ref()));
+
+        let melody_tones: Array<Tone> = Melody::Setup.into();
+        assert_eq!(melody_tones, Array::from(SETUP_MELODY.as_ref()));
+
+        let custom_tones = [
+            Tone::new(Note::A0 as u8, NOTE_1_4_DURATION),
+            Tone::new(Note::DSharp1 as u8, NOTE_1_2_DURATION),
+        ];
+        let melody_tones: Array<Tone> = Melody::Custom(Array::from(custom_tones.as_ref())).into();
+        assert_eq!(melody_tones, Array::from(custom_tones.as_ref()));
+    }
+}
