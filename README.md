@@ -10,7 +10,7 @@ Another goal was to see how well Rust fits into embedded development (basic inte
 **Kroneum** is an experimental, accessible (no GUI) and fully open source (both in code and hardware) time tracker device.
 
 There is neither GUI/LCD nor Wi-Fi/Bluetooth interface available, just two buttons one can use to configure the timer. More advanced users can use built-in USB functionality
-to configure device (via dedicated [CLI tool](./sw/cli)), upgrade firmware (via [DFU interface](./sw/firmware/README.md)) or upload various Krouneum "recipes" (e.g. to repurpose device completely).
+to configure device (via dedicated [CLI tool](./sw/cli) with optional Web interface), upgrade firmware (via [DFU interface](./sw/firmware/README.md)) or upload various Krouneum "recipes" (e.g. to repurpose device completely).
 
 ## Usage
 
@@ -58,6 +58,17 @@ $ cargo run -- reset
 
 ```
 
+It's also possible to use CLI tool as a standalone server with a minimalistic Web interface:
+
+```bash
+$ cargo run -- ui
+  Running Kroneum Web UI on http://127.0.0.1:8080
+``` 
+
+Web server is bound to a local `http://127.0.0.1:8080` address and can be accessed with any modern browser:
+
+![enclosure](./assets/web-ui-demo.png)
+
 Run `cargo run -- help` for more details.
 
 **NOTE:** To use CLI tool without `root` privilege you may need to add the following `udev` rule:
@@ -70,7 +81,10 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="deed", GROUP="use
 And then manually force `udev` to trigger this rule:
 ```bash
 # udevadm trigger
-``` 
+```
+
+In the future releases Web interface will be using [WebHID API](https://wicg.github.io/webhid/) completely eliminating the need in
+the local Web server.
 
 ## Building custom firmware
 
@@ -96,25 +110,46 @@ The `flash.sh` script is essentially consequent calls of `cargo build --release 
 Schematics is done in `KiCad` and can be found [here](./hw/pcb/Rev_0.5). PCB includes SWD, I2C and CR2032 connectors and may look a bit
 oversized because of that, but on the bright side hand soldering and [CNC engraving](./hw/pcb/Rev_0.3/cnc) was a breeze.
 
-Enclosure was machined from 5mm Plexiglas (walls and buttons) and 2mm Delrin (base and cap). G-Code can be found [here](./hw/enclosure/Rev_0.5/cnc).
+The most recent enclosure was machined from 5mm (base and cap) and 2mm (buttons) Delrin and the older versions were machined from
+5mm Plexiglas (walls and buttons) and 2mm Delrin (base and cap). G-Code can be found [here](./hw/enclosure/Rev_0.5/cnc).
 
-See [PCB](./hw/pcb/Rev_0.5/demo) and [enclosure](./hw/enclosure/Rev_0.5/demo) renders and photos of how it turned in real:
+See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) renders and photos of how it turned in real:
 
 #### PCB (rendered)
-![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-render.png)
-![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back-render.png)
+![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-render.png)
+![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-back-render.png)
+
+<details>
+  <summary>Older versions</summary>
+  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-render.png)
+  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back-render.png)
+</details>
 
 #### PCB (real)
-![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb.png)
-![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back.png)
+![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb.png)
+![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-back.png)
+
+<details>
+  <summary>Older versions</summary>
+  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb.png)
+  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back.png)
+</details>
 
 #### Enclosure (rendered)
-![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-render.png)
-![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-open-render.png)
+![enclosure](./hw/enclosure/Rev_0.6/demo/kroneum-enclosure-render.png)
+
+<details>
+  <summary>Older versions</summary>
+  ![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-render.png)
+</details>
 
 #### Enclosure (real)
-![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure.png)
-![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-open.png)
+![enclosure](./hw/enclosure/Rev_0.6/demo/kroneum-enclosure.png)
+
+<details>
+  <summary>Older versions</summary>
+  ![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure.png)
+</details>
 
 -.- .-. --- -. . ..- --
 
