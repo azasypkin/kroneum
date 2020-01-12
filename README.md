@@ -121,8 +121,10 @@ See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) re
 
 <details>
   <summary>Older versions</summary>
-  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-render.png)
-  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back-render.png)
+
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-render.png)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back-render.png)
+
 </details>
 
 #### PCB (real)
@@ -130,9 +132,11 @@ See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) re
 ![enclosure](./hw/pcb/Rev_0.6/demo/kroneum-pcb-back.png)
 
 <details>
-  <summary>Older versions</summary>
-  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb.png)
-  ![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back.png)
+<summary>Older versions</summary>
+
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb.png)
+![enclosure](./hw/pcb/Rev_0.5/demo/kroneum-pcb-back.png)
+
 </details>
 
 #### Enclosure (rendered)
@@ -140,7 +144,9 @@ See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) re
 
 <details>
   <summary>Older versions</summary>
-  ![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-render.png)
+
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure-render.png)
+
 </details>
 
 #### Enclosure (real)
@@ -148,7 +154,9 @@ See [PCB](./hw/pcb/Rev_0.6/demo) and [enclosure](./hw/enclosure/Rev_0.6/demo) re
 
 <details>
   <summary>Older versions</summary>
-  ![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure.png)
+
+![enclosure](./hw/enclosure/Rev_0.5/demo/kroneum-enclosure.png)
+
 </details>
 
 -.- .-. --- -. . ..- --
