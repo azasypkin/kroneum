@@ -97,10 +97,10 @@ Default firmware:
 $ ./scripts/flash.sh 
 
 # Example: blinking through TP1/SDA pad exposed on the back side of Kroneum PCB
-$ ./script/flash.sh blinky
+$ ./scripts/flash.sh blinky
 
 # Example: interfacing with SSD1306 LCD via TP1/SDA and TP2/SCL pads exposed on the back side of Kroneum PCB
-$ ./script/flash i2c_ssd1306 
+$ ./scripts/flash.sh i2c_ssd1306 
 ``` 
 
 The `flash.sh` script is essentially consequent calls of `cargo build --release ...`, `cargo objcopy --release ...` and `dfu-util ...`.
