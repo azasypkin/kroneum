@@ -21,12 +21,12 @@ pub trait RTCHardware {
     fn set_alarm(&self, bcd_time: BCDTime);
 }
 
-pub struct RTC<T: RTCHardware> {
-    hw: T,
+pub struct RTC<'a, T: RTCHardware> {
+    hw: &'a T,
 }
 
-impl<T: RTCHardware> RTC<T> {
-    pub fn new(hw: T) -> Self {
+impl<'a, T: RTCHardware> RTC<'a, T> {
+    pub fn new(hw: &'a T) -> Self {
         RTC { hw }
     }
 
@@ -75,11 +75,11 @@ mod tests {
         pub alarm: BCDTime,
     }
 
-    struct RTCHardwareMock<'a, 'b: 'a> {
-        data: RefCell<&'a mut MockData<'b, Call, AssociatedData>>,
+    struct RTCHardwareMock<'a> {
+        data: RefCell<MockData<'a, Call, AssociatedData>>,
     }
 
-    impl<'a, 'b: 'a> RTCHardware for RTCHardwareMock<'a, 'b> {
+    impl<'a> RTCHardware for RTCHardwareMock<'a> {
         fn setup(&self) {
             self.data.borrow_mut().calls.log_call(Call::Setup);
         }
@@ -119,38 +119,39 @@ mod tests {
         }
     }
 
-    fn create_rtc<'a, 'b: 'a>(
-        mock_data: &'a mut MockData<'b, Call, AssociatedData>,
-    ) -> RTC<RTCHardwareMock<'a, 'b>> {
-        RTC::new(RTCHardwareMock {
-            data: RefCell::new(mock_data),
-        })
-    }
-
     #[test]
     fn setup() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
-        create_rtc(&mut mock_data).setup();
+        RTC::new(&rtc_hw_mock).setup();
 
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
+        assert_eq!(rtc_hw_mock.data.borrow().calls.logs(), [Some(Call::Setup)]);
     }
 
     #[test]
     fn teardown() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
-        create_rtc(&mut mock_data).teardown();
+        RTC::new(&rtc_hw_mock).teardown();
 
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
+        assert_eq!(
+            rtc_hw_mock.data.borrow().calls.logs(),
+            [Some(Call::Teardown)]
+        );
     }
 
     #[test]
     fn get_time() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
         assert_eq!(
-            create_rtc(&mut mock_data).time(),
+            RTC::new(&rtc_hw_mock).time(),
             Time {
                 hours: 13,
                 minutes: 34,
@@ -161,10 +162,12 @@ mod tests {
 
     #[test]
     fn get_alarm() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
         assert_eq!(
-            create_rtc(&mut mock_data).alarm(),
+            RTC::new(&rtc_hw_mock).alarm(),
             Time {
                 hours: 13,
                 minutes: 35,
@@ -175,16 +178,18 @@ mod tests {
 
     #[test]
     fn set_time() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
-        create_rtc(&mut mock_data).set_time(Time {
+        RTC::new(&rtc_hw_mock).set_time(Time {
             hours: 13,
             minutes: 34,
             seconds: 51,
         });
 
         assert_eq!(
-            mock_data.data.time,
+            rtc_hw_mock.data.borrow().data.time,
             BCDTime {
                 hours_tens: 1,
                 hours: 3,
@@ -198,16 +203,18 @@ mod tests {
 
     #[test]
     fn set_alarm() {
-        let mut mock_data = MockData::new(AssociatedData::default());
+        let rtc_hw_mock = RTCHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData::default())),
+        };
 
-        create_rtc(&mut mock_data).set_alarm(Time {
+        RTC::new(&rtc_hw_mock).set_alarm(Time {
             hours: 13,
             minutes: 35,
             seconds: 55,
         });
 
         assert_eq!(
-            mock_data.data.alarm,
+            rtc_hw_mock.data.borrow().data.alarm,
             BCDTime {
                 hours_tens: 1,
                 hours: 3,

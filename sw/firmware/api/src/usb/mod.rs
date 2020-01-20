@@ -151,13 +151,13 @@ pub trait USBHardware {
 }
 
 pub struct USB<'a, T: USBHardware> {
-    hw: T,
+    hw: &'a T,
     pma: PacketMemoryArea,
     state: &'a mut UsbState,
 }
 
 impl<'a, T: USBHardware> USB<'a, T> {
-    pub fn new(hw: T, state: &'a mut UsbState) -> Self {
+    pub fn new(hw: &'a T, state: &'a mut UsbState) -> Self {
         let base_address = hw.btable_address();
         USB {
             hw,

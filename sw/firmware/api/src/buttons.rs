@@ -40,12 +40,6 @@ pub struct ButtonsState {
 
 /// Describes the Buttons hardware management interface.
 pub trait ButtonsHardware {
-    /// Initializes hardware if needed.
-    fn setup(&self);
-
-    /// Releases hardware if needed.
-    fn teardown(&self);
-
     /// Checks whether Button with specified type is pressed.
     fn is_button_pressed(&self, button_type: ButtonType) -> bool;
 
@@ -59,23 +53,13 @@ pub trait ButtonsHardware {
 }
 
 pub struct Buttons<'a, T: ButtonsHardware> {
-    hw: T,
+    hw: &'a T,
     state: &'a mut ButtonsState,
 }
 
 impl<'a, T: ButtonsHardware> Buttons<'a, T> {
-    pub fn new(hw: T, state: &'a mut ButtonsState) -> Self {
+    pub fn new(hw: &'a T, state: &'a mut ButtonsState) -> Self {
         Buttons { hw, state }
-    }
-
-    /// Setups Buttons hardware.
-    pub fn setup(&self) {
-        self.hw.setup()
-    }
-
-    /// Tears down Buttons hardware.
-    pub fn teardown(&self) {
-        self.hw.teardown()
     }
 
     pub fn poll(&mut self) -> ButtonsPoll {
@@ -135,8 +119,6 @@ mod tests {
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
     enum Call {
-        Setup,
-        Teardown,
         Reactivate(ButtonType),
     }
 
@@ -145,21 +127,13 @@ mod tests {
         pub is_button_triggered: FA,
     }
 
-    struct ButtonsHardwareMock<'a, 'b: 'a, F: Fn(ButtonType) -> bool, FA: Fn(ButtonType) -> bool> {
-        data: RefCell<&'a mut MockData<'b, Call, AssociatedData<F, FA>>>,
+    struct ButtonsHardwareMock<'a, F: Fn(ButtonType) -> bool, FA: Fn(ButtonType) -> bool> {
+        data: RefCell<MockData<'a, Call, AssociatedData<F, FA>>>,
     }
 
-    impl<'a, 'b: 'a, F: Fn(ButtonType) -> bool, FA: Fn(ButtonType) -> bool> ButtonsHardware
-        for ButtonsHardwareMock<'a, 'b, F, FA>
+    impl<'a, F: Fn(ButtonType) -> bool, FA: Fn(ButtonType) -> bool> ButtonsHardware
+        for ButtonsHardwareMock<'a, F, FA>
     {
-        fn setup(&self) {
-            self.data.borrow_mut().calls.log_call(Call::Setup);
-        }
-
-        fn teardown(&self) {
-            self.data.borrow_mut().calls.log_call(Call::Teardown);
-        }
-
         fn is_button_pressed(&self, button_type: ButtonType) -> bool {
             (self.data.borrow().data.is_button_pressed)(button_type)
         }
@@ -176,154 +150,131 @@ mod tests {
         }
     }
 
-    fn create_buttons<'a, 'b: 'a, F: Fn(ButtonType) -> bool, FA: Fn(ButtonType) -> bool>(
-        mock_data: &'a mut MockData<'b, Call, AssociatedData<F, FA>>,
-        state: &'a mut ButtonsState,
-    ) -> Buttons<'a, ButtonsHardwareMock<'a, 'b, F, FA>> {
-        Buttons::new(
-            ButtonsHardwareMock {
-                data: RefCell::new(mock_data),
-            },
-            state,
-        )
-    }
-
-    #[test]
-    fn setup() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| false,
-            is_button_triggered: |_: ButtonType| false,
-        });
-        let mut state = ButtonsState::default();
-
-        create_buttons(&mut mock_data, &mut state).setup();
-
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
-    }
-
-    #[test]
-    fn teardown() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| false,
-            is_button_triggered: |_: ButtonType| false,
-        });
-        let mut state = ButtonsState::default();
-
-        create_buttons(&mut mock_data, &mut state).teardown();
-
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
-    }
-
     #[test]
     fn reactivates_both() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| false,
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
 
-        create_buttons(&mut mock_data, &mut state).reactivate();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| false,
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
+
+        Buttons::new(&buttons_hw_mock, &mut state).reactivate();
 
         assert_eq!(
             [
                 Some(Call::Reactivate(ButtonType::One)),
                 Some(Call::Reactivate(ButtonType::Ten))
             ],
-            mock_data.calls.logs(),
-        )
+            buttons_hw_mock.data.borrow().calls.logs(),
+        );
     }
 
     #[test]
     fn both_none() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| false,
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| false,
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::None, ButtonPressType::None, 0))
         );
     }
 
     #[test]
     fn triggered_false_if_both_not_triggered() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| true,
-            is_button_triggered: |_: ButtonType| false,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| true,
+                is_button_triggered: |_: ButtonType| false,
+            })),
+        };
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).triggered(),
+            Buttons::new(&buttons_hw_mock, &mut state).triggered(),
             false
         );
     }
 
     #[test]
     fn triggered_true_if_both_triggered() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| true,
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| true,
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
-        assert_eq!(create_buttons(&mut mock_data, &mut state).triggered(), true);
+        assert_eq!(Buttons::new(&buttons_hw_mock, &mut state).triggered(), true);
     }
 
     #[test]
     fn triggered_true_if_ten_is_triggered_only() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| true,
-            is_button_triggered: |bt: ButtonType| match bt {
-                ButtonType::One => false,
-                ButtonType::Ten => true,
-            },
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| true,
+                is_button_triggered: |bt: ButtonType| match bt {
+                    ButtonType::One => false,
+                    ButtonType::Ten => true,
+                },
+            })),
+        };
 
-        assert_eq!(create_buttons(&mut mock_data, &mut state).triggered(), true);
+        assert_eq!(Buttons::new(&buttons_hw_mock, &mut state).triggered(), true);
     }
 
     #[test]
     fn triggered_true_if_one_is_triggered_only() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_: ButtonType| true,
-            is_button_triggered: |bt: ButtonType| match bt {
-                ButtonType::One => true,
-                ButtonType::Ten => false,
-            },
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_: ButtonType| true,
+                is_button_triggered: |bt: ButtonType| match bt {
+                    ButtonType::One => true,
+                    ButtonType::Ten => false,
+                },
+            })),
+        };
 
-        assert_eq!(create_buttons(&mut mock_data, &mut state).triggered(), true);
+        assert_eq!(Buttons::new(&buttons_hw_mock, &mut state).triggered(), true);
     }
 
     #[test]
     fn both_short() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_bt: ButtonType| {
-                if *pending_time.borrow() >= 250 {
-                    false
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_bt: ButtonType| {
+                    if *pending_time.borrow() >= 250 {
+                        false
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Pending(250)
         );
 
         *pending_time.borrow_mut() = 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Short, ButtonPressType::Short, 250))
         );
     }
@@ -331,27 +282,29 @@ mod tests {
     #[test]
     fn both_short_even_if_one_pressed_later() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| {
-                if *pending_time.borrow() >= 500 {
-                    false
-                } else if *pending_time.borrow() < 250 {
-                    match bt {
-                        ButtonType::One => false,
-                        ButtonType::Ten => true,
-                    }
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| {
+                    if *pending_time.borrow() >= 500 {
+                        false
+                    } else if *pending_time.borrow() < 250 {
+                        match bt {
+                            ButtonType::One => false,
+                            ButtonType::Ten => true,
+                        }
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..500).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -359,7 +312,7 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Short, ButtonPressType::Short, 500))
         );
     }
@@ -367,27 +320,29 @@ mod tests {
     #[test]
     fn both_short_even_if_ten_pressed_later() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| {
-                if *pending_time.borrow() >= 500 {
-                    false
-                } else if *pending_time.borrow() < 250 {
-                    match bt {
-                        ButtonType::One => true,
-                        ButtonType::Ten => false,
-                    }
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| {
+                    if *pending_time.borrow() >= 500 {
+                        false
+                    } else if *pending_time.borrow() < 250 {
+                        match bt {
+                            ButtonType::One => true,
+                            ButtonType::Ten => false,
+                        }
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..500).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -395,7 +350,7 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Short, ButtonPressType::Short, 500))
         );
     }
@@ -403,30 +358,32 @@ mod tests {
     #[test]
     fn one_none_ten_short() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => false,
-                ButtonType::Ten => {
-                    if *pending_time.borrow() >= 250 {
-                        false
-                    } else {
-                        true
-                    }
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => false,
+                    ButtonType::Ten => {
+                        if *pending_time.borrow() >= 250 {
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Pending(250)
         );
 
         *pending_time.borrow_mut() = 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::None, ButtonPressType::Short, 250))
         );
     }
@@ -434,30 +391,32 @@ mod tests {
     #[test]
     fn one_short_ten_none() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => {
-                    if *pending_time.borrow() >= 250 {
-                        false
-                    } else {
-                        true
-                    }
-                }
-                ButtonType::Ten => false,
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => {
+                        if *pending_time.borrow() >= 250 {
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    ButtonType::Ten => false,
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Pending(250)
         );
 
         *pending_time.borrow_mut() = 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Short, ButtonPressType::None, 250))
         );
     }
@@ -465,22 +424,24 @@ mod tests {
     #[test]
     fn both_long() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_bt: ButtonType| {
-                if *pending_time.borrow() > 1250 {
-                    false
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_bt: ButtonType| {
+                    if *pending_time.borrow() > 1250 {
+                        false
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..1250).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -488,28 +449,30 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::Long, 1250))
         );
     }
 
     #[test]
     fn both_long_when_infinitely_pressed() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |_bt: ButtonType| true,
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |_bt: ButtonType| true,
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for _ in (0..1250).step_by(250) {
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::Long, 1250))
         );
     }
@@ -517,27 +480,29 @@ mod tests {
     #[test]
     fn both_long_even_if_one_pressed_later() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| {
-                if *pending_time.borrow() > 1250 {
-                    false
-                } else if *pending_time.borrow() < 500 {
-                    match bt {
-                        ButtonType::One => false,
-                        ButtonType::Ten => true,
-                    }
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| {
+                    if *pending_time.borrow() > 1250 {
+                        false
+                    } else if *pending_time.borrow() < 500 {
+                        match bt {
+                            ButtonType::One => false,
+                            ButtonType::Ten => true,
+                        }
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..1250).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -545,7 +510,7 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::Long, 1250))
         );
     }
@@ -553,27 +518,29 @@ mod tests {
     #[test]
     fn both_long_even_if_ten_pressed_later() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| {
-                if *pending_time.borrow() > 1250 {
-                    false
-                } else if *pending_time.borrow() < 500 {
-                    match bt {
-                        ButtonType::One => true,
-                        ButtonType::Ten => false,
-                    }
-                } else {
-                    true
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| {
+                    if *pending_time.borrow() > 1250 {
+                        false
+                    } else if *pending_time.borrow() < 500 {
+                        match bt {
+                            ButtonType::One => true,
+                            ButtonType::Ten => false,
+                        }
+                    } else {
+                        true
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..1250).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -581,31 +548,33 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::Long, 1250))
         );
     }
 
     #[test]
     fn one_none_ten_long() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => false,
-                ButtonType::Ten => true,
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => false,
+                    ButtonType::Ten => true,
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for _ in (0..1250).step_by(250) {
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::None, ButtonPressType::Long, 1250))
         );
     }
@@ -613,55 +582,59 @@ mod tests {
     #[test]
     fn one_short_ten_long() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => {
-                    if *pending_time.borrow() >= 250 {
-                        false
-                    } else {
-                        true
-                    }
-                }
-                ButtonType::Ten => true,
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => {
+                        if *pending_time.borrow() >= 250 {
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    ButtonType::Ten => true,
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..1250).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Short, ButtonPressType::Long, 1250))
         );
     }
 
     #[test]
     fn one_long_ten_none() {
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => true,
-                ButtonType::Ten => false,
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => true,
+                    ButtonType::Ten => false,
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for _ in (0..1250).step_by(250) {
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::None, 1250))
         );
     }
@@ -669,25 +642,27 @@ mod tests {
     #[test]
     fn one_long_ten_short() {
         let pending_time = RefCell::new(0);
-        let mut mock_data = MockData::new(AssociatedData {
-            is_button_pressed: |bt: ButtonType| match bt {
-                ButtonType::One => true,
-                ButtonType::Ten => {
-                    if *pending_time.borrow() >= 250 {
-                        false
-                    } else {
-                        true
-                    }
-                }
-            },
-            is_button_triggered: |_: ButtonType| true,
-        });
         let mut state = ButtonsState::default();
+        let buttons_hw_mock = ButtonsHardwareMock {
+            data: RefCell::new(MockData::new(AssociatedData {
+                is_button_pressed: |bt: ButtonType| match bt {
+                    ButtonType::One => true,
+                    ButtonType::Ten => {
+                        if *pending_time.borrow() >= 250 {
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                },
+                is_button_triggered: |_: ButtonType| true,
+            })),
+        };
 
         for time in (0..1250).step_by(250) {
             *pending_time.borrow_mut() = time;
             assert_eq!(
-                create_buttons(&mut mock_data, &mut state).poll(),
+                Buttons::new(&buttons_hw_mock, &mut state).poll(),
                 ButtonsPoll::Pending(250)
             );
         }
@@ -695,7 +670,7 @@ mod tests {
         *pending_time.borrow_mut() += 250;
 
         assert_eq!(
-            create_buttons(&mut mock_data, &mut state).poll(),
+            Buttons::new(&buttons_hw_mock, &mut state).poll(),
             ButtonsPoll::Ready((ButtonPressType::Long, ButtonPressType::Short, 1250))
         );
     }

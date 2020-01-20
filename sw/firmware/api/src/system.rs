@@ -35,16 +35,11 @@ impl Default for SystemState {
 }
 
 /// Describes the SystemControl hardware management interface.
-pub trait SystemHardware {
-    type B: ButtonsHardware;
-    type F: FlashHardware;
-    type P: PWMBeeperHardware;
-    type R: RTCHardware;
-    type U: USBHardware;
-    type T: TimerHardware;
-
+pub trait SystemHardware:
+    ButtonsHardware + FlashHardware + PWMBeeperHardware + RTCHardware + USBHardware + TimerHardware
+{
     /// Initializes hardware if needed.
-    fn setup(&self);
+    fn setup(&mut self);
 
     /// Forces system to enter StandBy mode.
     fn enter_deep_sleep(&mut self);
@@ -54,44 +49,27 @@ pub trait SystemHardware {
 
     /// Performs system software reset.
     fn reset(&mut self);
-
-    /// Returns the `PWMBeeperHardware` used to create `PWMBeeper` component.
-    fn beeper(&self) -> Self::P;
-
-    // Returns the `ButtonsHardware` used to create `Buttons` component.
-    fn buttons(&self) -> Self::B;
-
-    /// Returns the `FlashHardware` used to create `Flash` component.
-    fn flash(&self) -> Self::F;
-
-    /// Returns the `RTCHardware` used to create `RTC` component.
-    fn rtc(&self) -> Self::R;
-
-    /// Returns the `TimerHardware` used to create `Timer` component.
-    fn timer(&self) -> Self::T;
-
-    /// Returns the `USBHardware` used to create `USB` component.
-    fn usb(&self) -> Self::U;
 }
 
-pub struct System<'a, T: SystemHardware, S: SysTickHardware> {
+pub struct System<T: SystemHardware, S: SysTickHardware> {
     hw: T,
-    state: &'a mut SystemState,
+    state: SystemState,
     systick: SysTick<S>,
 }
 
-impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
-    pub fn new(hw: T, state: &'a mut SystemState, systick: SysTick<S>) -> Self {
-        System { state, hw, systick }
-    }
+impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
+    pub fn run(mut hw: T, systick: SysTick<S>) -> Self {
+        SystemHardware::setup(&mut hw);
 
-    /// Setups system.
-    pub fn setup(&mut self) {
-        self.hw.setup();
+        let mut system = System {
+            state: SystemState::default(),
+            hw,
+            systick,
+        };
 
-        self.buttons().setup();
+        system.set_mode(SystemMode::Idle);
 
-        self.set_mode(SystemMode::Idle);
+        system
     }
 
     pub fn handle_alarm(&mut self) {
@@ -281,36 +259,32 @@ impl<'a, T: SystemHardware, S: SysTickHardware> System<'a, T, S> {
     }
 
     /// Creates an instance of `RTC` controller.
-    fn rtc(&mut self) -> RTC<T::R> {
-        RTC::new(self.hw.rtc())
+    fn rtc(&mut self) -> RTC<T> {
+        RTC::new(&self.hw)
     }
 
-    fn timer(&mut self) -> Timer<T::T> {
-        Timer::new(self.hw.timer())
+    fn timer(&mut self) -> Timer<T> {
+        Timer::new(&self.hw)
     }
 
     /// Creates an instance of `Beeper` controller.
-    fn beeper(&mut self) -> PWMBeeper<T::P, S> {
-        PWMBeeper::new(
-            self.hw.beeper(),
-            &mut self.systick,
-            &mut self.state.beeper_state,
-        )
+    fn beeper(&mut self) -> PWMBeeper<T, S> {
+        PWMBeeper::new(&self.hw, &mut self.systick, &mut self.state.beeper_state)
     }
 
     /// Creates an instance of `Buttons` controller.
-    fn buttons(&mut self) -> Buttons<T::B> {
-        Buttons::new(self.hw.buttons(), &mut self.state.buttons_state)
+    fn buttons(&mut self) -> Buttons<T> {
+        Buttons::new(&self.hw, &mut self.state.buttons_state)
     }
 
     /// Creates an instance of `Flash` controller.
-    fn flash(&mut self) -> Flash<T::F> {
-        Flash::new(self.hw.flash())
+    fn flash(&mut self) -> Flash<T> {
+        Flash::new(&self.hw)
     }
 
     /// Creates an instance of `USB` controller.
-    fn usb(&mut self) -> USB<T::U> {
-        USB::new(self.hw.usb(), &mut self.state.usb_state)
+    fn usb(&mut self) -> USB<T> {
+        USB::new(&self.hw, &mut self.state.usb_state)
     }
 }
 

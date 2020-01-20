@@ -7,12 +7,6 @@ use self::{storage::Storage, storage_page::StoragePage, storage_slot::StorageSlo
 
 /// Describes the Flash hardware management interface.
 pub trait FlashHardware {
-    /// Initializes hardware if needed.
-    fn setup(&self);
-
-    /// Releases hardware if needed.
-    fn teardown(&self);
-
     /// Returns addresses of the flash memory pages.
     fn page_addresses(&self) -> [usize; 2];
 
@@ -26,13 +20,13 @@ pub trait FlashHardware {
     fn disable_write_mode(&self);
 }
 
-pub struct Flash<T: FlashHardware> {
-    hw: T,
+pub struct Flash<'a, T: FlashHardware> {
+    hw: &'a T,
     storage: Storage,
 }
 
-impl<T: FlashHardware> Flash<T> {
-    pub fn new(hw: T) -> Self {
+impl<'a, T: FlashHardware> Flash<'a, T> {
+    pub fn new(hw: &'a T) -> Self {
         let page_addresses = hw.page_addresses();
         Flash {
             hw,
@@ -49,16 +43,6 @@ impl<T: FlashHardware> Flash<T> {
                 ],
             },
         }
-    }
-
-    /// Setups Flash hardware.
-    pub fn setup(&self) {
-        self.hw.setup()
-    }
-
-    /// Tears down Flash hardware.
-    pub fn teardown(&self) {
-        self.hw.teardown()
     }
 
     /// Reads a value from a specific memory slot.
@@ -105,27 +89,17 @@ mod tests {
 
     #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
     enum Call {
-        Setup,
-        Teardown,
         EnableWriteMode,
         DisableWriteMode,
         ErasePage(usize),
     }
 
-    struct FlashHardwareMock<'a, 'b: 'a> {
-        data: RefCell<&'a mut MockData<'b, Call>>,
+    struct FlashHardwareMock<'a> {
+        data: RefCell<MockData<'a, Call>>,
         page_addresses: [usize; 2],
     }
 
-    impl<'a, 'b: 'a> FlashHardware for FlashHardwareMock<'a, 'b> {
-        fn setup(&self) {
-            self.data.borrow_mut().calls.log_call(Call::Setup);
-        }
-
-        fn teardown(&self) {
-            self.data.borrow_mut().calls.log_call(Call::Teardown);
-        }
-
+    impl<'a> FlashHardware for FlashHardwareMock<'a> {
         fn page_addresses(&self) -> [usize; 2] {
             self.page_addresses
         }
@@ -149,56 +123,16 @@ mod tests {
         }
     }
 
-    fn create_flash<'a, 'b: 'a>(
-        mock_data: &'a mut MockData<'b, Call>,
-        page_addresses: [usize; 2],
-    ) -> Flash<FlashHardwareMock<'a, 'b>> {
-        Flash::new(FlashHardwareMock {
-            data: RefCell::new(mock_data),
-            page_addresses,
-        })
-    }
-
-    #[test]
-    fn setup() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
-        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
-        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
-
-        create_flash(
-            &mut mock_data,
-            [&page1 as *const _ as usize, &page2 as *const _ as usize],
-        )
-        .setup();
-
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Setup)])
-    }
-
-    #[test]
-    fn teardown() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
-        let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
-        let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
-
-        create_flash(
-            &mut mock_data,
-            [&page1 as *const _ as usize, &page2 as *const _ as usize],
-        )
-        .teardown();
-
-        assert_eq!(mock_data.calls.logs(), [Some(Call::Teardown)])
-    }
-
     #[test]
     fn read() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
         let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
-        let flash = create_flash(
-            &mut mock_data,
-            [&page1 as *const _ as usize, &page2 as *const _ as usize],
-        );
+        let flash_hw_mock = FlashHardwareMock {
+            data: RefCell::new(MockData::<Call, ()>::without_data()),
+            page_addresses: [&page1 as *const _ as usize, &page2 as *const _ as usize],
+        };
+        let flash = Flash::new(&flash_hw_mock);
 
         assert_eq!(flash.read(StorageSlot::One), None);
         assert_eq!(flash.read(StorageSlot::Two), None);
@@ -216,51 +150,48 @@ mod tests {
 
     #[test]
     fn write_when_page_has_enough_space() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
-        {
-            let flash = create_flash(
-                &mut mock_data,
-                [&page1 as *const _ as usize, &page2 as *const _ as usize],
-            );
+        let flash_hw_mock = FlashHardwareMock {
+            data: RefCell::new(MockData::<Call, ()>::without_data()),
+            page_addresses: [&page1 as *const _ as usize, &page2 as *const _ as usize],
+        };
 
-            assert_eq!(flash.write(StorageSlot::One, 10).is_ok(), true);
-        }
+        let flash = Flash::new(&flash_hw_mock);
+        assert_eq!(flash.write(StorageSlot::One, 10).is_ok(), true);
 
         assert_eq!(page1[..4], [0x0fff, 0xffff, 0x1f0a, 0xffff]);
         assert_eq!(
-            mock_data.calls.logs(),
+            flash.hw.data.borrow().calls.logs(),
             [Some(Call::EnableWriteMode), Some(Call::DisableWriteMode)]
-        )
+        );
     }
 
     #[test]
     fn write_when_page_is_full() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
         let mut page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
-        {
-            let flash = create_flash(
-                &mut mock_data,
-                [&page1 as *const _ as usize, &page2 as *const _ as usize],
-            );
+        let flash_hw_mock = FlashHardwareMock {
+            data: RefCell::new(MockData::<Call, ()>::without_data()),
+            page_addresses: [&page1 as *const _ as usize, &page2 as *const _ as usize],
+        };
 
-            // Imitate fully populated page.
-            page1[0] = 0x0fff;
-            page1[1] = 0x0001;
-            for i in 2..(PAGE_SIZE / 2) {
-                page1[i] = 0x1f12;
-            }
+        let flash = Flash::new(&flash_hw_mock);
 
-            assert_eq!(flash.write(StorageSlot::Two, 0x17).is_ok(), true);
+        // Imitate fully populated page.
+        page1[0] = 0x0fff;
+        page1[1] = 0x0001;
+        for i in 2..(PAGE_SIZE / 2) {
+            page1[i] = 0x1f12;
         }
+
+        assert_eq!(flash.write(StorageSlot::Two, 0x17).is_ok(), true);
 
         assert_eq!(page2[..5], [0x0fff, 0xffff, 0x1f12, 0x2f17, 0xffff]);
         assert_eq!(
-            mock_data.calls.logs(),
+            flash.hw.data.borrow().calls.logs(),
             [
                 Some(Call::EnableWriteMode),
                 Some(Call::DisableWriteMode),
@@ -268,27 +199,29 @@ mod tests {
                 Some(Call::EnableWriteMode),
                 Some(Call::DisableWriteMode)
             ]
-        )
+        );
     }
 
     #[test]
     fn erase_all() {
-        let mut mock_data = MockData::<Call, ()>::without_data();
         let page1: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
         let page2: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
 
-        create_flash(
-            &mut mock_data,
-            [&page1 as *const _ as usize, &page2 as *const _ as usize],
-        )
-        .erase_all();
+        let flash_hw_mock = FlashHardwareMock {
+            data: RefCell::new(MockData::<Call, ()>::without_data()),
+            page_addresses: [&page1 as *const _ as usize, &page2 as *const _ as usize],
+        };
+
+        let flash = Flash::new(&flash_hw_mock);
+
+        flash.erase_all();
 
         assert_eq!(
-            mock_data.calls.logs(),
+            flash.hw.data.borrow().calls.logs(),
             [
                 Some(Call::ErasePage(&page1 as *const _ as usize)),
                 Some(Call::ErasePage(&page2 as *const _ as usize))
             ]
-        )
+        );
     }
 }

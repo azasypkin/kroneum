@@ -7,12 +7,12 @@ pub trait TimerHardware {
     fn teardown(&self);
 }
 
-pub struct Timer<T: TimerHardware> {
-    hw: T,
+pub struct Timer<'a, T: TimerHardware> {
+    hw: &'a T,
 }
 
-impl<T: TimerHardware> Timer<T> {
-    pub fn new(hw: T) -> Self {
+impl<'a, T: TimerHardware> Timer<'a, T> {
+    pub fn new(hw: &'a T) -> Self {
         Timer { hw }
     }
 
@@ -38,11 +38,11 @@ pub(crate) mod tests {
         Teardown,
     }
 
-    pub(crate) struct TimerHardwareMock<'a, 'b: 'a> {
-        data: RefCell<&'a mut MockData<'b, Call>>,
+    pub(crate) struct TimerHardwareMock<'a> {
+        data: RefCell<MockData<'a, Call>>,
     }
 
-    impl<'a, 'b: 'a> TimerHardware for TimerHardwareMock<'a, 'b> {
+    impl<'a> TimerHardware for TimerHardwareMock<'a> {
         fn setup(&self, frequency: u32, reload_value: u32) {
             self.data
                 .borrow_mut()
@@ -55,24 +55,21 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn create_timer<'a, 'b: 'a>(
-        timer_mock: &'a mut MockData<'b, Call>,
-    ) -> Timer<TimerHardwareMock<'a, 'b>> {
-        Timer::new(TimerHardwareMock {
-            data: RefCell::new(timer_mock),
-        })
-    }
-
     #[test]
     fn properly_handles_timeout() {
-        let mut timer_mock = MockData::<Call, ()>::without_data();
+        let timer_hw_mock = TimerHardwareMock {
+            data: RefCell::new(MockData::<Call, ()>::without_data()),
+        };
 
-        create_timer(&mut timer_mock).start(1234);
-        assert_eq!(timer_mock.calls.logs(), [Some(Call::Setup((1000, 1234)))]);
-
-        create_timer(&mut timer_mock).stop();
+        Timer::new(&timer_hw_mock).start(1234);
         assert_eq!(
-            timer_mock.calls.logs(),
+            timer_hw_mock.data.borrow().calls.logs(),
+            [Some(Call::Setup((1000, 1234)))]
+        );
+
+        Timer::new(&timer_hw_mock).stop();
+        assert_eq!(
+            timer_hw_mock.data.borrow().calls.logs(),
             [Some(Call::Setup((1000, 1234))), Some(Call::Teardown)]
         );
     }

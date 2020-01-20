@@ -1,5 +1,6 @@
-use stm32f0::stm32f0x2::Peripherals;
+use crate::hal::stm32::Peripherals;
 
+use crate::system::SystemHardwareImpl;
 use kroneum_api::usb::{
     EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
     UsbInterrupt,
@@ -7,23 +8,11 @@ use kroneum_api::usb::{
 
 const BTABLE_ADDRESS: usize = 0x4000_6000;
 
-pub struct USBHardwareImpl<'a> {
-    p: &'a Peripherals,
+fn status_bits(current_bits: u8, status: EndpointStatus) -> u8 {
+    current_bits ^ status as u8
 }
 
-impl<'a> USBHardwareImpl<'a> {
-    pub fn new(p: &'a Peripherals) -> Self {
-        Self { p }
-    }
-}
-
-impl<'a> USBHardwareImpl<'a> {
-    fn status_bits(&self, current_bits: u8, status: EndpointStatus) -> u8 {
-        current_bits ^ status as u8
-    }
-}
-
-impl<'a> USBHardware for USBHardwareImpl<'a> {
+impl USBHardware for SystemHardwareImpl {
     /// Setups USB hardware, but doesn't activate it.
     fn setup(&self) {
         // Set alternative function #2 (USB) for PA11 and PA12.
@@ -32,16 +21,16 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
             .afrh
             .modify(|_, w| w.afrh11().af2().afrh12().af2());
 
-        start_clock(self.p);
+        start_clock(&self.p);
 
-        self.p.RCC.apb1enr.modify(|_, w| w.usben().set_bit());
+        self.p.RCC.apb1enr.modify(|_, w| w.usben().enabled());
 
         // Reset the peripheral.
         self.p
             .USB
             .cntr
-            .modify(|_, w| w.pdwn().clear_bit().fres().set_bit());
-        self.p.USB.cntr.modify(|_, w| w.fres().clear_bit());
+            .modify(|_, w| w.pdwn().disabled().fres().reset());
+        self.p.USB.cntr.modify(|_, w| w.fres().no_reset());
 
         // Reset any pending interrupts.
         self.p.USB.istr.reset();
@@ -50,32 +39,29 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         self.p
             .USB
             .cntr
-            .modify(|_, w| w.ctrm().set_bit().errm().set_bit().resetm().set_bit());
+            .modify(|_, w| w.ctrm().enabled().errm().enabled().resetm().enabled());
 
-        self.p.USB.bcdr.modify(|_, w| w.dppu().set_bit());
+        self.p.USB.bcdr.modify(|_, w| w.dppu().enabled());
     }
 
     /// Tears down USB hardware.
     fn teardown(&self) {
         // Disable all interrupts and force the USB reset.
-        self.p.USB.cntr.write(|w| w.fres().set_bit());
+        self.p.USB.cntr.write(|w| w.fres().reset());
 
         // Clear the interrupt status register.
         self.p.USB.istr.reset();
 
         // Switch-off the USB device.
-        self.p
-            .USB
-            .cntr
-            .write(|w| w.pdwn().set_bit().fres().set_bit());
+        self.p.USB.cntr.write(|w| w.pdwn().enabled().fres().reset());
 
         // Tell the host that we're gone by disabling pull-up on DP.
-        self.p.USB.bcdr.modify(|_, w| w.dppu().clear_bit());
+        self.p.USB.bcdr.modify(|_, w| w.dppu().disabled());
 
         // USB clock off.
-        self.p.RCC.apb1enr.modify(|_, w| w.usben().clear_bit());
+        self.p.RCC.apb1enr.modify(|_, w| w.usben().disabled());
 
-        stop_clock(self.p);
+        stop_clock(&self.p);
 
         // Set alternative function #0 (USB) for PA11 and PA12.
         self.p
@@ -85,7 +71,7 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
     }
 
     fn enable(&self) {
-        self.p.USB.daddr.write(|w| w.ef().set_bit());
+        self.p.USB.daddr.write(|w| w.ef().enabled());
     }
 
     fn btable_address(&self) -> usize {
@@ -110,7 +96,7 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
                 1 => EndpointType::Device,
                 _ => panic!("Unknown endpoint"),
             },
-            direction: if istr_reg.dir().bit_is_set() {
+            direction: if istr_reg.dir().is_from() {
                 EndpointDirection::Receive
             } else {
                 EndpointDirection::Transmit
@@ -136,8 +122,8 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
 
         self.p.USB.epr[endpoint_index].modify(|r, w| {
             let (rx, tx) = match direction {
-                EndpointDirection::Receive => (self.status_bits(r.stat_rx().bits(), status), 0b00),
-                EndpointDirection::Transmit => (0b00, self.status_bits(r.stat_tx().bits(), status)),
+                EndpointDirection::Receive => (status_bits(r.stat_rx().bits(), status), 0b00),
+                EndpointDirection::Transmit => (0b00, status_bits(r.stat_tx().bits(), status)),
             };
 
             // If current reg bit is not equal to the desired reg bit then set 1 in the reg to toggle it.
@@ -160,7 +146,7 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
         self.p
             .USB
             .daddr
-            .write(|w| w.add().bits(address).ef().set_bit());
+            .write(|w| w.add().bits(address).ef().enabled());
     }
 
     fn open_endpoint(&self, endpoint: EndpointType) {
@@ -180,9 +166,9 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
                 .ea()
                 .bits(endpoint_address)
                 .stat_rx()
-                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
+                .bits(status_bits(r.stat_rx().bits(), EndpointStatus::Valid))
                 .stat_tx()
-                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
+                .bits(status_bits(r.stat_tx().bits(), EndpointStatus::Nak))
                 .ctr_rx()
                 .set_bit()
                 .ctr_tx()
@@ -198,9 +184,9 @@ impl<'a> USBHardware for USBHardwareImpl<'a> {
 
         self.p.USB.epr[endpoint_index].modify(|r, w| {
             w.stat_tx()
-                .bits(self.status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
+                .bits(status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
-                .bits(self.status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
+                .bits(status_bits(r.stat_rx().bits(), EndpointStatus::Disabled))
         });
     }
 

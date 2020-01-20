@@ -1,56 +1,36 @@
-use crate::{
-    beeper::BeeperHardwareImpl, buttons::ButtonsHardwareImpl, flash::FlashHardwareImpl,
-    rtc::RTCHardwareImpl, timer::TimerHardwareImpl, usb::USBHardwareImpl,
-};
-use cortex_m::peripheral::SCB;
+use crate::hal::stm32::Interrupt;
+use crate::hal::stm32::Peripherals;
+use cortex_m::peripheral::{NVIC, SCB};
 use kroneum_api::system::SystemHardware;
-use stm32f0::stm32f0x2::Peripherals;
 
-pub struct SystemHardwareImpl<'a> {
-    p: &'a Peripherals,
-    scb: &'a mut SCB,
+pub struct SystemHardwareImpl {
+    pub p: Peripherals,
+    scb: SCB,
+    nvic: NVIC,
 }
 
-impl<'a> SystemHardwareImpl<'a> {
-    pub fn new(p: &'a Peripherals, scb: &'a mut SCB) -> Self {
-        Self { p, scb }
+impl SystemHardwareImpl {
+    pub fn new(p: Peripherals, scb: SCB, nvic: NVIC) -> Self {
+        Self { p, scb, nvic }
     }
 }
 
-impl<'a> SystemHardwareImpl<'a> {
+impl SystemHardwareImpl {
     fn toggle_deep_sleep(&mut self, on: bool) {
-        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register.
+        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register
+        // and enter Standby mode when the CPU enters Deep Sleep.
         if on {
             self.scb.set_sleepdeep();
+            self.p.PWR.cr.modify(|_, w| w.pdds().standby_mode());
         } else {
             self.scb.clear_sleepdeep();
+            self.p.PWR.cr.modify(|_, w| w.pdds().stop_mode());
         }
-
-        // Enter Standby mode when the CPU enters Deep Sleep.
-        self.p.PWR.cr.modify(|_, w| w.pdds().bit(on));
 
         self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
     }
-}
 
-impl<'a> SystemHardware for SystemHardwareImpl<'a> {
-    type B = ButtonsHardwareImpl<'a>;
-    type F = FlashHardwareImpl<'a>;
-    type P = BeeperHardwareImpl<'a>;
-    type R = RTCHardwareImpl<'a>;
-    type U = USBHardwareImpl<'a>;
-    type T = TimerHardwareImpl<'a>;
-
-    fn setup(&self) {
-        // Remap PA9-10 to PA11-12 for USB.
-        self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().set_bit());
-        self.p
-            .SYSCFG
-            .cfgr1
-            .modify(|_, w| w.pa11_pa12_rmp().set_bit().mem_mode().main_flash());
-
-        // -----------Buttons----------------
-
+    fn setup_buttons(&mut self) {
         // Enable EXTI0 interrupt line for PA0 and EXTI2 for PA2.
         self.p
             .SYSCFG
@@ -70,23 +50,92 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .imr
             .modify(|_, w| w.mr0().set_bit().mr2().set_bit());
 
+        // Enable clock for GPIO Port A.
+        self.p.RCC.ahbenr.modify(|_, w| w.iopaen().enabled());
+
+        // Switch PA0 (button) and PA2 (button) to alternate function mode.
+        self.p
+            .GPIOA
+            .moder
+            .modify(|_, w| w.moder0().alternate().moder2().alternate());
+
+        // Enable pull-down for PA0 and PA2.
+        self.p
+            .GPIOA
+            .pupdr
+            .modify(|_, w| w.pupdr0().pull_down().pupdr2().pull_down());
+
+        // Set alternative function #2 for PA0 (WKUP1) and PA2 (WKUP4).
+        self.p
+            .GPIOA
+            .afrl
+            .modify(|_, w| w.afrl0().af2().afrl2().af2());
+
+        // Enable wakers.
+        self.p
+            .PWR
+            .csr
+            .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
+    }
+
+    fn setup_usb(&mut self) {
+        // Remap PA9-10 to PA11-12 for USB.
+        self.p
+            .SYSCFG
+            .cfgr1
+            .modify(|_, w| w.pa11_pa12_rmp().remapped());
+
+        // Enable clock for GPIO Port A.
+        self.p.RCC.ahbenr.modify(|_, w| w.iopaen().enabled());
+
+        // Switch  PA11 and PA12 (usb) to alternate function mode.
+        self.p
+            .GPIOA
+            .moder
+            .modify(|_, w| w.moder11().alternate().moder12().alternate());
+
+        // Set "high" output speed for PA11 and PA12.
+        self.p.GPIOA.ospeedr.modify(|_, w| {
+            w.ospeedr11()
+                .very_high_speed()
+                .ospeedr12()
+                .very_high_speed()
+        });
+    }
+
+    fn setup_beeper(&mut self) {
+        // Enable clock for GPIO Port B.
+        self.p.RCC.ahbenr.modify(|_, w| w.iopben().enabled());
+
+        // Switch PB1 (beeper) to alternate function mode
+        self.p.GPIOB.moder.modify(|_, w| w.moder1().alternate());
+
+        // Set "high" output speed for PB1.
+        self.p
+            .GPIOB
+            .ospeedr
+            .modify(|_, w| w.ospeedr1().very_high_speed());
+
+        // Set alternative function #2 for PB1 (TIM1_CH3N).
+        self.p.GPIOB.afrl.modify(|_, w| w.afrl1().af2());
+    }
+}
+
+impl SystemHardware for SystemHardwareImpl {
+    fn setup(&mut self) {
+        self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().enabled());
+        self.p.SYSCFG.cfgr1.modify(|_, w| w.mem_mode().main_flash());
+
+        self.setup_usb();
+        self.setup_buttons();
+        self.setup_beeper();
+
         // ---------GPIO------------------
 
-        // Enable clock for GPIO Port A, B and F.
-        self.p
-            .RCC
-            .ahbenr
-            .modify(|_, w| w.iopaen().set_bit().iopben().set_bit().iopfen().set_bit());
-
-        // Switch PA0 (button), PA11 and PA12 (usb) to alternate function mode and
-        // PA1, PA3-7 to AIN to reduce power consumption.
+        // Switch  PA1, PA3-7 to AIN to reduce power consumption.
         self.p.GPIOA.moder.modify(|_, w| {
-            w.moder0()
-                .alternate()
-                .moder1()
+            w.moder1()
                 .analog()
-                .moder2()
-                .alternate()
                 .moder3()
                 .analog()
                 .moder4()
@@ -101,21 +150,17 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
                 .analog()
                 .moder10()
                 .analog()
-                .moder11()
-                .alternate()
-                .moder12()
-                .alternate()
                 .moder13()
                 .analog()
                 .moder14()
                 .analog()
         });
 
-        // Switch PB1 (beeper) to alternate function mode and PB8 to AIN to reduce power consumption.
-        self.p
-            .GPIOB
-            .moder
-            .modify(|_, w| w.moder1().alternate().moder8().analog());
+        // Switch PB8 to AIN to reduce power consumption.
+        self.p.GPIOB.moder.modify(|_, w| w.moder8().analog());
+
+        // Enable clock for GPIO Port F.
+        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().enabled());
 
         // Enable AIN for GPIO F to reduce power consumption.
         self.p
@@ -123,36 +168,23 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
             .moder
             .modify(|_, w| w.moder0().analog().moder1().analog());
 
-        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().clear_bit());
+        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().disabled());
 
-        // Enable pull-down for PA0 and PA2.
-        self.p
-            .GPIOA
-            .pupdr
-            .modify(|_, w| w.pupdr0().pull_down().pupdr2().pull_down());
+        // Configure and enable interrupts.
+        unsafe {
+            self.nvic.set_priority(Interrupt::EXTI0_1, 1);
+            self.nvic.set_priority(Interrupt::EXTI2_3, 1);
+            self.nvic.set_priority(Interrupt::RTC, 1);
+            self.nvic.set_priority(Interrupt::TIM2, 1);
 
-        // Set "high" output speed for PA11 and PA12.
-        self.p.GPIOA.ospeedr.modify(|_, w| {
-            w.ospeedr11()
-                .very_high_speed()
-                .ospeedr12()
-                .very_high_speed()
-        });
+            NVIC::unmask(Interrupt::EXTI0_1);
+            NVIC::unmask(Interrupt::EXTI2_3);
+            NVIC::unmask(Interrupt::RTC);
+            NVIC::unmask(Interrupt::USB);
+            NVIC::unmask(Interrupt::TIM2);
+        }
 
-        // Set "high" output speed for PB1.
-        self.p
-            .GPIOB
-            .ospeedr
-            .modify(|_, w| w.ospeedr1().very_high_speed());
-
-        // Set alternative function #2 for PA0 (WKUP1) and PA2 (WKUP4).
-        self.p
-            .GPIOA
-            .afrl
-            .modify(|_, w| w.afrl0().af2().afrl2().af2());
-
-        // Set alternative function #2 for PB1 (TIM1_CH3N).
-        self.p.GPIOB.afrl.modify(|_, w| w.afrl1().af2());
+        self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().disabled());
     }
 
     fn enter_deep_sleep(&mut self) {
@@ -165,29 +197,5 @@ impl<'a> SystemHardware for SystemHardwareImpl<'a> {
 
     fn reset(&mut self) {
         SCB::sys_reset();
-    }
-
-    fn beeper(&self) -> Self::P {
-        BeeperHardwareImpl::new(&self.p)
-    }
-
-    fn buttons(&self) -> Self::B {
-        ButtonsHardwareImpl::new(&self.p)
-    }
-
-    fn flash(&self) -> Self::F {
-        FlashHardwareImpl::new(&self.p)
-    }
-
-    fn rtc(&self) -> Self::R {
-        RTCHardwareImpl::new(&self.p)
-    }
-
-    fn timer(&self) -> Self::T {
-        TimerHardwareImpl::new(&self.p)
-    }
-
-    fn usb(&self) -> Self::U {
-        USBHardwareImpl::new(&self.p)
     }
 }

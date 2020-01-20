@@ -1,32 +1,28 @@
+use crate::hal::stm32::Peripherals;
+use crate::system::SystemHardwareImpl;
 use kroneum_api::{rtc::RTCHardware, time::BCDTime};
-use stm32f0::stm32f0x2::Peripherals;
 
-pub struct RTCHardwareImpl<'a> {
-    p: &'a Peripherals,
-}
+/// Disables or enables write protection for RTC registers.
+fn toggle_write_protection(p: &Peripherals, enable_write_protection: bool) {
+    let protection_keys: [u8; 2] = if enable_write_protection {
+        [0xFE, 0x64]
+    } else {
+        [0xCA, 0x53]
+    };
 
-impl<'a> RTCHardwareImpl<'a> {
-    pub fn new(p: &'a Peripherals) -> Self {
-        Self { p }
+    for key in &protection_keys {
+        p.RTC.wpr.write(|w| unsafe { w.key().bits(*key) });
     }
 }
 
-impl<'a> RTCHardwareImpl<'a> {
-    /// Disables or enables write protection for RTC registers.
-    fn toggle_write_protection(&self, enable_write_protection: bool) {
-        let protection_keys: [u8; 2] = if enable_write_protection {
-            [0xFE, 0x64]
-        } else {
-            [0xCA, 0x53]
-        };
-
-        for key in &protection_keys {
-            self.p.RTC.wpr.write(|w| unsafe { w.key().bits(*key) });
-        }
-    }
+fn toggle_alarm(p: &Peripherals, enable: bool) {
+    p.RTC.cr.modify(|_, w| {
+        w.alraie().bit(enable);
+        w.alrae().bit(enable)
+    });
 }
 
-impl<'a> RTCHardware for RTCHardwareImpl<'a> {
+impl RTCHardware for SystemHardwareImpl {
     fn setup(&self) {
         // Enable the LSI.
         self.p.RCC.csr.modify(|_, w| w.lsion().set_bit());
@@ -54,7 +50,7 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
     }
 
     fn teardown(&self) {
-        toggle_alarm(self.p, false);
+        toggle_alarm(&self.p, false);
 
         // Disable the LSI.
         self.p.RCC.csr.modify(|_, w| w.lsion().clear_bit());
@@ -93,7 +89,7 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
     }
 
     fn set_time(&self, bcd_time: BCDTime) {
-        self.toggle_write_protection(false);
+        toggle_write_protection(&self.p, false);
 
         // Enable init phase and wait until it is allowed to modify RTC register values.
         self.p.RTC.isr.modify(|_, w| w.init().set_bit());
@@ -129,14 +125,14 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
         // Disable init phase.
         self.p.RTC.isr.modify(|_, w| w.init().clear_bit());
 
-        self.toggle_write_protection(true);
+        toggle_write_protection(&self.p, true);
     }
 
     fn set_alarm(&self, bcd_time: BCDTime) {
-        self.toggle_write_protection(false);
+        toggle_write_protection(&self.p, false);
 
         // Disable alarm A to modify it.
-        toggle_alarm(self.p, false);
+        toggle_alarm(&self.p, false);
 
         // Wait until it is allowed to modify alarm A value.
         while self.p.RTC.isr.read().alrawf().bit_is_clear() {}
@@ -169,15 +165,8 @@ impl<'a> RTCHardware for RTCHardwareImpl<'a> {
         });
 
         // Enable alarm A and alarm A interrupt.
-        toggle_alarm(self.p, true);
+        toggle_alarm(&self.p, true);
 
-        self.toggle_write_protection(true);
+        toggle_write_protection(&self.p, true);
     }
-}
-
-fn toggle_alarm(p: &Peripherals, enable: bool) {
-    p.RTC.cr.modify(|_, w| {
-        w.alraie().bit(enable);
-        w.alrae().bit(enable)
-    });
 }
