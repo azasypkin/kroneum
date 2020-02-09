@@ -4,6 +4,7 @@ pub use self::device_identifier::DeviceIdentifier;
 
 use hidapi::{HidApi, HidDevice, HidDeviceInfo};
 use kroneum_api::{
+    adc::ADCChannel,
     array::Array,
     beeper::tone::Tone,
     config::{DEVICE_PID, DEVICE_VID},
@@ -141,5 +142,11 @@ impl Device {
     pub fn echo(&self, data: &[u8]) -> Result<Vec<u8>, String> {
         self.write(CommandPacket::Echo(Array::from(data)))
             .and_then(|_| self.read())
+    }
+
+    pub fn read_adc(&self, channel: ADCChannel) -> Result<u16, String> {
+        self.write(CommandPacket::ADCRead(channel))
+            .and_then(|_| self.read())
+            .map(|data| (data[0] as u16) | ((data[1] as u16) << 8))
     }
 }

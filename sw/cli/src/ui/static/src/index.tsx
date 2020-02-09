@@ -136,6 +136,82 @@ const DeviceAlarmSection = () => {
   );
 };
 
+interface ADCStatus {
+  isInProgress: boolean;
+  response: number | null;
+}
+const DeviceADCSection = () => {
+  const [adcStatus, setADCStatus] = useState<ADCStatus>({
+    isInProgress: false,
+    response: null,
+  });
+
+  /*  function reload() {
+    setADCStatus({
+      ...adcStatus,
+      isInProgress: true,
+    });
+
+    return axios
+      .get('/api/adc/1')
+      .then(
+        ({ data }) => data,
+        () => 'Error',
+      )
+      .then(data => {
+        setADCStatus({
+          isInProgress: false,
+          response: data,
+        });
+        setTimeout(() => reload(), 1000);
+      });
+  }
+
+  useEffect(() => {
+    setTimeout(() => reload(), 1000);
+  }, []);*/
+
+  return (
+    <EuiFlexItem>
+      <EuiPageContentHeader>
+        <EuiPageContentHeaderSection>
+          <EuiTitle>
+            <h2>ADC</h2>
+          </EuiTitle>
+        </EuiPageContentHeaderSection>
+      </EuiPageContentHeader>
+      <EuiPageContentBody>
+        <EuiPanel style={{ maxWidth: 300 }}>
+          <EuiFormRow label="Ch#1 value" display="columnCompressed" style={{ alignItems: 'center' }}>
+            <EuiText size="s">{adcStatus.response ?? 'Unknown'}</EuiText>
+          </EuiFormRow>
+          <EuiFormRow display="columnCompressed" style={{ alignItems: 'center' }}>
+            <EuiButton
+              isLoading={adcStatus.isInProgress}
+              fill
+              onClick={() => {
+                setADCStatus({
+                  ...adcStatus,
+                  isInProgress: true,
+                });
+
+                axios.get('/api/adc/1').then(({ data }) => {
+                  setADCStatus({
+                    isInProgress: false,
+                    response: data,
+                  });
+                });
+              }}
+            >
+              Read
+            </EuiButton>
+          </EuiFormRow>
+        </EuiPanel>
+      </EuiPageContentBody>
+    </EuiFlexItem>
+  );
+};
+
 interface EchoStatus {
   isInProgress: boolean;
   bytesString: string;
@@ -298,6 +374,7 @@ const IndexPage = () => {
             <DeviceIdentifierSection identifier={info?.identifier} />
             <DeviceFlashContentSection slots={info?.flash} />
             <DeviceAlarmSection />
+            <DeviceADCSection />
             <DeviceDiagnosticsSection />
           </EuiFlexGroup>
         </EuiPageContent>

@@ -1,8 +1,25 @@
 use crate::device::{Device, DeviceIdentifier};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use kroneum_api::{array::Array, beeper::tone::Tone, flash::storage_slot::StorageSlot};
+use core::convert::TryFrom;
+use kroneum_api::{
+    adc::ADCChannel, array::Array, beeper::tone::Tone, flash::storage_slot::StorageSlot,
+};
 use serde_derive::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct ADCParams {
+    channel: u8,
+}
+
+async fn adc(params: web::Path<ADCParams>) -> impl Responder {
+    match ADCChannel::try_from(params.channel) {
+        Ok(channel) => {
+            HttpResponse::Ok().json(Device::create().unwrap().read_adc(channel).unwrap())
+        }
+        Err(message) => HttpResponse::BadRequest().body(message),
+    }
+}
 
 async fn beep() -> impl Responder {
     let device = Device::create().unwrap();
@@ -57,6 +74,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/play", web::post().to(play))
             .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
+            .route("/api/adc/{channel}", web::get().to(adc))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })
     .bind(&ui_url)
