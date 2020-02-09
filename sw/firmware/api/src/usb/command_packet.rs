@@ -1,5 +1,7 @@
+use adc::ADCChannel;
 use array::Array;
 use beeper::tone::Tone;
+use core::convert::TryFrom;
 use flash::storage_slot::StorageSlot;
 use time::Time;
 
@@ -32,6 +34,7 @@ impl From<CommandPacket> for Array<u8> {
                 });
                 array.as_ref().into()
             }
+            CommandPacket::ADCRead(channel) => [10, channel.into()].as_ref().into(),
             CommandPacket::Unknown => [0].as_ref().into(),
         }
     }
@@ -66,6 +69,13 @@ impl Into<CommandPacket> for Array<u8> {
                     .for_each(|echo_value| echo_array.push(*echo_value));
                 CommandPacket::Echo(echo_array)
             }
+            10 => {
+                if let Ok(channel) = ADCChannel::try_from(self[1]) {
+                    CommandPacket::ADCRead(channel)
+                } else {
+                    CommandPacket::Unknown
+                }
+            }
             _ => CommandPacket::Unknown,
         }
     }
@@ -74,6 +84,7 @@ impl Into<CommandPacket> for Array<u8> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandPacket {
     Beep(u8),
+    ADCRead(ADCChannel),
     AlarmGet,
     AlarmSet(Time),
     FlashRead(StorageSlot),
@@ -234,11 +245,45 @@ mod tests {
     }
 
     #[test]
+    fn adc_read_command() {
+        assert_eq!(
+            CommandPacket::from([10, 1].as_ref()),
+            CommandPacket::ADCRead(ADCChannel::Channel1)
+        );
+        assert_eq!(
+            CommandPacket::from([10, 3].as_ref()),
+            CommandPacket::ADCRead(ADCChannel::Channel3)
+        );
+        assert_eq!(
+            CommandPacket::from([10, 7].as_ref()),
+            CommandPacket::ADCRead(ADCChannel::Channel7)
+        );
+
+        assert_eq!(
+            CommandPacket::from([10, 0].as_ref()),
+            CommandPacket::Unknown
+        );
+        assert_eq!(
+            CommandPacket::from([10, 2].as_ref()),
+            CommandPacket::Unknown
+        );
+        assert_eq!(
+            CommandPacket::from([10, 8].as_ref()),
+            CommandPacket::Unknown
+        );
+
+        assert_eq!(
+            Array::from(CommandPacket::ADCRead(ADCChannel::Channel5)).as_ref(),
+            [10, 5]
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         assert_eq!(CommandPacket::from([0].as_ref()), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from([10].as_ref()), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from([11].as_ref()), CommandPacket::Unknown);
         assert_eq!(
-            CommandPacket::from([11, 12, 13].as_ref()),
+            CommandPacket::from([12, 13, 14].as_ref()),
             CommandPacket::Unknown
         );
 

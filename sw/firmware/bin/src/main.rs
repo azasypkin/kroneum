@@ -5,6 +5,7 @@
 
 extern crate panic_reset;
 
+mod adc;
 mod beeper;
 mod buttons;
 mod flash;

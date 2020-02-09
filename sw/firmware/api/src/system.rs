@@ -1,3 +1,4 @@
+use adc::{ADCHardware, ADC};
 use beeper::{melody::Melody, BeeperState, PWMBeeper, PWMBeeperHardware};
 use buttons::{ButtonPressType, Buttons, ButtonsHardware, ButtonsPoll, ButtonsState};
 use flash::{Flash, FlashHardware};
@@ -36,7 +37,13 @@ impl Default for SystemState {
 
 /// Describes the SystemControl hardware management interface.
 pub trait SystemHardware:
-    ButtonsHardware + FlashHardware + PWMBeeperHardware + RTCHardware + USBHardware + TimerHardware
+    ADCHardware
+    + ButtonsHardware
+    + FlashHardware
+    + PWMBeeperHardware
+    + RTCHardware
+    + USBHardware
+    + TimerHardware
 {
     /// Initializes hardware if needed.
     fn setup(&mut self);
@@ -129,6 +136,10 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 self.flash().erase_all();
             } else if let CommandPacket::Echo(array) = command_packet {
                 self.usb().send(array.as_ref());
+            } else if let CommandPacket::ADCRead(channel) = command_packet {
+                let value = self.adc().read(channel);
+                self.usb()
+                    .send(&[(value & 0xff) as u8, ((value & 0xff00) >> 8) as u8]);
             }
         }
 
@@ -256,6 +267,11 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         }
 
         self.state.mode = mode;
+    }
+
+    /// Creates an instance of `ADC` controller.
+    fn adc(&mut self) -> ADC<T> {
+        ADC::new(&self.hw)
     }
 
     /// Creates an instance of `RTC` controller.

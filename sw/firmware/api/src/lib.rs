@@ -4,6 +4,7 @@
 
 extern crate libm;
 
+pub mod adc;
 pub mod array;
 pub mod beeper;
 pub mod buttons;
