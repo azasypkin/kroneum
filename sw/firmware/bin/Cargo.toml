@@ -21,6 +21,7 @@ stm32f0xx-hal = {version = "0.16.0", features = ["stm32f042", "rt"]}
 cortex-m-semihosting = "0.3.5"
 ssd1306 = "0.3.0-alpha.3"
 embedded-graphics = {version = "=0.6.0-alpha.2", features = ["bmp"]}
+embedded-nrf24l01 = { git = "https://github.com/astro/embedded-nrf24l01" }
 
 # this lets you use `cargo fix`!
 [[bin]]

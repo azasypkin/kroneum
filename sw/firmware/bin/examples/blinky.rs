@@ -23,7 +23,7 @@ fn main() -> ! {
             let mut delay = Delay::new(cp.SYST, &rcc);
 
             loop {
-                led.toggle();
+                led.toggle().unwrap();
                 delay.delay_ms(1_000_u16);
             }
         });
