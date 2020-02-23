@@ -15,7 +15,8 @@ cortex-m-rt = "0.6.12"
 kroneum-api = { version = "0.1.0", path = "../api" }
 panic-reset = "0.1.0"
 vcell = "0.1.2"
-stm32f0xx-hal = {version = "0.16.0", features = ["stm32f042", "rt"]}
+embedded-hal = "0.2.3"
+stm32f0xx-hal = {version = "0.16.0", features = ["stm32f042", "rt"], path = "../../../../stm32f0xx-hal"}
 
 [dev-dependencies]
 cortex-m-semihosting = "0.3.5"

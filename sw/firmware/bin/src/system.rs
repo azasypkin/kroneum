@@ -1,181 +1,104 @@
-use crate::hal::stm32::Interrupt;
-use crate::hal::stm32::Peripherals;
+use crate::hal::stm32::{Interrupt, Peripherals, ADC, CRS, EXTI, FLASH, PWR, RTC, TIM1, TIM2, USB};
+use cortex_m::interrupt::CriticalSection;
 use cortex_m::peripheral::{NVIC, SCB};
 use kroneum_api::system::SystemHardware;
+use stm32f0xx_hal::{
+    gpio::{
+        gpioa::{PA0, PA2},
+        GpioExt, Input, PullDown,
+    },
+    rcc::{Rcc, RccExt},
+};
 
 pub struct SystemHardwareImpl {
-    pub p: Peripherals,
+    pub(crate) adc: ADC,
+    pub(crate) crs: CRS,
+    pub(crate) exti: EXTI,
+    pub(crate) flash: FLASH,
+    pub(crate) pa0: PA0<Input<PullDown>>,
+    pub(crate) pa2: PA2<Input<PullDown>>,
+    pub(crate) pwr: PWR,
+    pub(crate) rcc: Rcc,
+    pub(crate) rtc: RTC,
     scb: SCB,
-    nvic: NVIC,
+    pub(crate) tim1: TIM1,
+    pub(crate) tim2: TIM2,
+    pub(crate) usb: USB,
 }
 
 impl SystemHardwareImpl {
-    pub fn new(p: Peripherals, scb: SCB, nvic: NVIC) -> Self {
-        Self { p, scb, nvic }
-    }
-}
+    pub fn init(p: Peripherals, scb: SCB, mut nvic: NVIC, cs: &CriticalSection) -> Self {
+        let Peripherals {
+            ADC: adc,
+            CRS: crs,
+            EXTI: exti,
+            FLASH: mut flash,
+            GPIOA: gpio_a,
+            GPIOB: gpio_b,
+            GPIOF: gpio_f,
+            PWR: pwr,
+            RCC: rcc,
+            RTC: rtc,
+            SYSCFG: syscfg,
+            TIM1: tim1,
+            TIM2: tim2,
+            USB: usb,
+            ..
+        } = p;
 
-impl SystemHardwareImpl {
-    fn toggle_deep_sleep(&mut self, on: bool) {
-        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register
-        // and enter Standby mode when the CPU enters Deep Sleep.
-        if on {
-            self.scb.set_sleepdeep();
-            self.p.PWR.cr.modify(|_, w| w.pdds().standby_mode());
-        } else {
-            self.scb.clear_sleepdeep();
-            self.p.PWR.cr.modify(|_, w| w.pdds().stop_mode());
-        }
+        let mut rcc = rcc.configure().freeze(&mut flash);
+        rcc.regs.apb2enr.modify(|_, w| w.syscfgen().enabled());
 
-        self.p.PWR.cr.modify(|_, w| w.cwuf().set_bit());
-    }
-
-    fn setup_buttons(&mut self) {
-        // Enable EXTI0 interrupt line for PA0 and EXTI2 for PA2.
-        self.p
-            .SYSCFG
-            .exticr1
-            .modify(|_, w| w.exti0().pa0().exti2().pa2());
-
-        // Configure PA0/PA2 to trigger an interrupt event on the EXTI0/EXTI2 line on a rising edge.
-        self.p
-            .EXTI
-            .rtsr
-            .modify(|_, w| w.tr0().set_bit().tr2().set_bit());
-
-        // Unmask the external interrupt line EXTI0\EXTI2 by setting the bit corresponding to the
-        // EXTI0\EXTI2 "bit 0/2" in the EXT_IMR register.
-        self.p
-            .EXTI
-            .imr
-            .modify(|_, w| w.mr0().set_bit().mr2().set_bit());
-
-        // Enable clock for GPIO Port A.
-        self.p.RCC.ahbenr.modify(|_, w| w.iopaen().enabled());
-
-        // Switch PA0 (button) and PA2 (button) to alternate function mode.
-        self.p
-            .GPIOA
-            .moder
-            .modify(|_, w| w.moder0().alternate().moder2().alternate());
-
-        // Enable pull-down for PA0 and PA2.
-        self.p
-            .GPIOA
-            .pupdr
-            .modify(|_, w| w.pupdr0().pull_down().pupdr2().pull_down());
-
-        // Set alternative function #2 for PA0 (WKUP1) and PA2 (WKUP4).
-        self.p
-            .GPIOA
-            .afrl
-            .modify(|_, w| w.afrl0().af2().afrl2().af2());
-
-        // Enable wakers.
-        self.p
-            .PWR
-            .csr
-            .modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
-    }
-
-    fn setup_usb(&mut self) {
+        syscfg.cfgr1.modify(|_, w| w.mem_mode().main_flash());
         // Remap PA9-10 to PA11-12 for USB.
-        self.p
-            .SYSCFG
-            .cfgr1
-            .modify(|_, w| w.pa11_pa12_rmp().remapped());
+        syscfg.cfgr1.modify(|_, w| w.pa11_pa12_rmp().remapped());
 
-        // Enable clock for GPIO Port A.
-        self.p.RCC.ahbenr.modify(|_, w| w.iopaen().enabled());
+        // Enable EXTI0 interrupt line for PA0 and EXTI2 for PA2:
+        // 1. Configure PA0/PA2 to trigger an interrupt event on the EXTI0/EXTI2 line on a rising edge
+        // 2. Unmask the external interrupt line EXTI0\EXTI2 by setting the bit corresponding to the
+        //    EXTI0\EXTI2 "bit 0/2" in the EXT_IMR register.
+        // 3. Enable wakers (WKUP1 - PA0, WKUP4 - PA2).
+        syscfg.exticr1.modify(|_, w| w.exti0().pa0().exti2().pa2());
+        exti.rtsr.modify(|_, w| w.tr0().set_bit().tr2().set_bit());
+        exti.imr.modify(|_, w| w.mr0().set_bit().mr2().set_bit());
+        pwr.csr.modify(|_, w| w.ewup1().set_bit().ewup4().set_bit());
 
-        // Switch  PA11 and PA12 (usb) to alternate function mode.
-        self.p
-            .GPIOA
-            .moder
-            .modify(|_, w| w.moder11().alternate().moder12().alternate());
+        // Configure port A: switch PA0 (button I) and PA2 (button X) to being pull-down inputs,
+        // PA11 (USB DP) and PA12 (USB DM) to alternate function mode #0 and PA1, PA3-7, PA13-14 to
+        // analog mode to reduce power consumption since these are not used.
+        let gpio_a = gpio_a.split(&mut rcc);
+        let pa0 = gpio_a.pa0.into_pull_down_input(cs);
+        let pa2 = gpio_a.pa2.into_pull_down_input(cs);
+        gpio_a.pa11.into_alternate_af0(cs);
+        gpio_a.pa12.into_alternate_af0(cs);
+        gpio_a.pa1.into_analog(cs);
+        gpio_a.pa3.into_analog(cs);
+        gpio_a.pa4.into_analog(cs);
+        gpio_a.pa5.into_analog(cs);
+        gpio_a.pa6.into_analog(cs);
+        gpio_a.pa7.into_analog(cs);
+        gpio_a.pa13.into_analog(cs);
+        gpio_a.pa14.into_analog(cs);
 
-        // Set "high" output speed for PA11 and PA12.
-        self.p.GPIOA.ospeedr.modify(|_, w| {
-            w.ospeedr11()
-                .very_high_speed()
-                .ospeedr12()
-                .very_high_speed()
-        });
-    }
+        // Configure port B: PB1 is used by beeper, so switch it into alternate function #2 (TIM1_CH3N)
+        // and PB8 to analog mode to reduce power consumption since it's not used.
+        let gpio_b = gpio_b.split(&mut rcc);
+        gpio_b.pb1.into_alternate_af2(cs);
+        gpio_b.pb8.into_analog(cs);
 
-    fn setup_beeper(&mut self) {
-        // Enable clock for GPIO Port B.
-        self.p.RCC.ahbenr.modify(|_, w| w.iopben().enabled());
-
-        // Switch PB1 (beeper) to alternate function mode
-        self.p.GPIOB.moder.modify(|_, w| w.moder1().alternate());
-
-        // Set "high" output speed for PB1.
-        self.p
-            .GPIOB
-            .ospeedr
-            .modify(|_, w| w.ospeedr1().very_high_speed());
-
-        // Set alternative function #2 for PB1 (TIM1_CH3N).
-        self.p.GPIOB.afrl.modify(|_, w| w.afrl1().af2());
-    }
-}
-
-impl SystemHardware for SystemHardwareImpl {
-    fn setup(&mut self) {
-        self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().enabled());
-        self.p.SYSCFG.cfgr1.modify(|_, w| w.mem_mode().main_flash());
-
-        self.setup_usb();
-        self.setup_buttons();
-        self.setup_beeper();
-
-        // ---------GPIO------------------
-
-        // Switch  PA1, PA3-7 to AIN to reduce power consumption.
-        self.p.GPIOA.moder.modify(|_, w| {
-            w.moder1()
-                .analog()
-                .moder3()
-                .analog()
-                .moder4()
-                .analog()
-                .moder5()
-                .analog()
-                .moder6()
-                .analog()
-                .moder7()
-                .analog()
-                .moder9()
-                .analog()
-                .moder10()
-                .analog()
-                .moder13()
-                .analog()
-                .moder14()
-                .analog()
-        });
-
-        // Switch PB8 to AIN to reduce power consumption.
-        self.p.GPIOB.moder.modify(|_, w| w.moder8().analog());
-
-        // Enable clock for GPIO Port F.
-        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().enabled());
-
-        // Enable AIN for GPIO F to reduce power consumption.
-        self.p
-            .GPIOF
-            .moder
-            .modify(|_, w| w.moder0().analog().moder1().analog());
-
-        self.p.RCC.ahbenr.modify(|_, w| w.iopfen().disabled());
+        // Configure port F: neither of its pins used, so switch all of them to analog mode to
+        // reduce power consumption and disable clock.
+        let gpio_f = gpio_f.split(&mut rcc);
+        gpio_f.pf0.into_analog(cs);
+        gpio_f.pf1.into_analog(cs);
+        rcc.regs.ahbenr.modify(|_, w| w.iopfen().disabled());
 
         // Configure and enable interrupts.
         unsafe {
-            self.nvic.set_priority(Interrupt::EXTI0_1, 1);
-            self.nvic.set_priority(Interrupt::EXTI2_3, 1);
-            self.nvic.set_priority(Interrupt::RTC, 1);
-            self.nvic.set_priority(Interrupt::TIM2, 1);
+            nvic.set_priority(Interrupt::EXTI0_1, 1);
+            nvic.set_priority(Interrupt::EXTI2_3, 1);
+            nvic.set_priority(Interrupt::RTC, 1);
+            nvic.set_priority(Interrupt::TIM2, 1);
 
             NVIC::unmask(Interrupt::EXTI0_1);
             NVIC::unmask(Interrupt::EXTI2_3);
@@ -184,9 +107,41 @@ impl SystemHardware for SystemHardwareImpl {
             NVIC::unmask(Interrupt::TIM2);
         }
 
-        self.p.RCC.apb2enr.modify(|_, w| w.syscfgen().disabled());
+        rcc.regs.apb2enr.modify(|_, w| w.syscfgen().disabled());
+
+        Self {
+            crs,
+            adc,
+            exti,
+            flash,
+            pa0,
+            pa2,
+            pwr,
+            rcc,
+            rtc,
+            scb,
+            tim1,
+            tim2,
+            usb,
+        }
     }
 
+    fn toggle_deep_sleep(&mut self, on: bool) {
+        // Toggle SLEEPDEEP bit of Cortex-M0 System Control Register
+        // and enter Standby mode when the CPU enters Deep Sleep.
+        if on {
+            self.scb.set_sleepdeep();
+            self.pwr.cr.modify(|_, w| w.pdds().standby_mode());
+        } else {
+            self.scb.clear_sleepdeep();
+            self.pwr.cr.modify(|_, w| w.pdds().stop_mode());
+        }
+
+        self.pwr.cr.modify(|_, w| w.cwuf().set_bit());
+    }
+}
+
+impl SystemHardware for SystemHardwareImpl {
     fn enter_deep_sleep(&mut self) {
         self.toggle_deep_sleep(true);
     }

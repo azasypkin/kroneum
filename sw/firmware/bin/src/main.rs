@@ -42,7 +42,7 @@ fn main() -> ! {
     {
         cortex_m::interrupt::free(|cs| {
             *SYSTEM.borrow(cs).borrow_mut() = Some(System::run(
-                system::SystemHardwareImpl::new(device, core.SCB, core.NVIC),
+                system::SystemHardwareImpl::init(device, core.SCB, core.NVIC, &cs),
                 SysTick::new(SystickHardwareImpl::new(core.SYST)),
             ));
         });

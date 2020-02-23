@@ -45,9 +45,6 @@ pub trait SystemHardware:
     + USBHardware
     + TimerHardware
 {
-    /// Initializes hardware if needed.
-    fn setup(&mut self);
-
     /// Forces system to enter StandBy mode.
     fn enter_deep_sleep(&mut self);
 
@@ -65,9 +62,7 @@ pub struct System<T: SystemHardware, S: SysTickHardware> {
 }
 
 impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
-    pub fn run(mut hw: T, systick: SysTick<S>) -> Self {
-        SystemHardware::setup(&mut hw);
-
+    pub fn run(hw: T, systick: SysTick<S>) -> Self {
         let mut system = System {
             state: SystemState::default(),
             hw,

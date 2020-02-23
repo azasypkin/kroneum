@@ -1,4 +1,4 @@
-use crate::hal::stm32::Peripherals;
+use crate::hal::stm32::FLASH;
 use crate::system::SystemHardwareImpl;
 use kroneum_api::flash::FlashHardware;
 
@@ -6,19 +6,19 @@ use kroneum_api::flash::FlashHardware;
 const PAGE_ADDRESSES: [usize; 2] = [0x0800_7800, 0x0800_7C00];
 
 /// Disables or enables Flash write protection.
-fn toggle_write_protection(p: &Peripherals, enable_write_protection: bool) {
-    let is_protected = p.FLASH.cr.read().lock().bit_is_set();
+fn toggle_write_protection(flash: &FLASH, enable_write_protection: bool) {
+    let is_protected = flash.cr.read().lock().bit_is_set();
     if enable_write_protection && !is_protected {
-        p.FLASH.cr.write(|w| w.lock().locked());
+        flash.cr.write(|w| w.lock().locked());
     } else if is_protected {
-        p.FLASH.keyr.write(|w| w.fkeyr().bits(0x4567_0123));
-        p.FLASH.keyr.write(|w| w.fkeyr().bits(0xCDEF_89AB));
+        flash.keyr.write(|w| w.fkeyr().bits(0x4567_0123));
+        flash.keyr.write(|w| w.fkeyr().bits(0xCDEF_89AB));
     }
 }
 
-fn busy_wait_until_ready(p: &Peripherals) {
+fn busy_wait_until_ready(flash: &FLASH) {
     // Wait until Flash is not busy.
-    while p.FLASH.sr.read().bsy().is_active() {}
+    while flash.sr.read().bsy().is_active() {}
 }
 
 impl FlashHardware for SystemHardwareImpl {
@@ -27,33 +27,33 @@ impl FlashHardware for SystemHardwareImpl {
     }
 
     fn erase_page(&self, page_address: usize) {
-        busy_wait_until_ready(&self.p);
-        toggle_write_protection(&self.p, false);
+        busy_wait_until_ready(&self.flash);
+        toggle_write_protection(&self.flash, false);
 
-        self.p.FLASH.cr.modify(|_, w| w.per().page_erase());
-        self.p.FLASH.ar.write(|w| w.far().bits(page_address as u32));
-        self.p.FLASH.cr.modify(|_, w| w.strt().start());
+        self.flash.cr.modify(|_, w| w.per().page_erase());
+        self.flash.ar.write(|w| w.far().bits(page_address as u32));
+        self.flash.cr.modify(|_, w| w.strt().start());
 
-        busy_wait_until_ready(&self.p);
+        busy_wait_until_ready(&self.flash);
 
-        self.p.FLASH.cr.modify(|_, w| w.per().clear_bit());
+        self.flash.cr.modify(|_, w| w.per().clear_bit());
 
-        toggle_write_protection(&self.p, true);
+        toggle_write_protection(&self.flash, true);
     }
 
     fn enable_write_mode(&self) {
-        busy_wait_until_ready(&self.p);
+        busy_wait_until_ready(&self.flash);
 
-        toggle_write_protection(&self.p, false);
+        toggle_write_protection(&self.flash, false);
 
-        self.p.FLASH.cr.modify(|_, w| w.pg().program());
+        self.flash.cr.modify(|_, w| w.pg().program());
     }
 
     fn disable_write_mode(&self) {
-        busy_wait_until_ready(&self.p);
+        busy_wait_until_ready(&self.flash);
 
-        self.p.FLASH.cr.modify(|_, w| w.pg().clear_bit());
+        self.flash.cr.modify(|_, w| w.pg().clear_bit());
 
-        toggle_write_protection(&self.p, true);
+        toggle_write_protection(&self.flash, true);
     }
 }
