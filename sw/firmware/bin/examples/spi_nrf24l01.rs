@@ -59,7 +59,7 @@ fn main() -> ! {
                 .unwrap();
             nrf.set_pipes_rx_enable(&[true, false, false, false, false, false])
                 .unwrap();
-            nrf.set_pipes_rx_lengths(&[None, Some(1), Some(1), Some(1), Some(1), Some(1)])
+            nrf.set_pipes_rx_lengths(&[Some(6), Some(1), Some(1), Some(1), Some(1), Some(1)])
                 .unwrap();
 
             nrf.flush_tx().unwrap();

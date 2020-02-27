@@ -1,4 +1,4 @@
-#![deny(warnings)]
+//#![deny(warnings)]
 #![allow(clippy::missing_safety_doc)]
 #![no_main]
 #![no_std]
@@ -9,6 +9,7 @@ mod adc;
 mod beeper;
 mod buttons;
 mod flash;
+mod radio;
 mod rtc;
 mod system;
 mod systick;
@@ -18,7 +19,7 @@ mod usb;
 use crate::hal::{stm32, stm32::interrupt};
 use crate::{system::SystemHardwareImpl, systick::SystickHardwareImpl};
 use core::cell::RefCell;
-use cortex_m::interrupt::Mutex;
+use cortex_m::interrupt::{CriticalSection, Mutex};
 use cortex_m_rt::{entry, exception, ExceptionFrame};
 use kroneum_api::{system::System, systick::SysTick};
 use stm32f0xx_hal as hal;
@@ -27,11 +28,11 @@ static SYSTEM: Mutex<RefCell<Option<System<SystemHardwareImpl, SystickHardwareIm
     Mutex::new(RefCell::new(None));
 fn get_system<F>(f: F)
 where
-    F: FnOnce(&mut System<SystemHardwareImpl, SystickHardwareImpl>),
+    F: FnOnce(&mut System<SystemHardwareImpl, SystickHardwareImpl>, &CriticalSection),
 {
     cortex_m::interrupt::free(|cs| {
         if let Some(system) = SYSTEM.borrow(cs).borrow_mut().as_mut() {
-            f(system);
+            f(system, cs);
         }
     });
 }
@@ -49,34 +50,34 @@ fn main() -> ! {
     }
 
     loop {
-        get_system(|system| system.sleep());
+        get_system(|system, _cs| system.sleep());
         cortex_m::asm::wfi();
     }
 }
 
 #[interrupt]
 fn EXTI2_3() {
-    get_system(|system| system.handle_button_press());
+    get_system(|system, _cs| system.handle_button_press());
 }
 
 #[interrupt]
 fn EXTI0_1() {
-    get_system(|system| system.handle_button_press());
+    get_system(|system, _cs| system.handle_button_press());
 }
 
 #[interrupt]
 fn RTC() {
-    get_system(|system| system.handle_alarm());
+    get_system(|system, _cs| system.handle_alarm());
 }
 
 #[interrupt]
 fn USB() {
-    get_system(|system| system.handle_usb_packet());
+    get_system(|system, cs| system.handle_usb_packet(cs));
 }
 
 #[interrupt]
 fn TIM2() {
-    get_system(|system| system.handle_timer());
+    get_system(|system, _cs| system.handle_timer());
 }
 
 #[exception]
@@ -91,5 +92,5 @@ fn HardFault(_ef: &ExceptionFrame) -> ! {
 
 #[exception]
 fn SysTick() {
-    get_system(|system| system.handle_systick());
+    get_system(|system, _cs| system.handle_systick());
 }

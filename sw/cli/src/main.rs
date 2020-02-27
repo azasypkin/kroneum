@@ -1,3 +1,4 @@
+#![deny(warnings)]
 mod device;
 mod ui;
 

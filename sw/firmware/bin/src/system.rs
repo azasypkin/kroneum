@@ -1,11 +1,14 @@
-use crate::hal::stm32::{Interrupt, Peripherals, ADC, CRS, EXTI, FLASH, PWR, RTC, TIM1, TIM2, USB};
+use crate::hal::stm32::{
+    Interrupt, Peripherals, ADC, CRS, EXTI, FLASH, PWR, RTC, SPI1, TIM1, TIM2, USB,
+};
+use crate::radio::SPIBus;
 use cortex_m::interrupt::CriticalSection;
 use cortex_m::peripheral::{NVIC, SCB};
 use kroneum_api::system::SystemHardware;
 use stm32f0xx_hal::{
     gpio::{
-        gpioa::{PA0, PA2},
-        GpioExt, Input, PullDown,
+        gpioa::{PA0, PA2, PA3, PA4, PA5, PA6, PA7},
+        Analog, GpioExt, Input, PullDown,
     },
     rcc::{Rcc, RccExt},
 };
@@ -17,10 +20,17 @@ pub struct SystemHardwareImpl {
     pub(crate) flash: FLASH,
     pub(crate) pa0: PA0<Input<PullDown>>,
     pub(crate) pa2: PA2<Input<PullDown>>,
+    pub(crate) pa3: Option<PA3<Analog>>,
+    pub(crate) pa4: Option<PA4<Analog>>,
+    pub(crate) pa5: Option<PA5<Analog>>,
+    pub(crate) pa6: Option<PA6<Analog>>,
+    pub(crate) pa7: Option<PA7<Analog>>,
     pub(crate) pwr: PWR,
     pub(crate) rcc: Rcc,
     pub(crate) rtc: RTC,
     scb: SCB,
+    pub(crate) spi: Option<SPI1>,
+    pub(crate) spi_bus: Option<SPIBus>,
     pub(crate) tim1: TIM1,
     pub(crate) tim2: TIM2,
     pub(crate) usb: USB,
@@ -40,6 +50,7 @@ impl SystemHardwareImpl {
             RCC: rcc,
             RTC: rtc,
             SYSCFG: syscfg,
+            SPI1: spi,
             TIM1: tim1,
             TIM2: tim2,
             USB: usb,
@@ -72,11 +83,11 @@ impl SystemHardwareImpl {
         gpio_a.pa11.into_alternate_af0(cs);
         gpio_a.pa12.into_alternate_af0(cs);
         gpio_a.pa1.into_analog(cs);
-        gpio_a.pa3.into_analog(cs);
-        gpio_a.pa4.into_analog(cs);
-        gpio_a.pa5.into_analog(cs);
-        gpio_a.pa6.into_analog(cs);
-        gpio_a.pa7.into_analog(cs);
+        let pa3 = gpio_a.pa3.into_analog(cs);
+        let pa4 = gpio_a.pa4.into_analog(cs);
+        let pa5 = gpio_a.pa5.into_analog(cs);
+        let pa6 = gpio_a.pa6.into_analog(cs);
+        let pa7 = gpio_a.pa7.into_analog(cs);
         gpio_a.pa13.into_analog(cs);
         gpio_a.pa14.into_analog(cs);
 
@@ -116,10 +127,17 @@ impl SystemHardwareImpl {
             flash,
             pa0,
             pa2,
+            pa3: Some(pa3),
+            pa4: Some(pa4),
+            pa5: Some(pa5),
+            pa6: Some(pa6),
+            pa7: Some(pa7),
             pwr,
             rcc,
             rtc,
             scb,
+            spi: Some(spi),
+            spi_bus: None,
             tim1,
             tim2,
             usb,

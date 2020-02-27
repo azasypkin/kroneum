@@ -31,6 +31,10 @@ async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
     HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
 }
 
+async fn radio(info: web::Json<Vec<u8>>) -> impl Responder {
+    HttpResponse::Ok().json(Device::create().unwrap().radio(info.as_ref()).unwrap())
+}
+
 async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
     let device = Device::create().unwrap();
     device
@@ -74,6 +78,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/play", web::post().to(play))
             .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
+            .route("/api/radio", web::post().to(radio))
             .route("/api/adc/{channel}", web::get().to(adc))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })

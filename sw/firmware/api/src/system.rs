@@ -1,12 +1,15 @@
 use adc::{ADCHardware, ADC};
+use array::Array;
+use bare_metal::CriticalSection;
 use beeper::{melody::Melody, BeeperState, PWMBeeper, PWMBeeperHardware};
 use buttons::{ButtonPressType, Buttons, ButtonsHardware, ButtonsPoll, ButtonsState};
 use flash::{Flash, FlashHardware};
+use radio::{Radio, RadioHardware};
 use rtc::{RTCHardware, RTC};
 use systick::{SysTick, SysTickHardware};
 use time::Time;
 use timer::{Timer, TimerHardware};
-use usb::{command_packet::CommandPacket, USBHardware, UsbState, USB};
+use usb::{command_packet::CommandPacket, commands::RadioCommand, USBHardware, UsbState, USB};
 
 #[derive(Debug, Copy, Clone)]
 enum SystemMode {
@@ -42,6 +45,7 @@ pub trait SystemHardware:
     + FlashHardware
     + PWMBeeperHardware
     + RTCHardware
+    + RadioHardware
     + USBHardware
     + TimerHardware
 {
@@ -101,41 +105,61 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         self.poll_buttons();
     }
 
-    pub fn handle_usb_packet(&mut self) {
+    pub fn handle_usb_packet(&mut self, cs: &CriticalSection) {
         self.usb().interrupt();
 
-        if let Some(command_packet) = self.state.usb_state.command {
-            if let CommandPacket::Beep(num) = command_packet {
-                self.beeper().play_and_repeat(Melody::Beep, num as usize);
-            } else if let CommandPacket::Melody(tones) = command_packet {
-                self.beeper().play(Melody::Custom(tones));
-            } else if let CommandPacket::AlarmSet(time) = command_packet {
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
-            } else if let CommandPacket::AlarmGet = command_packet {
+        match self.state.usb_state.command {
+            Some(CommandPacket::Beep(num)) => {
+                self.beeper().play_and_repeat(Melody::Beep, num as usize)
+            }
+            Some(CommandPacket::Melody(tones)) => self.beeper().play(Melody::Custom(tones)),
+            Some(CommandPacket::AlarmSet(time)) => {
+                self.set_mode(SystemMode::Alarm(time, Melody::Alarm))
+            }
+            Some(CommandPacket::AlarmGet) => {
                 let alarm = self.rtc().alarm();
                 self.usb()
                     .send(&[alarm.hours, alarm.minutes, alarm.seconds]);
-            } else if let CommandPacket::Reset = command_packet {
-                self.reset();
-            } else if let CommandPacket::FlashRead(slot) = command_packet {
+            }
+            Some(CommandPacket::Reset) => self.reset(),
+            Some(CommandPacket::FlashRead(slot)) => {
                 let value = self.flash().read(slot).unwrap_or_else(|| 0);
                 self.usb().send(&[value]);
-            } else if let CommandPacket::FlashWrite(slot, value) = command_packet {
+            }
+            Some(CommandPacket::FlashWrite(slot, value)) => {
                 let status = if self.flash().write(slot, value).is_ok() {
                     1
                 } else {
                     0
                 };
                 self.usb().send(&[status]);
-            } else if let CommandPacket::FlashEraseAll = command_packet {
-                self.flash().erase_all();
-            } else if let CommandPacket::Echo(array) = command_packet {
-                self.usb().send(array.as_ref());
-            } else if let CommandPacket::ADCRead(channel) = command_packet {
+            }
+            Some(CommandPacket::FlashEraseAll) => self.flash().erase_all(),
+            Some(CommandPacket::Echo(array)) => self.usb().send(array.as_ref()),
+            Some(CommandPacket::ADCRead(channel)) => {
                 let value = self.adc().read(channel);
                 self.usb()
                     .send(&[(value & 0xff) as u8, ((value & 0xff00) >> 8) as u8]);
             }
+            Some(CommandPacket::Radio(radio_command)) => {
+                let response = match radio_command {
+                    RadioCommand::Transmit(data) => {
+                        self.radio().transmit(cs, data).map(|_| Array::new())
+                    }
+                    RadioCommand::Receive => self.radio().receive(cs),
+                    RadioCommand::Status => self.radio().status(cs),
+                    RadioCommand::Unknown => Err(()),
+                };
+
+                match response {
+                    Ok(mut array) => {
+                        array.unshift(0x00);
+                        self.usb().send(array.as_ref());
+                    }
+                    Err(_) => self.usb().send(&[0xFF]),
+                };
+            }
+            _ => {}
         }
 
         self.state.usb_state.command = None;
@@ -272,6 +296,11 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     /// Creates an instance of `RTC` controller.
     fn rtc(&mut self) -> RTC<T> {
         RTC::new(&self.hw)
+    }
+
+    /// Creates an instance of `ADC` controller.
+    fn radio(&mut self) -> Radio<T, S> {
+        Radio::new(&mut self.hw, &mut self.systick)
     }
 
     fn timer(&mut self) -> Timer<T> {

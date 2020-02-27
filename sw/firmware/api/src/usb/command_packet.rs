@@ -1,3 +1,4 @@
+use super::commands::RadioCommand;
 use adc::ADCChannel;
 use array::Array;
 use beeper::tone::Tone;
@@ -34,7 +35,12 @@ impl From<CommandPacket> for Array<u8> {
                 });
                 array.as_ref().into()
             }
-            CommandPacket::ADCRead(channel) => [10, channel.into()].as_ref().into(),
+            CommandPacket::ADCRead(channel) => [0xA, channel.into()].as_ref().into(),
+            CommandPacket::Radio(command) => {
+                let mut array = Array::<u8>::from(command);
+                array.unshift(0xB);
+                array.as_ref().into()
+            }
             CommandPacket::Unknown => [0].as_ref().into(),
         }
     }
@@ -44,37 +50,44 @@ impl Into<CommandPacket> for Array<u8> {
     fn into(self) -> CommandPacket {
         let command_type_byte = self[0];
         match command_type_byte {
-            1 => CommandPacket::Beep(self[1]),
-            2 => CommandPacket::AlarmSet(Time {
+            0x1 => CommandPacket::Beep(self[1]),
+            0x2 => CommandPacket::AlarmSet(Time {
                 hours: self[1],
                 minutes: self[2],
                 seconds: self[3],
             }),
-            3 => CommandPacket::AlarmGet,
-            4 => CommandPacket::Reset,
-            5 => CommandPacket::FlashRead(StorageSlot::from(self[1])),
-            6 => CommandPacket::FlashWrite(StorageSlot::from(self[1]), self[2]),
-            7 => CommandPacket::FlashEraseAll,
-            8 => {
+            0x3 => CommandPacket::AlarmGet,
+            0x4 => CommandPacket::Reset,
+            0x5 => CommandPacket::FlashRead(StorageSlot::from(self[1])),
+            0x6 => CommandPacket::FlashWrite(StorageSlot::from(self[1]), self[2]),
+            0x7 => CommandPacket::FlashEraseAll,
+            0x8 => {
                 let mut array: Array<Tone> = Array::new();
                 for index in (1..self.len()).step_by(2) {
                     array.push(Tone::new(self[index], self[index + 1]));
                 }
                 CommandPacket::Melody(array)
             }
-            9 => {
+            0x9 => {
                 let mut echo_array = Array::new();
                 self.as_ref()[1..]
                     .iter()
                     .for_each(|echo_value| echo_array.push(*echo_value));
                 CommandPacket::Echo(echo_array)
             }
-            10 => {
+            0xA => {
                 if let Ok(channel) = ADCChannel::try_from(self[1]) {
                     CommandPacket::ADCRead(channel)
                 } else {
                     CommandPacket::Unknown
                 }
+            }
+            0xB => {
+                let mut raw_command = Array::new();
+                self.as_ref()[1..]
+                    .iter()
+                    .for_each(|byte| raw_command.push(*byte));
+                CommandPacket::Radio(raw_command.into())
             }
             _ => CommandPacket::Unknown,
         }
@@ -93,6 +106,7 @@ pub enum CommandPacket {
     Reset,
     Melody(Array<Tone>),
     Echo(Array<u8>),
+    Radio(RadioCommand),
     Unknown,
 }
 

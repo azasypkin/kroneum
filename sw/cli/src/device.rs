@@ -149,4 +149,9 @@ impl Device {
             .and_then(|_| self.read())
             .map(|data| (data[0] as u16) | ((data[1] as u16) << 8))
     }
+
+    pub fn radio(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+        self.write(CommandPacket::RadioCommand(Array::from(data)))
+            .and_then(|_| self.read())
+    }
 }

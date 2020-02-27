@@ -353,6 +353,114 @@ const DeviceDiagnosticsSection = () => {
   );
 };
 
+interface RadioStatus {
+  isInProgress: boolean;
+  bytesString: string;
+  isValid: boolean;
+  response: number[] | null;
+}
+const DeviceRadioSection = () => {
+  const [radioStatus, setRadioStatus] = useState<RadioStatus>({
+    isInProgress: false,
+    bytesString: '',
+    isValid: false,
+    response: null,
+  });
+
+  const showError = !radioStatus.isValid && radioStatus.bytesString.length > 0;
+
+  const [isRadioPopOverOpen, setIsRadioPopOverOpen] = useState<boolean>(false);
+  const radioButton = <EuiButton onClick={() => setIsRadioPopOverOpen(true)}>Send command</EuiButton>;
+
+  return (
+    <EuiFlexItem>
+      <EuiPageContentHeader>
+        <EuiPageContentHeaderSection>
+          <EuiTitle>
+            <h2>Radio</h2>
+          </EuiTitle>
+        </EuiPageContentHeaderSection>
+      </EuiPageContentHeader>
+      <EuiPageContentBody>
+        <EuiPanel style={{ maxWidth: 300 }}>
+          <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
+            <EuiPopover
+              id="trapFocus"
+              ownFocus
+              button={radioButton}
+              isOpen={isRadioPopOverOpen}
+              closePopover={() => {
+                setIsRadioPopOverOpen(false);
+                setRadioStatus({
+                  isInProgress: false,
+                  bytesString: '',
+                  isValid: false,
+                  response: null,
+                });
+              }}
+            >
+              <EuiFormRow
+                style={{ minWidth: 300 }}
+                label="Bytes sequence to send"
+                helpText={radioStatus.response ? `Response: [${radioStatus.response.join(', ')}]` : ''}
+                isInvalid={showError}
+                error={['Bytes should be a comma separated list of `u8` values.']}
+              >
+                <EuiFieldText
+                  placeholder="Enter comma separated `u8` numbers..."
+                  value={radioStatus.bytesString}
+                  name="text"
+                  isInvalid={showError}
+                  onChange={ev =>
+                    setRadioStatus({
+                      ...radioStatus,
+                      response: null,
+                      isValid:
+                        ev.target.value &&
+                        ev.target.value.split(',').every(value => {
+                          const intValue = parseInt(value.trim());
+                          return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
+                        }),
+                      bytesString: ev.target.value,
+                    })
+                  }
+                />
+              </EuiFormRow>
+              <EuiSpacer />
+              <EuiButton
+                isDisabled={!radioStatus.isValid}
+                isLoading={radioStatus.isInProgress}
+                fill
+                onClick={() => {
+                  setRadioStatus({
+                    ...radioStatus,
+                    isInProgress: true,
+                  });
+
+                  axios
+                    .post(
+                      '/api/radio',
+                      radioStatus.bytesString.split(',').map(value => parseInt(value.trim())),
+                    )
+                    .then(({ data }) => {
+                      setRadioStatus({
+                        ...radioStatus,
+                        isInProgress: false,
+                        response: data,
+                      });
+                    });
+                }}
+              >
+                Send
+              </EuiButton>
+            </EuiPopover>
+          </EuiFormRow>
+        </EuiPanel>
+      </EuiPageContentBody>
+    </EuiFlexItem>
+  );
+};
+
 const IndexPage = () => {
   const [info, setInfo] = useState<DeviceInfo | null>(null);
   useEffect(() => {
@@ -375,6 +483,7 @@ const IndexPage = () => {
             <DeviceFlashContentSection slots={info?.flash} />
             <DeviceAlarmSection />
             <DeviceADCSection />
+            <DeviceRadioSection />
             <DeviceDiagnosticsSection />
           </EuiFlexGroup>
         </EuiPageContent>

@@ -1,4 +1,5 @@
 pub mod command_packet;
+pub mod commands;
 mod descriptors;
 mod pma;
 mod setup_packet;

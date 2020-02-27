@@ -2,6 +2,8 @@
 #![deny(warnings)]
 #![no_std]
 
+extern crate bare_metal;
+extern crate bit_field;
 extern crate libm;
 
 pub mod adc;
@@ -10,6 +12,7 @@ pub mod beeper;
 pub mod buttons;
 pub mod config;
 pub mod flash;
+pub mod radio;
 pub mod rtc;
 pub mod system;
 pub mod systick;

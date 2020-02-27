@@ -1,5 +1,5 @@
 use core::fmt::{Debug, Error, Formatter};
-use core::ops::Index;
+use core::ops::{Index, IndexMut};
 
 const MAX_SIZE: usize = 64;
 
@@ -21,10 +21,36 @@ impl<T: Default + Copy> Array<T> {
     /// Pushes value into `Array`. Note that if internal buffer is full, no more data will be
     /// written effectively making it read-only.
     pub fn push(&mut self, value: T) {
-        if self.len < MAX_SIZE {
+        if self.len < self.buffer.len() {
             self.buffer[self.len] = value;
             self.len += 1;
         }
+    }
+
+    pub fn unshift(&mut self, value: T) {
+        if self.len < self.buffer.len() {
+            let mut buffer = [T::default(); MAX_SIZE];
+            buffer[0] = value;
+            buffer[1..self.len + 1].copy_from_slice(&self.buffer[..self.len]);
+
+            self.buffer = buffer;
+            self.len += 1;
+        }
+    }
+
+    pub fn shift(&mut self) -> Option<T> {
+        if self.len == 0 {
+            return None;
+        }
+
+        let mut buffer = [T::default(); MAX_SIZE];
+        buffer[..self.len - 1].copy_from_slice(&self.buffer[1..self.len]);
+
+        let shifted_value = self[0];
+        self.buffer = buffer;
+        self.len -= 1;
+
+        Some(shifted_value)
     }
 
     /// Returns length of the part of internal buffer that contains values.
@@ -81,9 +107,28 @@ impl<T: Copy> Index<usize> for Array<T> {
     }
 }
 
+impl<T: Copy> IndexMut<usize> for Array<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index >= self.len {
+            panic!(
+                "index out of bounds: the len is {} but the index is {}",
+                self.len, index
+            );
+        }
+
+        &mut self.buffer[index]
+    }
+}
+
 impl<T> AsRef<[T]> for Array<T> {
     fn as_ref(&self) -> &[T] {
         &self.buffer[..self.len]
+    }
+}
+
+impl<T> AsMut<[T]> for Array<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.buffer[..self.len].as_mut()
     }
 }
 
@@ -186,6 +231,16 @@ mod tests {
 
         assert_eq!(array.len(), MAX_SIZE);
         assert_eq!(array.is_empty(), false);
+    }
+
+    #[test]
+    fn correctly_copied_into_buffer() {
+        let array = Array::<u8>::from([1, 2, 3, 3, 2, 1].as_ref());
+
+        let mut buffer = [0xFFu8; 10];
+        buffer[1..array.len() + 1].copy_from_slice(array.as_ref());
+
+        assert_eq!(buffer, [0xFF, 1, 2, 3, 3, 2, 1, 0xFF, 0xFF, 0xFF]);
     }
 
     #[test]

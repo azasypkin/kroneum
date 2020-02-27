@@ -5,6 +5,8 @@ authors = ["Aleh Zasypkin <aleh.zasypkin@gmail.com>"]
 categories = ["embedded", "no-std"]
 
 [dependencies]
+bare-metal = "0.2.5"
+bit_field = "0.10.0"
 libm = "0.2.1"
 vcell = "0.1.2"
 
