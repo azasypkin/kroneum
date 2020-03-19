@@ -2,7 +2,7 @@ mod device_identifier;
 
 pub use self::device_identifier::DeviceIdentifier;
 
-use hidapi::{HidApi, HidDevice, HidDeviceInfo};
+use hidapi::{HidApi, HidDevice};
 use kroneum_api::{
     adc::ADCChannel,
     array::Array,
@@ -18,7 +18,7 @@ const MAX_ALARM_SECONDS: u64 = 3600 * 24;
 
 pub struct Device {
     device: HidDevice,
-    device_info: HidDeviceInfo,
+    manufacturer: String,
 }
 
 impl Device {
@@ -26,35 +26,34 @@ impl Device {
         let api = HidApi::new()
             .or_else(|err| Err(format!("Failed to create HID API adapter {:?}", err)))?;
 
-        api.devices()
-            .iter()
-            .find(|dev| dev.product_id == DEVICE_PID && dev.vendor_id == DEVICE_VID)
-            .cloned()
-            .ok_or_else(|| "Failed to find HID device.".to_string())
-            .and_then(|device_info| {
-                api.open(DEVICE_VID, DEVICE_PID)
-                    .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))
-                    .map(|device| Device {
-                        device_info,
-                        device,
-                    })
+        let device_info = api
+            .device_list()
+            .find(|dev| dev.product_id() == DEVICE_PID && dev.vendor_id() == DEVICE_VID)
+            .ok_or_else(|| "Failed to find HID device.".to_string())?;
+
+        let manufacturer = device_info
+            .manufacturer_string()
+            .unwrap_or_else(|| "")
+            .to_string();
+
+        api.open(DEVICE_VID, DEVICE_PID)
+            .or_else(|err| Err(format!("Failed to open HID device {:?}", err)))
+            .map(|device| Device {
+                device,
+                manufacturer,
             })
     }
 }
 
 impl Device {
-    pub fn get_identifier(&self) -> Result<DeviceIdentifier, String> {
-        self.device_info
-            .manufacturer_string
-            .clone()
-            .ok_or_else(|| "Failed to retrieve device manufacturer.".to_string())
-            .map(|manufacturer| DeviceIdentifier {
-                bus: 0,
-                address: 0,
-                vendor_id: self.device_info.vendor_id,
-                product_id: self.device_info.product_id,
-                manufacturer,
-            })
+    pub fn get_identifier(&self) -> DeviceIdentifier {
+        DeviceIdentifier {
+            bus: 0,
+            address: 0,
+            vendor_id: DEVICE_VID,
+            product_id: DEVICE_PID,
+            manufacturer: self.manufacturer.clone(),
+        }
     }
 
     pub fn write(&self, packet: CommandPacket) -> Result<(), String> {

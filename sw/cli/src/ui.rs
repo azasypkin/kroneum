@@ -54,7 +54,7 @@ async fn radio_status() -> impl Responder {
     HttpResponse::Ok().json(
         Device::create()
             .unwrap()
-            .radio(RadioCommand::Debug)
+            .radio(RadioCommand::Status)
             .unwrap(),
     )
 }
@@ -82,7 +82,7 @@ struct DeviceInfo {
 async fn get_info() -> impl Responder {
     let device = Device::create().unwrap();
     HttpResponse::Ok().json(DeviceInfo {
-        identifier: device.get_identifier().unwrap(),
+        identifier: device.get_identifier(),
         flash: vec![
             device.read_flash(StorageSlot::One).unwrap(),
             device.read_flash(StorageSlot::Two).unwrap(),
