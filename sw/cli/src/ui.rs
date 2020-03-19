@@ -4,6 +4,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use core::convert::TryFrom;
 use kroneum_api::{
     adc::ADCChannel, array::Array, beeper::tone::Tone, flash::storage_slot::StorageSlot,
+    usb::commands::RadioCommand,
 };
 use serde_derive::{Deserialize, Serialize};
 
@@ -31,8 +32,31 @@ async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
     HttpResponse::Ok().json(Device::create().unwrap().echo(info.as_ref()).unwrap())
 }
 
-async fn radio(info: web::Json<Vec<u8>>) -> impl Responder {
-    HttpResponse::Ok().json(Device::create().unwrap().radio(info.as_ref()).unwrap())
+async fn radio_transmit(info: web::Json<Vec<u8>>) -> impl Responder {
+    HttpResponse::Ok().json(
+        Device::create()
+            .unwrap()
+            .radio(RadioCommand::Transmit(Array::from(info.as_ref())))
+            .unwrap(),
+    )
+}
+
+async fn radio_receive() -> impl Responder {
+    HttpResponse::Ok().json(
+        Device::create()
+            .unwrap()
+            .radio(RadioCommand::Receive)
+            .unwrap(),
+    )
+}
+
+async fn radio_status() -> impl Responder {
+    HttpResponse::Ok().json(
+        Device::create()
+            .unwrap()
+            .radio(RadioCommand::Debug)
+            .unwrap(),
+    )
 }
 
 async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
@@ -78,7 +102,9 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/play", web::post().to(play))
             .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
-            .route("/api/radio", web::post().to(radio))
+            .route("/api/radio/receive", web::get().to(radio_receive))
+            .route("/api/radio/transmit", web::post().to(radio_transmit))
+            .route("/api/radio/status", web::get().to(radio_status))
             .route("/api/adc/{channel}", web::get().to(adc))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })

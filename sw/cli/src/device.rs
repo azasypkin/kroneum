@@ -10,7 +10,7 @@ use kroneum_api::{
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,
-    usb::command_packet::CommandPacket,
+    usb::{command_packet::CommandPacket, commands::RadioCommand},
 };
 use std::time::Duration;
 
@@ -150,8 +150,8 @@ impl Device {
             .map(|data| (data[0] as u16) | ((data[1] as u16) << 8))
     }
 
-    pub fn radio(&self, data: &[u8]) -> Result<Vec<u8>, String> {
-        self.write(CommandPacket::RadioCommand(Array::from(data)))
+    pub fn radio(&self, command: RadioCommand) -> Result<Vec<u8>, String> {
+        self.write(CommandPacket::Radio(command))
             .and_then(|_| self.read())
     }
 }

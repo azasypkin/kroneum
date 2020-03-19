@@ -370,7 +370,7 @@ const DeviceRadioSection = () => {
   const showError = !radioStatus.isValid && radioStatus.bytesString.length > 0;
 
   const [isRadioPopOverOpen, setIsRadioPopOverOpen] = useState<boolean>(false);
-  const radioButton = <EuiButton onClick={() => setIsRadioPopOverOpen(true)}>Send command</EuiButton>;
+  const radioButton = <EuiButton onClick={() => setIsRadioPopOverOpen(true)}>Transmit</EuiButton>;
 
   return (
     <EuiFlexItem>
@@ -383,6 +383,55 @@ const DeviceRadioSection = () => {
       </EuiPageContentHeader>
       <EuiPageContentBody>
         <EuiPanel style={{ maxWidth: 300 }}>
+          <EuiFormRow label="Last response" display="columnCompressed" style={{ alignItems: 'center' }}>
+            <EuiText size="s">
+              {Array.isArray(radioStatus.response) ? `[${radioStatus.response.join(', ')}]` : 'Unknown'}
+            </EuiText>
+          </EuiFormRow>
+          <EuiFormRow display="columnCompressed" style={{ alignItems: 'center' }}>
+            <EuiButton
+              isLoading={radioStatus.isInProgress}
+              fill
+              onClick={() => {
+                setRadioStatus({
+                  ...radioStatus,
+                  isInProgress: true,
+                });
+
+                axios.get('/api/radio/receive').then(({ data }) => {
+                  setRadioStatus({
+                    ...radioStatus,
+                    isInProgress: false,
+                    response: data,
+                  });
+                });
+              }}
+            >
+              Receive
+            </EuiButton>
+          </EuiFormRow>
+          <EuiFormRow display="columnCompressed" style={{ alignItems: 'center' }}>
+            <EuiButton
+              isLoading={radioStatus.isInProgress}
+              fill
+              onClick={() => {
+                setRadioStatus({
+                  ...radioStatus,
+                  isInProgress: true,
+                });
+
+                axios.get('/api/radio/status').then(({ data }) => {
+                  setRadioStatus({
+                    ...radioStatus,
+                    isInProgress: false,
+                    response: data,
+                  });
+                });
+              }}
+            >
+              Status
+            </EuiButton>
+          </EuiFormRow>
           <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
             <EuiPopover
               id="trapFocus"
@@ -439,7 +488,7 @@ const DeviceRadioSection = () => {
 
                   axios
                     .post(
-                      '/api/radio',
+                      '/api/radio/transmit',
                       radioStatus.bytesString.split(',').map(value => parseInt(value.trim())),
                     )
                     .then(({ data }) => {
@@ -451,7 +500,7 @@ const DeviceRadioSection = () => {
                     });
                 }}
               >
-                Send
+                Transmit
               </EuiButton>
             </EuiPopover>
           </EuiFormRow>

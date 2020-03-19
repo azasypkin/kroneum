@@ -29,6 +29,6 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "parcel build src/index.html",
-    "watch": "parcel watch src/index.html"
+    "watch": "parcel watch src/index.html src/index.tsx"
   }
 }
