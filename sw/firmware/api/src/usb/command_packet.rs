@@ -293,11 +293,48 @@ mod tests {
     }
 
     #[test]
+    fn radio_command() {
+        assert_eq!(
+            CommandPacket::from([11, 1, 2].as_ref()),
+            CommandPacket::Radio(RadioCommand::Transmit(Array::from([2].as_ref())))
+        );
+        assert_eq!(
+            CommandPacket::from([11, 2].as_ref()),
+            CommandPacket::Radio(RadioCommand::Receive)
+        );
+        assert_eq!(
+            CommandPacket::from([11, 3].as_ref()),
+            CommandPacket::Radio(RadioCommand::Status)
+        );
+
+        assert_eq!(
+            CommandPacket::from([11, 0].as_ref()),
+            CommandPacket::Radio(RadioCommand::Unknown)
+        );
+        assert_eq!(
+            CommandPacket::from([11, 4].as_ref()),
+            CommandPacket::Radio(RadioCommand::Unknown)
+        );
+        assert_eq!(
+            CommandPacket::from([11, 5].as_ref()),
+            CommandPacket::Radio(RadioCommand::Unknown)
+        );
+
+        assert_eq!(
+            Array::from(CommandPacket::Radio(RadioCommand::Transmit(Array::from(
+                [2].as_ref()
+            ))))
+            .as_ref(),
+            [11, 1, 2]
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         assert_eq!(CommandPacket::from([0].as_ref()), CommandPacket::Unknown);
-        assert_eq!(CommandPacket::from([11].as_ref()), CommandPacket::Unknown);
+        assert_eq!(CommandPacket::from([12].as_ref()), CommandPacket::Unknown);
         assert_eq!(
-            CommandPacket::from([12, 13, 14].as_ref()),
+            CommandPacket::from([13, 14, 15].as_ref()),
             CommandPacket::Unknown
         );
 
