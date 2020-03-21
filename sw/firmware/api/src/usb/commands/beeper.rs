@@ -1,5 +1,7 @@
 use array::Array;
 use beeper::tone::Tone;
+use core::convert::TryFrom;
+use usb::command_error::CommandError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BeeperCommand {
@@ -25,26 +27,30 @@ impl From<BeeperCommand> for Array<u8> {
     }
 }
 
-impl Into<BeeperCommand> for Array<u8> {
-    fn into(mut self) -> BeeperCommand {
-        match (self.shift(), self.len()) {
-            (Some(0x1), 1) => BeeperCommand::Beep(self[0].into()),
+impl TryFrom<Array<u8>> for BeeperCommand {
+    type Error = CommandError;
+
+    fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
+        match (value.shift(), value.len()) {
+            (Some(0x1), 1) => Ok(BeeperCommand::Beep(value[0].into())),
             // Every tone consists of frequency and duration, so number of bytes should be even.
             (Some(0x2), n_tones) if n_tones > 1 && n_tones & 1 == 0 => {
                 let mut array: Array<Tone> = Array::new();
                 for index in (0..n_tones).step_by(2) {
-                    array.push(Tone::new(self[index], self[index + 1]));
+                    array.push(Tone::new(value[index], value[index + 1]));
                 }
-                BeeperCommand::Melody(array)
+                Ok(BeeperCommand::Melody(array))
             }
-            _ => BeeperCommand::Unknown,
+            _ => Err(CommandError::InvalidCommand),
         }
     }
 }
 
-impl From<&[u8]> for BeeperCommand {
-    fn from(slice: &[u8]) -> Self {
-        Array::from(slice).into()
+impl TryFrom<&[u8]> for BeeperCommand {
+    type Error = CommandError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        Self::try_from(Array::from(slice))
     }
 }
 
@@ -55,7 +61,10 @@ mod tests {
 
     #[test]
     fn beep_command() {
-        assert_eq!(BeeperCommand::from([1, 5].as_ref()), BeeperCommand::Beep(5));
+        assert_eq!(
+            BeeperCommand::try_from([1, 5].as_ref()),
+            Ok(BeeperCommand::Beep(5))
+        );
 
         assert_eq!(Array::from(BeeperCommand::Beep(5)).as_ref(), [1, 5]);
     }
@@ -67,8 +76,8 @@ mod tests {
         tones.push(Tone::new(Note::B5 as u8, 50));
 
         assert_eq!(
-            BeeperCommand::from([2, 0xA5, 100, 0xC5, 50].as_ref()),
-            BeeperCommand::Melody(tones)
+            BeeperCommand::try_from([2, 0xA5, 100, 0xC5, 50].as_ref()),
+            Ok(BeeperCommand::Melody(tones))
         );
 
         assert_eq!(
@@ -79,13 +88,17 @@ mod tests {
 
     #[test]
     fn unknown_command() {
-        assert_eq!(BeeperCommand::from([0].as_ref()), BeeperCommand::Unknown);
-        assert_eq!(BeeperCommand::from([3].as_ref()), BeeperCommand::Unknown);
         assert_eq!(
-            BeeperCommand::from([4, 5, 6].as_ref()),
-            BeeperCommand::Unknown
+            BeeperCommand::try_from([0].as_ref()),
+            Err(CommandError::InvalidCommand)
         );
-
-        assert_eq!(Array::from(BeeperCommand::Unknown).as_ref(), [0]);
+        assert_eq!(
+            BeeperCommand::try_from([3].as_ref()),
+            Err(CommandError::InvalidCommand)
+        );
+        assert_eq!(
+            BeeperCommand::try_from([4, 5, 6].as_ref()),
+            Err(CommandError::InvalidCommand)
+        );
     }
 }

@@ -1,12 +1,13 @@
 use array::Array;
+use core::convert::TryFrom;
 use flash::storage_slot::StorageSlot;
+use usb::command_error::CommandError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FlashCommand {
     Read(StorageSlot),
     Write(StorageSlot, u8),
     EraseAll,
-    Unknown,
 }
 
 impl From<FlashCommand> for Array<u8> {
@@ -17,25 +18,28 @@ impl From<FlashCommand> for Array<u8> {
                 [2, storage_slot.into(), value].as_ref().into()
             }
             FlashCommand::EraseAll => [3].as_ref().into(),
-            FlashCommand::Unknown => [0].as_ref().into(),
         }
     }
 }
 
-impl Into<FlashCommand> for Array<u8> {
-    fn into(mut self) -> FlashCommand {
-        match (self.shift(), self.len()) {
-            (Some(0x1), 1) => FlashCommand::Read(self[0].into()),
-            (Some(0x2), 2) => FlashCommand::Write(self[0].into(), self[1]),
-            (Some(0x3), 0) => FlashCommand::EraseAll,
-            _ => FlashCommand::Unknown,
+impl TryFrom<Array<u8>> for FlashCommand {
+    type Error = CommandError;
+
+    fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
+        match (value.shift(), value.len()) {
+            (Some(0x1), 1) => Ok(FlashCommand::Read(value[0].into())),
+            (Some(0x2), 2) => Ok(FlashCommand::Write(value[0].into(), value[1])),
+            (Some(0x3), 0) => Ok(FlashCommand::EraseAll),
+            _ => Err(CommandError::InvalidCommand),
         }
     }
 }
 
-impl From<&[u8]> for FlashCommand {
-    fn from(slice: &[u8]) -> Self {
-        Array::from(slice).into()
+impl TryFrom<&[u8]> for FlashCommand {
+    type Error = CommandError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        Self::try_from(Array::from(slice))
     }
 }
 
@@ -46,8 +50,8 @@ mod tests {
     #[test]
     fn read_command() {
         assert_eq!(
-            FlashCommand::from([1, 0x2f].as_ref()),
-            FlashCommand::Read(StorageSlot::Two)
+            FlashCommand::try_from([1, 0x2f].as_ref()),
+            Ok(FlashCommand::Read(StorageSlot::Two))
         );
 
         assert_eq!(
@@ -59,12 +63,12 @@ mod tests {
     #[test]
     fn write_command() {
         assert_eq!(
-            FlashCommand::from([2, 0x1f, 8].as_ref()),
-            FlashCommand::Write(StorageSlot::One, 8)
+            FlashCommand::try_from([2, 0x1f, 8].as_ref()),
+            Ok(FlashCommand::Write(StorageSlot::One, 8))
         );
         assert_eq!(
-            FlashCommand::from([2, 0x3f, 22].as_ref()),
-            FlashCommand::Write(StorageSlot::Three, 22)
+            FlashCommand::try_from([2, 0x3f, 22].as_ref()),
+            Ok(FlashCommand::Write(StorageSlot::Three, 22))
         );
 
         assert_eq!(
@@ -75,20 +79,27 @@ mod tests {
 
     #[test]
     fn erase_all_command() {
-        assert_eq!(FlashCommand::from([3].as_ref()), FlashCommand::EraseAll);
+        assert_eq!(
+            FlashCommand::try_from([3].as_ref()),
+            Ok(FlashCommand::EraseAll)
+        );
 
         assert_eq!(Array::from(FlashCommand::EraseAll).as_ref(), [3]);
     }
 
     #[test]
     fn unknown_command() {
-        assert_eq!(FlashCommand::from([0].as_ref()), FlashCommand::Unknown);
-        assert_eq!(FlashCommand::from([4].as_ref()), FlashCommand::Unknown);
         assert_eq!(
-            FlashCommand::from([5, 6, 7].as_ref()),
-            FlashCommand::Unknown
+            FlashCommand::try_from([0].as_ref()),
+            Err(CommandError::InvalidCommand),
         );
-
-        assert_eq!(Array::from(FlashCommand::Unknown).as_ref(), [0]);
+        assert_eq!(
+            FlashCommand::try_from([4].as_ref()),
+            Err(CommandError::InvalidCommand),
+        );
+        assert_eq!(
+            FlashCommand::try_from([5, 6, 7].as_ref()),
+            Err(CommandError::InvalidCommand),
+        );
     }
 }

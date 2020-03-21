@@ -1,3 +1,4 @@
+pub mod command_error;
 pub mod command_packet;
 pub mod commands;
 mod descriptors;
@@ -9,6 +10,7 @@ use self::descriptors::*;
 use self::pma::PacketMemoryArea;
 use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
 use array::Array;
+use core::convert::TryFrom;
 
 #[derive(Copy, Clone)]
 pub enum EndpointType {
@@ -319,7 +321,13 @@ impl<'a, T: USBHardware> USB<'a, T> {
             }
         }
 
-        self.state.command = Some(command_byte_array.into());
+        self.state.command = Some(
+            if let Ok(packet) = CommandPacket::try_from(command_byte_array) {
+                packet
+            } else {
+                CommandPacket::Unknown
+            },
+        );
 
         self.pma.set_rx_count(transaction.endpoint, 0);
         self.hw.set_endpoint_status(

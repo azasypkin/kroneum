@@ -1,11 +1,12 @@
 use array::Array;
+use core::convert::TryFrom;
 use time::Time;
+use usb::command_error::CommandError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AlarmCommand {
     Get,
     Set(Time),
-    Unknown,
 }
 
 impl From<AlarmCommand> for Array<u8> {
@@ -13,28 +14,31 @@ impl From<AlarmCommand> for Array<u8> {
         match packet {
             AlarmCommand::Get => [1].as_ref().into(),
             AlarmCommand::Set(time) => [2, time.hours, time.minutes, time.seconds].as_ref().into(),
-            AlarmCommand::Unknown => [0].as_ref().into(),
         }
     }
 }
 
-impl Into<AlarmCommand> for Array<u8> {
-    fn into(mut self) -> AlarmCommand {
-        match (self.shift(), self.len()) {
-            (Some(0x1), 0) => AlarmCommand::Get,
-            (Some(0x2), 3) => AlarmCommand::Set(Time {
-                hours: self[0],
-                minutes: self[1],
-                seconds: self[2],
-            }),
-            _ => AlarmCommand::Unknown,
+impl TryFrom<Array<u8>> for AlarmCommand {
+    type Error = CommandError;
+
+    fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
+        match (value.shift(), value.len()) {
+            (Some(0x1), 0) => Ok(AlarmCommand::Get),
+            (Some(0x2), 3) => Ok(AlarmCommand::Set(Time {
+                hours: value[0],
+                minutes: value[1],
+                seconds: value[2],
+            })),
+            _ => Err(CommandError::InvalidCommand),
         }
     }
 }
 
-impl From<&[u8]> for AlarmCommand {
-    fn from(slice: &[u8]) -> Self {
-        Array::from(slice).into()
+impl TryFrom<&[u8]> for AlarmCommand {
+    type Error = CommandError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        Self::try_from(Array::from(slice))
     }
 }
 
@@ -44,7 +48,7 @@ mod tests {
 
     #[test]
     fn get_command() {
-        assert_eq!(AlarmCommand::from([1].as_ref()), AlarmCommand::Get);
+        assert_eq!(AlarmCommand::try_from([1].as_ref()), Ok(AlarmCommand::Get));
 
         assert_eq!(Array::from(AlarmCommand::Get).as_ref(), [1]);
     }
@@ -52,20 +56,20 @@ mod tests {
     #[test]
     fn set_command() {
         assert_eq!(
-            AlarmCommand::from([2, 18, 33, 17].as_ref()),
-            AlarmCommand::Set(Time {
+            AlarmCommand::try_from([2, 18, 33, 17].as_ref()),
+            Ok(AlarmCommand::Set(Time {
                 hours: 18,
                 minutes: 33,
                 seconds: 17,
-            })
+            }))
         );
         assert_eq!(
-            AlarmCommand::from([2, 33, 18, 1].as_ref()),
-            AlarmCommand::Set(Time {
+            AlarmCommand::try_from([2, 33, 18, 1].as_ref()),
+            Ok(AlarmCommand::Set(Time {
                 hours: 33,
                 minutes: 18,
                 seconds: 1,
-            })
+            }))
         );
 
         assert_eq!(
@@ -91,13 +95,17 @@ mod tests {
 
     #[test]
     fn unknown_command() {
-        assert_eq!(AlarmCommand::from([0].as_ref()), AlarmCommand::Unknown);
-        assert_eq!(AlarmCommand::from([3].as_ref()), AlarmCommand::Unknown);
         assert_eq!(
-            AlarmCommand::from([4, 5, 6].as_ref()),
-            AlarmCommand::Unknown
+            AlarmCommand::try_from([0].as_ref()),
+            Err(CommandError::InvalidCommand)
         );
-
-        assert_eq!(Array::from(AlarmCommand::Unknown).as_ref(), [0]);
+        assert_eq!(
+            AlarmCommand::try_from([3].as_ref()),
+            Err(CommandError::InvalidCommand)
+        );
+        assert_eq!(
+            AlarmCommand::try_from([4, 5, 6].as_ref()),
+            Err(CommandError::InvalidCommand)
+        );
     }
 }

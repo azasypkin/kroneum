@@ -167,7 +167,6 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                         self.flash().erase_all();
                         Ok(Array::new())
                     }
-                    FlashCommand::Unknown => Err(()),
                 };
 
                 match response {
@@ -182,20 +181,13 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 let response = match command {
                     ADCCommand::Read(channel) => {
                         let value = self.adc().read(channel);
-                        Ok(Array::from(
-                            [(value & 0xff) as u8, ((value & 0xff00) >> 8) as u8].as_ref(),
-                        ))
+                        Array::from(
+                            [0x00, (value & 0xff) as u8, ((value & 0xff00) >> 8) as u8].as_ref(),
+                        )
                     }
-                    ADCCommand::Unknown => Err(()),
                 };
 
-                match response {
-                    Ok(mut array) => {
-                        array.unshift(0x00);
-                        self.usb().send(array.as_ref());
-                    }
-                    Err(_) => self.usb().send(&[0xFF]),
-                };
+                self.usb().send(response.as_ref());
             }
             Some(CommandPacket::Radio(command)) => {
                 let response = match command {
@@ -204,7 +196,6 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     }
                     RadioCommand::Receive => self.radio().receive(cs),
                     RadioCommand::Status => self.radio().status(cs),
-                    RadioCommand::Unknown => Err(()),
                 };
 
                 match response {
@@ -215,7 +206,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     Err(_) => self.usb().send(&[0xFF]),
                 };
             }
-            _ => {}
+            _ => self.usb().send(&[0xFF]),
         }
 
         self.state.usb_state.command = None;
