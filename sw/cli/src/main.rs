@@ -10,7 +10,7 @@ use std::time::Duration;
 fn process_command(matches: ArgMatches) -> Result<(), String> {
     match matches.subcommand() {
         ("beep", Some(matches)) => {
-            Device::create()?.beep(
+            Device::create()?.beeper_beep(
                 matches
                     .value_of("NUMBER")
                     .ok_or_else(|| "<NUMBER> argument is not provided.".to_string())
@@ -92,7 +92,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
 
         ("reset", _) => {
             println!("Device is being reset...");
-            Device::create()?.reset()?
+            Device::create()?.system_reset()?
         }
 
         ("ui", Some(matches)) => ui::run_server(

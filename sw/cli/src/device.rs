@@ -10,7 +10,12 @@ use kroneum_api::{
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
     time::Time,
-    usb::{command_packet::CommandPacket, commands::RadioCommand},
+    usb::{
+        command_packet::CommandPacket,
+        commands::{
+            ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, RadioCommand, SystemCommand,
+        },
+    },
 };
 use std::time::Duration;
 
@@ -56,37 +61,30 @@ impl Device {
         }
     }
 
-    pub fn write(&self, packet: CommandPacket) -> Result<(), String> {
-        self.device
-            .write(Array::from(packet).as_ref())
+    pub fn beeper_beep(&self, n_beeps: u8) -> Result<(), String> {
+        self.send_command(CommandPacket::Beeper(BeeperCommand::Beep(n_beeps)))
             .map(|_| ())
-            .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
+            .map_err(|_| "Failed to beep".to_string())
     }
 
-    pub fn read(&self) -> Result<Vec<u8>, String> {
-        let mut data = [0; 100];
-        self.device
-            .read_timeout(&mut data, 5000)
-            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
-            .map(|count| data[..count].to_vec())
-    }
-
-    pub fn beep(&self, beeps_n: u8) -> Result<(), String> {
-        self.write(CommandPacket::Beep(beeps_n))
-    }
-
-    pub fn play_melody(&self, tones: Array<Tone>) -> Result<(), String> {
-        self.write(CommandPacket::Melody(tones))
+    pub fn beeper_melody(&self, tones: Array<Tone>) -> Result<(), String> {
+        self.send_command(CommandPacket::Beeper(BeeperCommand::Melody(tones)))
+            .map(|_| ())
+            .map_err(|_| "Failed to play melody".to_string())
     }
 
     pub fn get_alarm(&self) -> Result<Duration, String> {
-        self.write(CommandPacket::AlarmGet)
-            .and_then(|_| self.read())
-            .map(|data| {
-                Duration::from_secs(
-                    u64::from(data[0]) * 3600 + u64::from(data[1]) * 60 + u64::from(data[2]),
-                )
-            })
+        if let Ok(response) = self.send_command(CommandPacket::Alarm(AlarmCommand::Get)) {
+            if response.len() == 3 {
+                return Ok(Duration::from_secs(
+                    u64::from(response[0]) * 3600
+                        + u64::from(response[1]) * 60
+                        + u64::from(response[2]),
+                ));
+            }
+        }
+
+        Err("Failed to get alarm time".to_string())
     }
 
     pub fn set_alarm(&self, duration: Duration) -> Result<(), String> {
@@ -95,9 +93,13 @@ impl Device {
             return Err("Alarm is limited to 23h 59m 59s".to_string());
         }
 
-        self.write(CommandPacket::AlarmSet(Time::from_seconds(
-            duration_sec as u32,
-        )))
+        if let Ok(_) = self.send_command(CommandPacket::Alarm(AlarmCommand::Set(
+            Time::from_seconds(duration_sec as u32),
+        ))) {
+            Ok(())
+        } else {
+            Err("Failed to set alarm".to_string())
+        }
     }
 
     pub fn read_flash(&self, slot: StorageSlot) -> Result<u8, String> {
@@ -105,9 +107,13 @@ impl Device {
             return Err("Unknown memory slot is provided".to_string());
         }
 
-        self.write(CommandPacket::FlashRead(slot))
-            .and_then(|_| self.read())
-            .map(|data| data[0])
+        if let Ok(response) = self.send_command(CommandPacket::Flash(FlashCommand::Read(slot))) {
+            if response.len() > 0 {
+                return Ok(response[0]);
+            }
+        }
+
+        Err("Failed to read Flash value".to_string())
     }
 
     pub fn write_flash(&self, slot: StorageSlot, value: u8) -> Result<(), String> {
@@ -115,42 +121,82 @@ impl Device {
             return Err("Unknown memory slot is provided".to_string());
         }
 
-        if self
-            .write(CommandPacket::FlashWrite(slot, value))
-            .and_then(|_| self.read())
-            .map(|data| data[0] == 1)?
-        {
-            Ok(())
-        } else {
-            Err(format!(
+        let packet = CommandPacket::Flash(FlashCommand::Write(slot, value));
+        self.send_command(packet).map(|_| ()).map_err(|_| {
+            format!(
                 "Could not write value {} to a memory slot {:#X}",
                 value,
                 Into::<u8>::into(slot)
-            ))
-        }
+            )
+        })
     }
 
     pub fn erase_flash(&self) -> Result<(), String> {
-        self.write(CommandPacket::FlashEraseAll)
+        let packet = CommandPacket::Flash(FlashCommand::EraseAll);
+        self.send_command(packet)
+            .map(|_| ())
+            .map_err(|_| "Could not erase flash".to_string())
     }
 
-    pub fn reset(&self) -> Result<(), String> {
-        self.write(CommandPacket::Reset)
+    pub fn system_reset(&self) -> Result<(), String> {
+        self.send_command(CommandPacket::System(SystemCommand::Reset))
+            .map(|_| ())
+            .map_err(|_| "Failed to reset device".to_string())
     }
 
-    pub fn echo(&self, data: &[u8]) -> Result<Vec<u8>, String> {
-        self.write(CommandPacket::Echo(Array::from(data)))
+    pub fn system_echo(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+        self.send_command(CommandPacket::System(SystemCommand::Echo(Array::from(
+            data,
+        ))))
+        .map_err(|_| "Failed to send/receive echo data".to_string())
+    }
+
+    pub fn adc_read(&self, channel: ADCChannel) -> Result<u16, String> {
+        self.send_command(CommandPacket::ADC(ADCCommand::Read(channel)))
+            .map(|response| (response[0] as u16) | ((response[1] as u16) << 8))
+            .map_err(|_| "Failed to read ADC value".to_string())
+    }
+
+    pub fn radio_status(&self) -> Result<Vec<u8>, String> {
+        self.send_command(CommandPacket::Radio(RadioCommand::Status))
+            .map_err(|_| "Failed to retrieve radio status".to_string())
+    }
+
+    pub fn radio_receive(&self) -> Result<Vec<u8>, String> {
+        self.send_command(CommandPacket::Radio(RadioCommand::Receive))
+            .map_err(|_| "Failed to receive data over radio".to_string())
+    }
+
+    pub fn radio_transmit(&self, data: Array<u8>) -> Result<(), String> {
+        self.send_command(CommandPacket::Radio(RadioCommand::Transmit(data)))
+            .map(|_| ())
+            .map_err(|_| "Failed to transmit data over radio".to_string())
+    }
+
+    fn send_command(&self, packet: CommandPacket) -> Result<Vec<u8>, String> {
+        self.write(packet)
             .and_then(|_| self.read())
+            .and_then(|mut response| {
+                if response.len() == 0 || response[0] == 0xFF {
+                    Err("Failed to process packet".to_string())
+                } else {
+                    Ok(response.drain(1..).collect())
+                }
+            })
     }
 
-    pub fn read_adc(&self, channel: ADCChannel) -> Result<u16, String> {
-        self.write(CommandPacket::ADCRead(channel))
-            .and_then(|_| self.read())
-            .map(|data| (data[0] as u16) | ((data[1] as u16) << 8))
+    fn write(&self, packet: CommandPacket) -> Result<(), String> {
+        self.device
+            .write(Array::from(packet).as_ref())
+            .map(|_| ())
+            .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
     }
 
-    pub fn radio(&self, command: RadioCommand) -> Result<Vec<u8>, String> {
-        self.write(CommandPacket::Radio(command))
-            .and_then(|_| self.read())
+    fn read(&self) -> Result<Vec<u8>, String> {
+        let mut data = [0; 100];
+        self.device
+            .read_timeout(&mut data, 5000)
+            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
+            .map(|count| data[..count].to_vec())
     }
 }
