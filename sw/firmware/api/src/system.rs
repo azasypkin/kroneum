@@ -9,7 +9,13 @@ use rtc::{RTCHardware, RTC};
 use systick::{SysTick, SysTickHardware};
 use time::Time;
 use timer::{Timer, TimerHardware};
-use usb::{command_packet::CommandPacket, commands::RadioCommand, USBHardware, UsbState, USB};
+use usb::{
+    command_packet::CommandPacket,
+    commands::{
+        ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, RadioCommand, SystemCommand,
+    },
+    USBHardware, UsbState, USB,
+};
 
 #[derive(Debug, Copy, Clone)]
 enum SystemMode {
@@ -109,40 +115,90 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         self.usb().interrupt();
 
         match self.state.usb_state.command {
-            Some(CommandPacket::Beep(num)) => {
-                self.beeper().play_and_repeat(Melody::Beep, num as usize)
-            }
-            Some(CommandPacket::Melody(tones)) => self.beeper().play(Melody::Custom(tones)),
-            Some(CommandPacket::AlarmSet(time)) => {
-                self.set_mode(SystemMode::Alarm(time, Melody::Alarm))
-            }
-            Some(CommandPacket::AlarmGet) => {
-                let alarm = self.rtc().alarm();
-                self.usb()
-                    .send(&[alarm.hours, alarm.minutes, alarm.seconds]);
-            }
-            Some(CommandPacket::Reset) => self.reset(),
-            Some(CommandPacket::FlashRead(slot)) => {
-                let value = self.flash().read(slot).unwrap_or_else(|| 0);
-                self.usb().send(&[value]);
-            }
-            Some(CommandPacket::FlashWrite(slot, value)) => {
-                let status = if self.flash().write(slot, value).is_ok() {
-                    1
-                } else {
-                    0
+            Some(CommandPacket::Beeper(command)) => {
+                let response = match command {
+                    BeeperCommand::Beep(n_beeps) => Ok(self
+                        .beeper()
+                        .play_and_repeat(Melody::Beep, n_beeps as usize)),
+                    BeeperCommand::Melody(tones) => Ok(self.beeper().play(Melody::Custom(tones))),
+                    BeeperCommand::Unknown => Err(()),
                 };
-                self.usb().send(&[status]);
-            }
-            Some(CommandPacket::FlashEraseAll) => self.flash().erase_all(),
-            Some(CommandPacket::Echo(array)) => self.usb().send(array.as_ref()),
-            Some(CommandPacket::ADCRead(channel)) => {
-                let value = self.adc().read(channel);
+
                 self.usb()
-                    .send(&[(value & 0xff) as u8, ((value & 0xff00) >> 8) as u8]);
+                    .send(&[if response.is_ok() { 0x00 } else { 0xFF }]);
             }
-            Some(CommandPacket::Radio(radio_command)) => {
-                let response = match radio_command {
+            Some(CommandPacket::Alarm(command)) => {
+                if let AlarmCommand::Get = command {
+                    let alarm = self.rtc().alarm();
+                    self.usb()
+                        .send(&[0x00, alarm.hours, alarm.minutes, alarm.seconds]);
+                } else if let AlarmCommand::Set(time) = command {
+                    // We should send OK response before we enter Alarm mode and USB will be disabled.
+                    self.usb().send(&[0x00]);
+                    self.systick.delay(100);
+                    self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                } else {
+                    self.usb().send(&[0xFF]);
+                }
+            }
+            Some(CommandPacket::System(command)) => {
+                if let SystemCommand::Echo(mut echo_data) = command {
+                    echo_data.unshift(0x00);
+                    self.usb().send(echo_data.as_ref());
+                } else if let SystemCommand::Reset = command {
+                    // We should send OK response before we reset.
+                    self.usb().send(&[0x00]);
+                    self.systick.delay(100);
+                    self.reset();
+                } else {
+                    self.usb().send(&[0xFF]);
+                }
+            }
+            Some(CommandPacket::Flash(command)) => {
+                let response = match command {
+                    FlashCommand::Read(storage_slot) => Ok(Array::from(
+                        [self.flash().read(storage_slot).unwrap_or_else(|| 0)].as_ref(),
+                    )),
+                    FlashCommand::Write(storage_slot, value) => self
+                        .flash()
+                        .write(storage_slot, value)
+                        .map(|_| Array::new()),
+                    FlashCommand::EraseAll => {
+                        self.flash().erase_all();
+                        Ok(Array::new())
+                    }
+                    FlashCommand::Unknown => Err(()),
+                };
+
+                match response {
+                    Ok(mut array) => {
+                        array.unshift(0x00);
+                        self.usb().send(array.as_ref());
+                    }
+                    Err(_) => self.usb().send(&[0xFF]),
+                };
+            }
+            Some(CommandPacket::ADC(command)) => {
+                let response = match command {
+                    ADCCommand::Read(channel) => {
+                        let value = self.adc().read(channel);
+                        Ok(Array::from(
+                            [(value & 0xff) as u8, ((value & 0xff00) >> 8) as u8].as_ref(),
+                        ))
+                    }
+                    ADCCommand::Unknown => Err(()),
+                };
+
+                match response {
+                    Ok(mut array) => {
+                        array.unshift(0x00);
+                        self.usb().send(array.as_ref());
+                    }
+                    Err(_) => self.usb().send(&[0xFF]),
+                };
+            }
+            Some(CommandPacket::Radio(command)) => {
+                let response = match command {
                     RadioCommand::Transmit(data) => {
                         self.radio().transmit(cs, data).map(|_| Array::new())
                     }

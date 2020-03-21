@@ -26,18 +26,11 @@ impl From<RadioCommand> for Array<u8> {
 }
 
 impl Into<RadioCommand> for Array<u8> {
-    fn into(self) -> RadioCommand {
-        let command_type_byte = self[0];
-        match command_type_byte {
-            0x1 => {
-                let mut data_to_transmit = Array::new();
-                self.as_ref()[1..]
-                    .iter()
-                    .for_each(|byte| data_to_transmit.push(*byte));
-                RadioCommand::Transmit(data_to_transmit)
-            }
-            0x2 => RadioCommand::Receive,
-            0x3 => RadioCommand::Status,
+    fn into(mut self) -> RadioCommand {
+        match (self.shift(), self.len()) {
+            (Some(0x1), num) if num > 0 => RadioCommand::Transmit(self),
+            (Some(0x2), 0) => RadioCommand::Receive,
+            (Some(0x3), 0) => RadioCommand::Status,
             _ => RadioCommand::Unknown,
         }
     }
@@ -70,10 +63,7 @@ mod tests {
     #[test]
     fn receive_command() {
         assert_eq!(RadioCommand::from([2].as_ref()), RadioCommand::Receive);
-        assert_eq!(
-            RadioCommand::from([2, 11, 22].as_ref()),
-            RadioCommand::Receive
-        );
+        assert_eq!(RadioCommand::from([2].as_ref()), RadioCommand::Receive);
 
         assert_eq!(Array::from(RadioCommand::Receive).as_ref(), [2]);
     }
@@ -81,10 +71,7 @@ mod tests {
     #[test]
     fn status_command() {
         assert_eq!(RadioCommand::from([3].as_ref()), RadioCommand::Status);
-        assert_eq!(
-            RadioCommand::from([3, 11, 22].as_ref()),
-            RadioCommand::Status
-        );
+        assert_eq!(RadioCommand::from([3].as_ref()), RadioCommand::Status);
 
         assert_eq!(Array::from(RadioCommand::Status).as_ref(), [3]);
     }
