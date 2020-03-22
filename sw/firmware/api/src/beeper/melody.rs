@@ -15,10 +15,10 @@ pub enum Melody {
 impl Into<Array<Tone>> for Melody {
     fn into(self) -> Array<Tone> {
         match self {
-            Melody::Alarm => Array::from(ALARM_MELODY.as_ref()),
-            Melody::Beep => Array::from(BEEP_MELODY.as_ref()),
-            Melody::Reset => Array::from(RESET_MELODY.as_ref()),
-            Melody::Setup => Array::from(SETUP_MELODY.as_ref()),
+            Melody::Alarm => Array::from(&ALARM_MELODY),
+            Melody::Beep => Array::from(&BEEP_MELODY),
+            Melody::Reset => Array::from(&RESET_MELODY),
+            Melody::Setup => Array::from(&SETUP_MELODY),
             Melody::Custom(tones) => tones,
         }
     }
@@ -86,22 +86,22 @@ mod tests {
     #[test]
     fn properly_converts_into_tones_array() {
         let melody_tones: Array<Tone> = Melody::Beep.into();
-        assert_eq!(melody_tones, Array::from(BEEP_MELODY.as_ref()));
+        assert_eq!(melody_tones, Array::from(&BEEP_MELODY));
 
         let melody_tones: Array<Tone> = Melody::Alarm.into();
-        assert_eq!(melody_tones, Array::from(ALARM_MELODY.as_ref()));
+        assert_eq!(melody_tones, Array::from(&ALARM_MELODY));
 
         let melody_tones: Array<Tone> = Melody::Reset.into();
-        assert_eq!(melody_tones, Array::from(RESET_MELODY.as_ref()));
+        assert_eq!(melody_tones, Array::from(&RESET_MELODY));
 
         let melody_tones: Array<Tone> = Melody::Setup.into();
-        assert_eq!(melody_tones, Array::from(SETUP_MELODY.as_ref()));
+        assert_eq!(melody_tones, Array::from(&SETUP_MELODY));
 
         let custom_tones = [
             Tone::new(Note::A0 as u8, NOTE_1_4_DURATION),
             Tone::new(Note::DSharp1 as u8, NOTE_1_2_DURATION),
         ];
-        let melody_tones: Array<Tone> = Melody::Custom(Array::from(custom_tones.as_ref())).into();
-        assert_eq!(melody_tones, Array::from(custom_tones.as_ref()));
+        let melody_tones: Array<Tone> = Melody::Custom(Array::from(&custom_tones)).into();
+        assert_eq!(melody_tones, Array::from(&custom_tones));
     }
 }

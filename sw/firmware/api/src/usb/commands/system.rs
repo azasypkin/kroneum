@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn echo_command() {
-        let array = Array::from([1, 2, 3, 10].as_ref());
+        let array = Array::from(&[1, 2, 3, 10]);
         assert_eq!(
             SystemCommand::try_from([2, 1, 2, 3, 10].as_ref()),
             Ok(SystemCommand::Echo(array))

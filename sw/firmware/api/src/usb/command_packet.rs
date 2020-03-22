@@ -49,7 +49,7 @@ impl From<CommandPacket> for Array<u8> {
                 array.unshift(0x6);
                 array
             }
-            CommandPacket::Unknown => Array::from([0].as_ref()),
+            CommandPacket::Unknown => Array::from(&[0]),
         };
 
         array.into()
@@ -185,7 +185,7 @@ mod tests {
             [3, 1]
         );
 
-        let array = Array::from([1, 2, 3, 10].as_ref());
+        let array = Array::from(&[1, 2, 3, 10]);
         assert_eq!(
             CommandPacket::try_from([3, 2, 1, 2, 3, 10].as_ref()),
             Ok(CommandPacket::System(SystemCommand::Echo(array)))

@@ -13,9 +13,9 @@ pub enum BeeperCommand {
 impl From<BeeperCommand> for Array<u8> {
     fn from(packet: BeeperCommand) -> Self {
         match packet {
-            BeeperCommand::Beep(n_beeps) => [1, n_beeps].as_ref().into(),
+            BeeperCommand::Beep(n_beeps) => (&[1, n_beeps]).into(),
             BeeperCommand::Melody(tones) => {
-                let mut array = Array::from([2].as_ref());
+                let mut array = Array::from(&[2]);
                 tones.as_ref().iter().for_each(|tone| {
                     array.push(tone.note);
                     array.push(tone.duration);
@@ -35,10 +35,11 @@ impl TryFrom<Array<u8>> for BeeperCommand {
             (Some(0x1), 1) => Ok(BeeperCommand::Beep(value[0].into())),
             // Every tone consists of frequency and duration, so number of bytes should be even.
             (Some(0x2), n_tones) if n_tones > 1 && n_tones & 1 == 0 => {
-                let mut array: Array<Tone> = Array::new();
-                for index in (0..n_tones).step_by(2) {
-                    array.push(Tone::new(value[index], value[index + 1]));
-                }
+                let mut array = Array::new();
+                value
+                    .as_ref()
+                    .chunks(2)
+                    .for_each(|pair| array.push(Tone::new(pair[0], pair[1])));
                 Ok(BeeperCommand::Melody(array))
             }
             _ => Err(CommandError::InvalidCommand),

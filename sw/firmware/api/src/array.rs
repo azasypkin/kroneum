@@ -27,6 +27,8 @@ impl<T: Default + Copy> Array<T> {
         }
     }
 
+    /// Adds the specified value into the beginning of the `Array`. Note that if internal buffer is
+    /// full, no more data will be written effectively making it read-only.
     pub fn unshift(&mut self, value: T) {
         if self.len < self.buffer.len() {
             let mut buffer = [T::default(); MAX_SIZE];
@@ -132,10 +134,13 @@ impl<T> AsMut<[T]> for Array<T> {
     }
 }
 
-impl<T: Default + Copy> From<&[T]> for Array<T> {
-    fn from(slice: &[T]) -> Self {
+impl<'a, T, I: 'a + Copy + Default> From<T> for Array<I>
+where
+    T: IntoIterator<Item = &'a I>,
+{
+    fn from(slice: T) -> Self {
         let mut array = Array::new();
-        slice.iter().enumerate().for_each(|(_, n)| array.push(*n));
+        slice.into_iter().for_each(|n| array.push(*n));
         array
     }
 }
@@ -217,7 +222,7 @@ mod tests {
 
     #[test]
     fn correctly_constructed_from_slice() {
-        let array = Array::from([11, 22, 33].as_ref());
+        let array = Array::from(&[11, 22, 33]);
         assert_eq!(array.len(), 3);
         assert_eq!(array.as_ref(), [11, 22, 33]);
     }
@@ -235,7 +240,7 @@ mod tests {
 
     #[test]
     fn correctly_copied_into_buffer() {
-        let array = Array::<u8>::from([1, 2, 3, 3, 2, 1].as_ref());
+        let array = Array::<u8>::from(&[1, 2, 3, 3, 2, 1]);
 
         let mut buffer = [0xFFu8; 10];
         buffer[1..array.len() + 1].copy_from_slice(array.as_ref());
@@ -261,5 +266,51 @@ mod tests {
 
         let _existing_value = array[2];
         let _non_existing_value = array[3];
+    }
+
+    #[test]
+    fn correctly_handles_push() {
+        let mut array: Array<u8> = Array::from(&[0, 1]);
+        assert_eq!(array.is_empty(), false);
+        assert_eq!(array.len(), 2);
+
+        // Push new values.
+        for i in 2..MAX_SIZE {
+            array.push(i as u8);
+            assert_eq!(array.len(), i + 1);
+        }
+
+        // We cannot push anymore.
+        assert_eq!(array.len(), MAX_SIZE);
+        array.push(MAX_SIZE as u8);
+        assert_eq!(array.len(), MAX_SIZE);
+
+        // Check all values.
+        for i in 0..MAX_SIZE {
+            assert_eq!(array[i], i as u8);
+        }
+    }
+
+    #[test]
+    fn correctly_handles_unshift() {
+        let mut array: Array<u8> = Array::from(&[62, 63]);
+        assert_eq!(array.is_empty(), false);
+        assert_eq!(array.len(), 2);
+
+        // Unshift new values.
+        for i in (0..MAX_SIZE - 2).rev() {
+            array.unshift(i as u8);
+            assert_eq!(array.len(), MAX_SIZE - i);
+        }
+
+        // We cannot unshift anymore.
+        assert_eq!(array.len(), MAX_SIZE);
+        array.unshift(MAX_SIZE as u8);
+        assert_eq!(array.len(), MAX_SIZE);
+
+        // Check all values.
+        for i in 0..MAX_SIZE {
+            assert_eq!(array[i], i as u8);
+        }
     }
 }

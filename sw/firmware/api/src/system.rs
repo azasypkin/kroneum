@@ -181,9 +181,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 let response = match command {
                     ADCCommand::Read(channel) => {
                         let value = self.adc().read(channel);
-                        Array::from(
-                            [0x00, (value & 0xff) as u8, ((value & 0xff00) >> 8) as u8].as_ref(),
-                        )
+                        Array::from(&[0x00, (value & 0xff) as u8, ((value & 0xff00) >> 8) as u8])
                     }
                 };
 

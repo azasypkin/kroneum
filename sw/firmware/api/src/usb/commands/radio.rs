@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn transmit_command() {
-        let array = Array::from([4, 2, 3, 10].as_ref());
+        let array = Array::from(&[4, 2, 3, 10]);
         assert_eq!(
             RadioCommand::try_from([1, 4, 2, 3, 10].as_ref()),
             Ok(RadioCommand::Transmit(array))

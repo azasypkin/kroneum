@@ -153,13 +153,10 @@ mod tests {
     }
 
     fn create_tones() -> Array<Tone> {
-        Array::from(
-            [
-                Tone::new(Note::C0 as u8, 100),
-                Tone::new(Note::B7 as u8, 250),
-            ]
-            .as_ref(),
-        )
+        Array::from(&[
+            Tone::new(Note::C0 as u8, 100),
+            Tone::new(Note::B7 as u8, 250),
+        ])
     }
 
     #[test]
