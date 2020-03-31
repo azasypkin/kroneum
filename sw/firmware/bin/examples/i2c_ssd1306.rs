@@ -7,13 +7,14 @@ use crate::hal::{i2c::I2c, prelude::*, stm32};
 use stm32f0xx_hal as hal;
 
 use cortex_m_rt::entry;
-use embedded_graphics::fonts::Font6x8;
-use embedded_graphics::pixelcolor::BinaryColor;
-use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::Line;
-use embedded_graphics::Drawing;
-use ssd1306::prelude::*;
-use ssd1306::Builder;
+use embedded_graphics::{
+    fonts::{Font6x8, Text},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    primitives::Line,
+    style::{PrimitiveStyle, TextStyleBuilder},
+};
+use ssd1306::{prelude::*, Builder};
 
 #[entry]
 fn main() -> ! {
@@ -36,17 +37,19 @@ fn main() -> ! {
             disp.init().unwrap();
             disp.flush().unwrap();
 
-            disp.draw(
-                Font6x8::render_str("Hello Kroneum!")
-                    .stroke(Some(BinaryColor::On))
-                    .into_iter(),
-            );
+            Text::new("Hello Kroneum!", Point::zero())
+                .into_styled(
+                    TextStyleBuilder::new(Font6x8)
+                        .text_color(BinaryColor::On)
+                        .build(),
+                )
+                .draw(&mut disp)
+                .unwrap();
 
-            disp.draw(
-                Line::new(Point::new(0, 16), Point::new(16, 16))
-                    .stroke(Some(BinaryColor::On))
-                    .into_iter(),
-            );
+            Line::new(Point::new(0, 16), Point::new(16, 16))
+                .into_styled(PrimitiveStyle::with_stroke(BinaryColor::On, 1))
+                .draw(&mut disp)
+                .unwrap();
 
             disp.flush().unwrap();
         });
