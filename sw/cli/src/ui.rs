@@ -2,9 +2,7 @@ use crate::device::{Device, DeviceIdentifier};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use core::convert::TryFrom;
-use kroneum_api::{
-    adc::ADCChannel, array::Array, beeper::tone::Tone, flash::storage_slot::StorageSlot,
-};
+use kroneum_api::{adc::ADCChannel, beeper::tone::Tone, flash::storage_slot::StorageSlot};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -40,7 +38,7 @@ async fn radio_transmit(info: web::Json<Vec<u8>>) -> impl Responder {
     HttpResponse::Ok().json(
         Device::create()
             .unwrap()
-            .radio_transmit(Array::from(info.as_ref()))
+            .radio_transmit(info.as_ref())
             .unwrap(),
     )
 }
@@ -56,13 +54,13 @@ async fn radio_status() -> impl Responder {
 async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
     let device = Device::create().unwrap();
     device
-        .beeper_melody(Array::<Tone>::from(
+        .beeper_melody(
             tones
                 .iter()
                 .map(|(note, duration)| Tone::new(*note, *duration))
                 .collect::<Vec<Tone>>()
                 .as_ref(),
-        ))
+        )
         .unwrap();
     HttpResponse::NoContent()
 }

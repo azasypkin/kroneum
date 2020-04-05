@@ -67,10 +67,12 @@ impl Device {
             .map_err(|_| "Failed to beep".to_string())
     }
 
-    pub fn beeper_melody(&self, tones: Array<Tone>) -> Result<(), String> {
-        self.send_command(CommandPacket::Beeper(BeeperCommand::Melody(tones)))
-            .map(|_| ())
-            .map_err(|_| "Failed to play melody".to_string())
+    pub fn beeper_melody(&self, tones: &[Tone]) -> Result<(), String> {
+        self.send_command(CommandPacket::Beeper(BeeperCommand::Melody(Array::from(
+            tones,
+        ))))
+        .map(|_| ())
+        .map_err(|_| "Failed to play melody".to_string())
     }
 
     pub fn get_alarm(&self) -> Result<Duration, String> {
@@ -167,10 +169,12 @@ impl Device {
             .map_err(|_| "Failed to receive data over radio".to_string())
     }
 
-    pub fn radio_transmit(&self, data: Array<u8>) -> Result<(), String> {
-        self.send_command(CommandPacket::Radio(RadioCommand::Transmit(data)))
-            .map(|_| ())
-            .map_err(|_| "Failed to transmit data over radio".to_string())
+    pub fn radio_transmit(&self, data: &[u8]) -> Result<(), String> {
+        self.send_command(CommandPacket::Radio(RadioCommand::Transmit(Array::from(
+            data,
+        ))))
+        .map(|_| ())
+        .map_err(|_| "Failed to transmit data over radio".to_string())
     }
 
     fn send_command(&self, packet: CommandPacket) -> Result<Vec<u8>, String> {
