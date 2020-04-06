@@ -13,7 +13,6 @@ pub enum CommandPacket {
     Flash(FlashCommand),
     System(SystemCommand),
     Radio(RadioCommand),
-    Unknown,
 }
 
 impl From<CommandPacket> for Array<u8> {
@@ -49,7 +48,6 @@ impl From<CommandPacket> for Array<u8> {
                 array.unshift(0x6);
                 array
             }
-            CommandPacket::Unknown => Array::from(&[0]),
         };
 
         array.into()
@@ -324,7 +322,5 @@ mod tests {
             CommandPacket::try_from([8, 9, 10].as_ref()),
             Err(CommandError::InvalidCommand)
         );
-
-        assert_eq!(Array::from(CommandPacket::Unknown).as_ref(), [0]);
     }
 }

@@ -321,13 +321,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
             }
         }
 
-        self.state.command = Some(
-            if let Ok(packet) = CommandPacket::try_from(command_byte_array) {
-                packet
-            } else {
-                CommandPacket::Unknown
-            },
-        );
+        self.state.command = CommandPacket::try_from(command_byte_array).ok();
 
         self.pma.set_rx_count(transaction.endpoint, 0);
         self.hw.set_endpoint_status(
