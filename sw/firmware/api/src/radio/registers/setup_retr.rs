@@ -6,13 +6,13 @@ pub struct SetupRetrRegister([u8; 1]);
 impl SetupRetrRegister {
     /// Get Auto Re-transmit Delay ‘0000’ – Wait 250+86uS, ‘0001’ – Wait 500+86uS etc.
     pub fn ard(&self) -> u8 {
-        self.0[0].get_bits(4..=7).into()
+        self.0[0].get_bits(4..=7)
     }
 
     /// Set Auto Re-transmit Delay ‘0000’ – Wait 250+86uS, ‘0001’ – Wait 500+86uS etc.
     pub fn set_ard(&mut self, value: u8) -> &mut Self {
         if value <= 0xF {
-            self.0[0].set_bits(4..=7, value.into());
+            self.0[0].set_bits(4..=7, value);
         }
 
         self
@@ -21,14 +21,14 @@ impl SetupRetrRegister {
     /// Get Auto Retransmit Count ‘0000’ – Re-Transmit disabled, ‘0001’ – Up to 1 Re-Transmit on
     /// fail of AA, etc. Up to 15 Re-Transmit on fail of AA.
     pub fn arc(&self) -> u8 {
-        self.0[0].get_bits(0..=3).into()
+        self.0[0].get_bits(0..=3)
     }
 
     /// Set Auto Retransmit Count ‘0000’ – Re-Transmit disabled, ‘0001’ – Up to 1 Re-Transmit on
     /// fail of AA, etc. Up to 15 Re-Transmit on fail of AA.
     pub fn set_arc(&mut self, value: u8) -> &mut Self {
         if value <= 0xF {
-            self.0[0].set_bits(0..=3, value.into());
+            self.0[0].set_bits(0..=3, value);
         }
 
         self

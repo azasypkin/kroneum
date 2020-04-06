@@ -32,7 +32,7 @@ impl TryFrom<Array<u8>> for BeeperCommand {
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
-            (Some(0x1), 1) => Ok(BeeperCommand::Beep(value[0].into())),
+            (Some(0x1), 1) => Ok(BeeperCommand::Beep(value[0])),
             // Every tone consists of frequency and duration, so number of bytes should be even.
             (Some(0x2), n_tones) if n_tones > 1 && n_tones & 1 == 0 => {
                 let mut array = Array::new();

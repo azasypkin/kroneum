@@ -236,12 +236,12 @@ impl<'a, T: RadioHardware, S: SysTickHardware> Radio<'a, T, S> {
     }
 
     fn power_up(&mut self) -> Result<(), ()> {
-        let new_config = self.config.set_pwr_up(true).clone();
+        let new_config = *self.config.set_pwr_up(true);
         self.write_register(&new_config).map(|_status| {})
     }
 
     fn power_down(&mut self) -> Result<(), ()> {
-        let new_config = self.config.set_pwr_up(false).clone();
+        let new_config = *self.config.set_pwr_up(false);
         self.write_register(&new_config).map(|_status| {})
     }
 

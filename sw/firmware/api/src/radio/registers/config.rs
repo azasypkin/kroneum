@@ -18,9 +18,10 @@ impl Into<bool> for ConfigRegisterPrim {
 
 impl From<bool> for ConfigRegisterPrim {
     fn from(value: bool) -> Self {
-        match value {
-            false => ConfigRegisterPrim::Transmitter,
-            true => ConfigRegisterPrim::Receiver,
+        if value {
+            ConfigRegisterPrim::Receiver
+        } else {
+            ConfigRegisterPrim::Transmitter
         }
     }
 }
@@ -41,9 +42,10 @@ impl Into<bool> for ConfigRegisterCRCO {
 
 impl From<bool> for ConfigRegisterCRCO {
     fn from(value: bool) -> Self {
-        match value {
-            true => ConfigRegisterCRCO::TwoBytes,
-            false => ConfigRegisterCRCO::OneByte,
+        if value {
+            ConfigRegisterCRCO::TwoBytes
+        } else {
+            ConfigRegisterCRCO::OneByte
         }
     }
 }

@@ -17,7 +17,7 @@ pub enum CommandPacket {
 
 impl From<CommandPacket> for Array<u8> {
     fn from(packet: CommandPacket) -> Self {
-        let array: Array<u8> = match packet {
+        match packet {
             CommandPacket::Beeper(command) => {
                 let mut array = Array::from(command);
                 array.unshift(0x1);
@@ -48,9 +48,7 @@ impl From<CommandPacket> for Array<u8> {
                 array.unshift(0x6);
                 array
             }
-        };
-
-        array.into()
+        }
     }
 }
 

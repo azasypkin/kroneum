@@ -29,7 +29,7 @@ pub enum Command {
 impl Into<u8> for Command {
     fn into(self) -> u8 {
         match self {
-            Command::ReadRegister(address) => address | 0b000_00000,
+            Command::ReadRegister(address) => address,
             Command::WriteRegister(address) => address | 0b001_00000,
             Command::ReadRxPayload => 0b0110_0001,
             Command::WriteTxPayload => 0b1010_0000,
