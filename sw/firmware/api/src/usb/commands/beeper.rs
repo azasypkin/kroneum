@@ -7,7 +7,6 @@ use usb::command_error::CommandError;
 pub enum BeeperCommand {
     Beep(u8),
     Melody(Array<Tone>),
-    Unknown,
 }
 
 impl From<BeeperCommand> for Array<u8> {
@@ -22,7 +21,6 @@ impl From<BeeperCommand> for Array<u8> {
                 });
                 array.as_ref().into()
             }
-            BeeperCommand::Unknown => [0].as_ref().into(),
         }
     }
 }

@@ -116,21 +116,17 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
 
         match self.state.usb_state.command {
             Some(CommandPacket::Beeper(command)) => {
-                let response = match command {
+                match command {
                     BeeperCommand::Beep(n_beeps) => {
                         self.beeper()
                             .play_and_repeat(Melody::Beep, n_beeps as usize);
-                        Ok(())
                     }
                     BeeperCommand::Melody(tones) => {
                         self.beeper().play(Melody::Custom(tones));
-                        Ok(())
                     }
-                    BeeperCommand::Unknown => Err(()),
                 };
 
-                self.usb()
-                    .send(&[if response.is_ok() { 0x00 } else { 0xFF }]);
+                self.usb().send(&[0x00]);
             }
             Some(CommandPacket::Alarm(command)) => {
                 if let AlarmCommand::Get = command {
