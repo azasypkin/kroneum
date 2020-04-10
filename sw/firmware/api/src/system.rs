@@ -205,7 +205,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     Err(_) => self.usb().send(&[0xFF]),
                 };
             }
-            _ => self.usb().send(&[0xFF]),
+            _ => {}
         }
 
         self.state.usb_state.command = None;
