@@ -14,6 +14,7 @@ use usb::{
     commands::{
         ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, RadioCommand, SystemCommand,
     },
+    endpoint::DeviceEndpoint,
     USBHardware, UsbState, USB,
 };
 
@@ -126,33 +127,35 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     }
                 };
 
-                self.usb().send(&[0x00]);
+                self.usb().send(DeviceEndpoint::System, &[0x00]);
             }
             Some(CommandPacket::Alarm(command)) => {
                 if let AlarmCommand::Get = command {
                     let alarm = self.rtc().alarm();
-                    self.usb()
-                        .send(&[0x00, alarm.hours, alarm.minutes, alarm.seconds]);
+                    self.usb().send(
+                        DeviceEndpoint::System,
+                        &[0x00, alarm.hours, alarm.minutes, alarm.seconds],
+                    );
                 } else if let AlarmCommand::Set(time) = command {
                     // We should send OK response before we enter Alarm mode and USB will be disabled.
-                    self.usb().send(&[0x00]);
+                    self.usb().send(DeviceEndpoint::System, &[0x00]);
                     self.systick.delay(100);
                     self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
                 } else {
-                    self.usb().send(&[0xFF]);
+                    self.usb().send(DeviceEndpoint::System, &[0xFF]);
                 }
             }
             Some(CommandPacket::System(command)) => {
                 if let SystemCommand::Echo(mut echo_data) = command {
                     echo_data.unshift(0x00);
-                    self.usb().send(echo_data.as_ref());
+                    self.usb().send(DeviceEndpoint::System, echo_data.as_ref());
                 } else if let SystemCommand::Reset = command {
                     // We should send OK response before we reset.
-                    self.usb().send(&[0x00]);
+                    self.usb().send(DeviceEndpoint::System, &[0x00]);
                     self.systick.delay(100);
                     self.reset();
                 } else {
-                    self.usb().send(&[0xFF]);
+                    self.usb().send(DeviceEndpoint::System, &[0xFF]);
                 }
             }
             Some(CommandPacket::Flash(command)) => {
@@ -173,9 +176,9 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 match response {
                     Ok(mut array) => {
                         array.unshift(0x00);
-                        self.usb().send(array.as_ref());
+                        self.usb().send(DeviceEndpoint::System, array.as_ref());
                     }
-                    Err(_) => self.usb().send(&[0xFF]),
+                    Err(_) => self.usb().send(DeviceEndpoint::System, &[0xFF]),
                 };
             }
             Some(CommandPacket::ADC(command)) => {
@@ -186,7 +189,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     }
                 };
 
-                self.usb().send(response.as_ref());
+                self.usb().send(DeviceEndpoint::System, response.as_ref());
             }
             Some(CommandPacket::Radio(command)) => {
                 let response = match command {
@@ -200,9 +203,9 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 match response {
                     Ok(mut array) => {
                         array.unshift(0x00);
-                        self.usb().send(array.as_ref());
+                        self.usb().send(DeviceEndpoint::System, array.as_ref());
                     }
-                    Err(_) => self.usb().send(&[0xFF]),
+                    Err(_) => self.usb().send(DeviceEndpoint::System, &[0xFF]),
                 };
             }
             _ => {}

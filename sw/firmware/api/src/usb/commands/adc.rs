@@ -1,7 +1,7 @@
 use adc::ADCChannel;
 use array::Array;
 use core::convert::TryFrom;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ADCCommand {
@@ -9,7 +9,7 @@ pub enum ADCCommand {
 }
 
 impl TryFrom<Array<u8>> for ADCCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         if let (Some(0x1), 1) = (value.shift(), value.len()) {
@@ -18,12 +18,12 @@ impl TryFrom<Array<u8>> for ADCCommand {
             }
         }
 
-        Err(CommandError::InvalidCommand)
+        Err(USBError::InvalidCommand)
     }
 }
 
 impl TryFrom<&[u8]> for ADCCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -61,32 +61,32 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             ADCCommand::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             ADCCommand::try_from([2].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             ADCCommand::try_from([3, 4, 5].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
 
         // Read command with unknown channels.
         assert_eq!(
             ADCCommand::try_from([1, 0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             ADCCommand::try_from([1, 2].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             ADCCommand::try_from([1, 8].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
     }
 }

@@ -66,16 +66,17 @@ pub const DEV_DESC: [u8; 18] = [
     0x01, // bNumConfigurations 1
 ];
 
-pub const CONF_DESC: [u8; 41] = [
+pub const CONF_DESC: [u8; 66] = [
     0x09, // bLength
     0x02, // bDescriptorType (Configuration)
-    0x29,
+    0x42,
     0x00, // wTotalLength
-    0x01, // bNumInterfaces
+    0x02, // bNumInterfaces
     0x01, // bConfigurationValue
     0x04, // iConfiguration (String Index)
     0x80, // bmAttributes
     0xFA, // bMaxPower 500mA
+    // System Interface
     0x09, // bLength
     0x04, // bDescriptorType (Interface)
     0x00, // bInterfaceNumber 0
@@ -85,7 +86,7 @@ pub const CONF_DESC: [u8; 41] = [
     0x00, // bInterfaceSubClass 1=BOOT, 0=no boot
     0x00, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
     0x00, // iInterface (String Index)
-    // HID descriptor
+    // System HID descriptor
     0x09, // bLength
     0x21, // bDescriptorType (HID)
     0x11,
@@ -95,7 +96,7 @@ pub const CONF_DESC: [u8; 41] = [
     0x22, // bDescriptorType[0] (HID)
     0x20,
     0x00, // wDescriptorLength[0] 32
-    // IN endpoint descriptor
+    // System IN endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
     0x81, // bEndpointAddress (IN/D2H)
@@ -103,18 +104,46 @@ pub const CONF_DESC: [u8; 41] = [
     MAX_PACKET_SIZE as u8,
     0x00, // wMaxPacketSize 64
     0x20, // bInterval 1 (unit depends on device speed)
-    // OUT endpoint descriptor
+    // System OUT endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
     0x01, // bEndpointAddress (OUT/H2D)
     0x03, // bmAttributes (Interrupt)
     MAX_PACKET_SIZE as u8,
     0x00, // wMaxPacketSize 64
-    0x20, // bInterval 1 (unit depends on device speed)
+    0x20, // bInterval 1 (unit depends on device speed),
+    // Keyboard Interface
+    0x09, // bLength
+    0x04, // bDescriptorType (Interface)
+    0x01, // bInterfaceNumber 1
+    0x00, // bAlternateSetting
+    0x01, // bNumEndpoints 1
+    0x03, // bInterfaceClass
+    0x01, // bInterfaceSubClass 1=BOOT, 0=no boot
+    0x01, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
+    0x00, // iInterface (String Index)
+    // Keyboard HID descriptor
+    0x09, // bLength
+    0x21, // bDescriptorType (HID)
+    0x11,
+    0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (HID)
+    0x3F,
+    0x00, // wDescriptorLength[0] 63
+    // Keyboard IN endpoint descriptor
+    0x07, // bLength
+    0x05, // bDescriptorType (Endpoint)
+    0x82, // bEndpointAddress (IN/D2H)
+    0x03, // bmAttributes (Interrupt)
+    MAX_PACKET_SIZE as u8,
+    0x00, // wMaxPacketSize 64
+    0x0A, // bInterval 10 (unit depends on device speed, expressed in milliseconds),
 ];
 
 // The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
-pub const HID_DESC: [u8; 9] = [
+pub const SYSTEM_HID_DESC: [u8; 9] = [
     0x09, // bLength: CUSTOM_HID Descriptor size
     0x21, // bDescriptorType (HID)
     0x11, 0x01, // bcdHID 1.11
@@ -124,7 +153,18 @@ pub const HID_DESC: [u8; 9] = [
     0x20, 0x00, // wDescriptorLength[0] 32
 ];
 
-pub const REPORT_DESC: [u8; 32] = [
+// The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
+pub const KEYBOARD_HID_DESC: [u8; 9] = [
+    0x09, // bLength: CUSTOM_HID Descriptor size
+    0x21, // bDescriptorType (HID)
+    0x11, 0x01, // bcdHID 1.11
+    0x00, // bCountryCode
+    0x01, // bNumDescriptors
+    0x22, // bDescriptorType[0] (HID)
+    0x3F, 0x00, // wDescriptorLength[0] 63
+];
+
+pub const SYSTEM_REPORT_DESC: [u8; 32] = [
     0x05, 0x01, // USAGE_PAGE (Generic Desktop)
     0x09, 0x00, // USAGE (Undefined)
     0xa1, 0x01, // COLLECTION (Application)
@@ -142,6 +182,41 @@ pub const REPORT_DESC: [u8; 32] = [
     0x95, 0x3f, // REPORT_COUNT (this is the byte length)
     0x09, 0x00, //   USAGE (Undefined)
     0x91, 0x82, //   OUTPUT (Data,Var,Abs,Vol)
+    0xc0, // END_COLLECTION
+];
+
+pub const KEYBOARD_REPORT_DESC: [u8; 63] = [
+    0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+    0x09, 0x06, // USAGE (Keyboard)
+    0xa1, 0x01, // COLLECTION (Application)
+    0x05, 0x07, //   Usage Page (Key Codes)
+    0x19, 0xE0, //   Usage Minimum (224)
+    0x29, 0xE7, //   Usage Maximum (231)
+    0x15, 0x00, //   Logical Minimum (0)
+    0x25, 0x01, //   Logical Maximum (1)
+    0x75, 0x01, //   Report Size (1)
+    0x95, 0x08, //   Report Count (8)
+    0x81, 0x02, //   Input (Data, Variable, Absolute), Modifier byte
+    0x95, 0x01, //   Report Count (1)
+    0x75, 0x08, //   Report Size (8)
+    0x81, 0x01, //   Input (Constant), Reserved byte
+    0x95, 0x05, //   Report Count (5)
+    0x75, 0x01, //   Report Size (1)
+    0x05, 0x08, //   Usage Page (Page# for LEDs)
+    0x19, 0x01, //   Usage Minimum (1)
+    0x29, 0x05, //   Usage Maximum (5)
+    0x91, 0x02, //   Output (Data, Variable, Absolute), LED report
+    0x95, 0x01, //   Report Count (1)
+    0x75, 0x03, //   Report Size (3)
+    0x91, 0x01, //   Output (Constant), LED report padding
+    0x95, 0x06, //   Report Count (6)
+    0x75, 0x08, //   Report Size (8)
+    0x15, 0x00, //   Logical Minimum (0)
+    0x25, 0x65, //   Logical Maximum (101)
+    0x05, 0x07, //   Usage Page (Key Codes)
+    0x19, 0x00, //   Usage Minimum (0)
+    0x29, 0x65, //   Usage Maximum (101)
+    0x81, 0x00, //   Input (Data, Array), Key arrays (6 bytes)
     0xc0, // END_COLLECTION
 ];
 
@@ -176,12 +251,28 @@ mod tests {
 
     #[test]
     fn descriptors_with_correct_length() {
-        let descriptors: [&[u8]; 3] = [&LANG_ID_DESCRIPTOR, &DEV_DESC, &HID_DESC];
+        let descriptors: [&[u8]; 4] = [
+            &LANG_ID_DESCRIPTOR,
+            &DEV_DESC,
+            &SYSTEM_HID_DESC,
+            &KEYBOARD_HID_DESC,
+        ];
 
         for descriptor in descriptors.iter() {
             assert_eq!(descriptor[0], descriptor.len() as u8);
         }
 
+        // Config descriptor length.
         assert_eq!(CONF_DESC[2], CONF_DESC.len() as u8);
+
+        // HID reports lengths.
+        assert_eq!(
+            SYSTEM_HID_DESC[SYSTEM_HID_DESC.len() - 2],
+            SYSTEM_REPORT_DESC.len() as u8
+        );
+        assert_eq!(
+            KEYBOARD_HID_DESC[KEYBOARD_HID_DESC.len() - 2],
+            KEYBOARD_REPORT_DESC.len() as u8
+        );
     }
 }

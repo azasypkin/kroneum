@@ -1,7 +1,7 @@
 use array::Array;
 use core::convert::TryFrom;
 use flash::storage_slot::StorageSlot;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FlashCommand {
@@ -23,20 +23,20 @@ impl From<FlashCommand> for Array<u8> {
 }
 
 impl TryFrom<Array<u8>> for FlashCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
             (Some(0x1), 1) => Ok(FlashCommand::Read(value[0].into())),
             (Some(0x2), 2) => Ok(FlashCommand::Write(value[0].into(), value[1])),
             (Some(0x3), 0) => Ok(FlashCommand::EraseAll),
-            _ => Err(CommandError::InvalidCommand),
+            _ => Err(USBError::InvalidCommand),
         }
     }
 }
 
 impl TryFrom<&[u8]> for FlashCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -88,18 +88,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             FlashCommand::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand),
+            Err(USBError::InvalidCommand),
         );
         assert_eq!(
             FlashCommand::try_from([4].as_ref()),
-            Err(CommandError::InvalidCommand),
+            Err(USBError::InvalidCommand),
         );
         assert_eq!(
             FlashCommand::try_from([5, 6, 7].as_ref()),
-            Err(CommandError::InvalidCommand),
+            Err(USBError::InvalidCommand),
         );
     }
 }

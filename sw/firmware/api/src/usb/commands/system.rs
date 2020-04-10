@@ -1,6 +1,6 @@
 use array::Array;
 use core::convert::TryFrom;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SystemCommand {
@@ -21,19 +21,19 @@ impl From<SystemCommand> for Array<u8> {
 }
 
 impl TryFrom<Array<u8>> for SystemCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
             (Some(0x1), 0) => Ok(SystemCommand::Reset),
             (Some(0x2), n_echo_bytes) if n_echo_bytes > 0 => Ok(SystemCommand::Echo(value)),
-            _ => Err(CommandError::InvalidCommand),
+            _ => Err(USBError::InvalidCommand),
         }
     }
 }
 
 impl TryFrom<&[u8]> for SystemCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -69,18 +69,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             SystemCommand::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             SystemCommand::try_from([3].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             SystemCommand::try_from([4, 5, 6].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
     }
 }

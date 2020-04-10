@@ -3,7 +3,7 @@ use super::commands::{
 };
 use array::Array;
 use core::convert::TryFrom;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandPacket {
@@ -53,7 +53,7 @@ impl From<CommandPacket> for Array<u8> {
 }
 
 impl TryFrom<Array<u8>> for CommandPacket {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match value.shift() {
@@ -63,13 +63,13 @@ impl TryFrom<Array<u8>> for CommandPacket {
             Some(0x4) => Ok(CommandPacket::Flash(FlashCommand::try_from(value)?)),
             Some(0x5) => Ok(CommandPacket::ADC(ADCCommand::try_from(value)?)),
             Some(0x6) => Ok(CommandPacket::Radio(RadioCommand::try_from(value)?)),
-            _ => Err(CommandError::InvalidCommand),
+            _ => Err(USBError::InvalidCommand),
         }
     }
 }
 
 impl TryFrom<&[u8]> for CommandPacket {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -250,15 +250,15 @@ mod tests {
 
         assert_eq!(
             CommandPacket::try_from([5, 0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([5, 2].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([5, 8].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
 
         assert_eq!(
@@ -286,15 +286,15 @@ mod tests {
 
         assert_eq!(
             CommandPacket::try_from([6, 0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([6, 4].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([6, 5].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
 
         assert_eq!(
@@ -307,18 +307,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             CommandPacket::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([7].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             CommandPacket::try_from([8, 9, 10].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
     }
 }

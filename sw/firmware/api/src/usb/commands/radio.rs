@@ -1,6 +1,6 @@
 use array::Array;
 use core::convert::TryFrom;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RadioCommand {
@@ -26,20 +26,20 @@ impl From<RadioCommand> for Array<u8> {
 }
 
 impl TryFrom<Array<u8>> for RadioCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
             (Some(0x1), num) if num > 0 => Ok(RadioCommand::Transmit(value)),
             (Some(0x2), 0) => Ok(RadioCommand::Receive),
             (Some(0x3), 0) => Ok(RadioCommand::Status),
-            _ => Err(CommandError::InvalidCommand),
+            _ => Err(USBError::InvalidCommand),
         }
     }
 }
 
 impl TryFrom<&[u8]> for RadioCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -93,18 +93,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             RadioCommand::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             RadioCommand::try_from([4].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             RadioCommand::try_from([5, 6, 7].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
     }
 }

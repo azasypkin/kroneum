@@ -1,7 +1,7 @@
 use array::Array;
 use beeper::tone::Tone;
 use core::convert::TryFrom;
-use usb::command_error::CommandError;
+use usb::usb_error::USBError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BeeperCommand {
@@ -26,7 +26,7 @@ impl From<BeeperCommand> for Array<u8> {
 }
 
 impl TryFrom<Array<u8>> for BeeperCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
@@ -40,13 +40,13 @@ impl TryFrom<Array<u8>> for BeeperCommand {
                     .for_each(|pair| array.push(Tone::new(pair[0], pair[1])));
                 Ok(BeeperCommand::Melody(array))
             }
-            _ => Err(CommandError::InvalidCommand),
+            _ => Err(USBError::InvalidCommand),
         }
     }
 }
 
 impl TryFrom<&[u8]> for BeeperCommand {
-    type Error = CommandError;
+    type Error = USBError;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from(Array::from(slice))
@@ -86,18 +86,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn invalid_command() {
         assert_eq!(
             BeeperCommand::try_from([0].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             BeeperCommand::try_from([3].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
         assert_eq!(
             BeeperCommand::try_from([4, 5, 6].as_ref()),
-            Err(CommandError::InvalidCommand)
+            Err(USBError::InvalidCommand)
         );
     }
 }

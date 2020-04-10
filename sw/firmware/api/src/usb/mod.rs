@@ -1,36 +1,30 @@
-pub mod command_error;
 pub mod command_packet;
 pub mod commands;
 mod descriptors;
+pub mod endpoint;
+mod packet_queue;
 mod pma;
 mod setup_packet;
+pub mod usb_error;
 
-use self::command_packet::CommandPacket;
-use self::descriptors::*;
-use self::pma::PacketMemoryArea;
-use self::setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket};
+use self::{
+    command_packet::CommandPacket,
+    descriptors::*,
+    endpoint::{
+        ControlEndpointStatus, DeviceEndpoint, EndpointDirection, EndpointStatus, EndpointType,
+    },
+    packet_queue::PacketQueue,
+    pma::PacketMemoryArea,
+    setup_packet::{Request, RequestKind, RequestRecipient, SetupPacket},
+};
 use array::Array;
 use core::convert::TryFrom;
 
-#[derive(Copy, Clone)]
-pub enum EndpointType {
-    Control = 0b0,
-    Device = 0b1,
-}
-
-#[derive(Copy, Clone)]
-pub enum EndpointDirection {
-    Receive,
-    Transmit,
-}
-
-#[derive(Copy, Clone)]
-pub enum EndpointStatus {
-    Disabled = 0b0,
-    Stall = 0b01,
-    Nak = 0b10,
-    Valid = 0b11,
-}
+pub const SUPPORTED_ENDPOINTS: [EndpointType; 3] = [
+    EndpointType::Control,
+    EndpointType::Device(DeviceEndpoint::System),
+    EndpointType::Device(DeviceEndpoint::Keyboard),
+];
 
 #[derive(Copy, Clone)]
 pub enum DeviceStatus {
@@ -44,18 +38,6 @@ pub enum DeviceStatus {
     Suspended,
     // Synthetic status for the woken up device,
     WokenUp,
-}
-
-/// The possible statuses for the control endpoint.
-#[derive(Copy, Clone)]
-pub enum ControlEndpointStatus {
-    Idle,
-    Setup(u16),
-    DataIn,
-    DataOut,
-    StatusIn,
-    StatusOut,
-    Stall,
 }
 
 /// Possible interrupt types.
@@ -83,6 +65,7 @@ pub struct UsbState {
     device_status: DeviceStatus,
     suspended_device_status: Option<DeviceStatus>,
     control_endpoint_status: ControlEndpointStatus,
+    packets: PacketQueue,
     setup_data_length: u16,
     address: u8,
     configuration_index: u8,
@@ -98,6 +81,7 @@ impl Default for UsbState {
             device_status: DeviceStatus::Default,
             suspended_device_status: None,
             control_endpoint_status: ControlEndpointStatus::Idle,
+            packets: PacketQueue::new(),
             setup_data_length: 0,
             address: 0,
             configuration_index: 0,
@@ -172,7 +156,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
     /// Prepares and starts USB hardware (setup clocks, SOF etc.).
     pub fn setup(&mut self) {
         self.hw.setup();
-        self.pma.init();
+        self.pma.init(&SUPPORTED_ENDPOINTS);
 
         self.state.address = 0;
         self.update_device_status(DeviceStatus::Default);
@@ -180,8 +164,9 @@ impl<'a, T: USBHardware> USB<'a, T> {
 
     /// Stops and releases USB hardware (stops clocks, disables interrupts etc.).
     pub fn teardown(&mut self) {
-        self.hw.close_endpoint(EndpointType::Device);
-        self.hw.close_endpoint(EndpointType::Control);
+        SUPPORTED_ENDPOINTS
+            .iter()
+            .for_each(|endpoint| self.hw.close_endpoint(*endpoint));
 
         self.state.address = 0;
         self.update_device_status(DeviceStatus::Default);
@@ -207,30 +192,29 @@ impl<'a, T: USBHardware> USB<'a, T> {
         }
     }
 
-    /// Sends custom report via Device endpoint.
-    pub fn send(&self, data: &[u8]) {
-        self.send_data(EndpointType::Device, Some(&data));
+    /// Sends report via specified Device endpoint.
+    pub fn send(&mut self, endpoint: DeviceEndpoint, data: &[u8]) {
+        self.send_data(EndpointType::Device(endpoint), &data);
     }
 
     fn correct_transfer(&mut self) {
-        // USB_ISTR_CTR is read only and will be automatically cleared by
-        // hardware when we've processed all endpoint results.
+        // USB_ISTR_CTR is read only and will be automatically cleared by hardware when we process
+        // all endpoint results.
         while self.hw.is_interrupt_active(UsbInterrupt::CorrectTransfer) {
             let transaction = self.hw.transaction();
-            match &transaction.endpoint {
-                EndpointType::Control => match &transaction.direction {
-                    EndpointDirection::Receive => self.handle_control_out_transfer(&transaction),
-                    EndpointDirection::Transmit => self.handle_control_in_transfer(&transaction),
-                },
-                EndpointType::Device => match (&transaction.direction, &transaction.flags) {
-                    (EndpointDirection::Receive, TransactionFlags { rx: true, .. }) => {
-                        self.handle_device_out_transfer(&transaction);
-                    }
-                    (EndpointDirection::Transmit, TransactionFlags { tx: true, .. }) => {
-                        self.handle_device_in_transfer(&transaction);
-                    }
-                    _ => {}
-                },
+            match (&transaction.endpoint, &transaction.direction) {
+                (EndpointType::Control, EndpointDirection::Receive) => {
+                    self.handle_control_out_transfer(&transaction)
+                }
+                (EndpointType::Control, EndpointDirection::Transmit) => {
+                    self.handle_control_in_transfer(&transaction)
+                }
+                (EndpointType::Device(_), EndpointDirection::Receive) => {
+                    self.handle_device_out_transfer(&transaction)
+                }
+                (EndpointType::Device(_), EndpointDirection::Transmit) => {
+                    self.handle_device_in_transfer(&transaction)
+                }
             }
         }
     }
@@ -287,6 +271,12 @@ impl<'a, T: USBHardware> USB<'a, T> {
         self.hw
             .mark_transaction_as_handled(transaction.endpoint, transaction.direction);
 
+        // If we have pending packets, continue to send to them.
+        if let Some(packet) = self.state.packets.dequeue(transaction.endpoint) {
+            self.send_packet(transaction.endpoint, packet.as_ref());
+            return;
+        }
+
         if let ControlEndpointStatus::DataIn = self.state.control_endpoint_status {
             self.update_control_endpoint_status(ControlEndpointStatus::DataOut);
 
@@ -331,9 +321,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
         );
     }
 
-    fn handle_device_in_transfer(&self, transaction: &Transaction) {
+    fn handle_device_in_transfer(&mut self, transaction: &Transaction) {
         self.hw
             .mark_transaction_as_handled(transaction.endpoint, transaction.direction);
+
+        // If we have pending packets, continue to send to them.
+        if let Some(packet) = self.state.packets.dequeue(transaction.endpoint) {
+            self.send_packet(transaction.endpoint, packet.as_ref());
+        }
     }
 
     fn update_address(&mut self, address: u8) {
@@ -344,16 +339,27 @@ impl<'a, T: USBHardware> USB<'a, T> {
         self.state.address = address;
     }
 
-    fn send_data(&self, endpoint_type: EndpointType, data: Option<&[u8]>) {
-        let length = data
-            .and_then(|d| {
-                self.pma.write(endpoint_type, &d);
-                Some(d)
-            })
-            .map_or(0, |d| d.len() as u16);
+    fn send_data(&mut self, endpoint_type: EndpointType, data: &[u8]) {
+        // If data to send is larger than maximum packet size, let's send the first chunk and put
+        // the rest of the data into packet queue.
+        let packet = if data.len() > MAX_PACKET_SIZE {
+            self.state
+                .packets
+                .enqueue(endpoint_type, &data[MAX_PACKET_SIZE..]);
+            &data[..MAX_PACKET_SIZE]
+        } else {
+            self.state.packets.clear(endpoint_type);
+            data
+        };
 
-        // Now that the PMA memory is prepared, set the length and tell the peripheral to send it.
-        self.pma.set_tx_count(endpoint_type, length);
+        self.send_packet(endpoint_type, packet);
+    }
+
+    fn send_packet(&mut self, endpoint_type: EndpointType, packet: &[u8]) {
+        self.pma.write(endpoint_type, packet);
+        self.pma.set_tx_count(endpoint_type, packet.len() as u16);
+
+        // Now that the PMA memory is prepared,tell the peripheral to send it.
         self.hw.set_endpoint_status(
             endpoint_type,
             EndpointDirection::Transmit,
@@ -361,14 +367,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
         );
     }
 
-    fn send_control_data(&mut self, data: Option<&[u8]>) {
+    fn send_control_data(&mut self, data: &[u8]) {
         self.update_control_endpoint_status(ControlEndpointStatus::DataIn);
         self.send_data(EndpointType::Control, data);
     }
 
     fn send_control_zero_length_packet(&mut self) {
         self.update_control_endpoint_status(ControlEndpointStatus::StatusIn);
-        self.send_data(EndpointType::Control, None);
+        self.send_data(EndpointType::Control, &[]);
     }
 
     fn reset(&mut self) {
@@ -402,17 +408,27 @@ impl<'a, T: USBHardware> USB<'a, T> {
     }
 
     fn stall_endpoint(&self, endpoint_address: u8) {
-        let endpoint_index = endpoint_address & 0x7f;
-        if endpoint_index == 0 {
-            self.control_endpoint_error();
-        } else {
-            let endpoint = match endpoint_index {
-                0 => EndpointType::Control,
-                1 => EndpointType::Device,
-                _ => return,
-            };
+        match EndpointType::try_from(endpoint_address & 0x7f) {
+            Ok(EndpointType::Control) => {
+                self.control_endpoint_error();
+            }
+            Ok(endpoint) => {
+                let direction = if endpoint_address & 0x80 == 0x80 {
+                    EndpointDirection::Transmit
+                } else {
+                    EndpointDirection::Receive
+                };
 
-            let direction = if endpoint_address & 0x80 == 0x80 {
+                self.hw
+                    .set_endpoint_status(endpoint, direction, EndpointStatus::Stall);
+            }
+            _ => {}
+        };
+    }
+
+    fn unstall_endpoint(&self, endpoint_address: u8) {
+        if let Ok(endpoint) = EndpointType::try_from(endpoint_address & 0x7f) {
+            let direction = if endpoint.is_control() || endpoint_address & 0x80 == 0x80 {
                 EndpointDirection::Transmit
             } else {
                 EndpointDirection::Receive
@@ -421,24 +437,6 @@ impl<'a, T: USBHardware> USB<'a, T> {
             self.hw
                 .set_endpoint_status(endpoint, direction, EndpointStatus::Stall);
         }
-    }
-
-    fn unstall_endpoint(&self, endpoint_address: u8) {
-        let endpoint_index = endpoint_address & 0x7f;
-        let endpoint = match endpoint_index {
-            0 => EndpointType::Control,
-            1 => EndpointType::Device,
-            _ => return,
-        };
-
-        let direction = if endpoint_index == 0 || endpoint_address & 0x80 == 0x80 {
-            EndpointDirection::Transmit
-        } else {
-            EndpointDirection::Receive
-        };
-
-        self.hw
-            .set_endpoint_status(endpoint, direction, EndpointStatus::Stall);
     }
 
     fn handle_endpoint_request(&mut self, request_header: SetupPacket) {
@@ -494,7 +492,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
                     }
                     DeviceStatus::Configured => {
                         // SHOULD BE:  status=isStalled(ep_addr) ? 1 : 0; sendControlData(&status,2);
-                        self.send_control_data(Some([0x0, 0x0].as_ref()));
+                        self.send_control_data(&[0x0, 0x0]);
                     }
                     _ => self.control_endpoint_error(),
                 }
@@ -519,20 +517,14 @@ impl<'a, T: USBHardware> USB<'a, T> {
                 self.send_control_zero_length_packet();
             }
             // CUSTOM_HID_REQ_GET_PROTOCOL
-            Request::SetFeature => {
-                let protocol = [self.state.protocol];
-                self.send_control_data(Some(protocol.as_ref()))
-            }
+            Request::SetFeature => self.send_control_data(&[self.state.protocol]),
             // CUSTOM_HID_REQ_SET_IDLE
             Request::GetInterface => {
                 self.state.idle_state = (request_header.value >> 8) as u8;
                 self.send_control_zero_length_packet();
             }
             // CUSTOM_HID_REQ_GET_IDLE
-            Request::Two => {
-                let idle_state = [self.state.idle_state];
-                self.send_control_data(Some(idle_state.as_ref()))
-            }
+            Request::Two => self.send_control_data(&[self.state.idle_state]),
             // CUSTOM_HID_REQ_SET_REPORT
             Request::SetConfiguration => {
                 self.update_control_endpoint_status(ControlEndpointStatus::DataOut);
@@ -551,33 +543,34 @@ impl<'a, T: USBHardware> USB<'a, T> {
 
     fn handle_standard_setup(&mut self, request_header: SetupPacket) {
         match request_header.request {
+            // See HID Spec 7.1: the HID class uses the standard request `Get_Descriptor` as
+            // described in the USB Specification.
             Request::GetDescriptor => {
-                let data = match request_header.value >> 8 {
-                    // USB_DESC_TYPE_HID_REPORT
-                    0x22 => Some(if (request_header.length as usize) < REPORT_DESC.len() {
-                        &REPORT_DESC[..request_header.length as usize]
-                    } else {
-                        &REPORT_DESC
-                    }),
-                    // USB_DESC_TYPE_HID_DESCRIPTOR
-                    0x21 => Some(if (request_header.length as usize) < HID_DESC.len() {
-                        &HID_DESC[..request_header.length as usize]
-                    } else {
-                        &HID_DESC
-                    }),
-                    _ => None,
+                let ack_data = [];
+                // Value is 2 bytes value, we need only high byte:
+                let data = match (request_header.value >> 8, request_header.index) {
+                    // USB_DESC_TYPE_HID_DESCRIPTOR (HID)
+                    (0x21, 0) => SYSTEM_HID_DESC.as_ref(),
+                    (0x21, 1) => KEYBOARD_HID_DESC.as_ref(),
+                    // USB_DESC_TYPE_HID_REPORT (Report)
+                    (0x22, 0) => SYSTEM_REPORT_DESC.as_ref(),
+                    (0x22, 1) => KEYBOARD_REPORT_DESC.as_ref(),
+                    // 0x23 - Physical descriptor, 0x24 - 0x2F Reserved or unknown interface.
+                    _ => ack_data.as_ref(),
                 };
 
-                self.send_control_data(data);
+                let report_length = request_header.length as usize;
+                self.send_control_data(if report_length < data.len() {
+                    &data[..report_length]
+                } else {
+                    &data
+                });
             }
             Request::SetInterface => {
                 self.state.alt_setting = request_header.value as u8;
                 self.send_control_zero_length_packet();
             }
-            Request::GetInterface => {
-                let alt_setting = [self.state.alt_setting];
-                self.send_control_data(Some(alt_setting.as_ref()))
-            }
+            Request::GetInterface => self.send_control_data(&[self.state.alt_setting]),
             _ => self.control_endpoint_error(),
         }
     }
@@ -612,7 +605,7 @@ impl<'a, T: USBHardware> USB<'a, T> {
                 } else {
                     request_header.length as usize
                 };
-                self.send_control_data(Some(&data[..data_to_send_length]));
+                self.send_control_data(&data[..data_to_send_length]);
             }
         } else {
             self.control_endpoint_error();
@@ -661,7 +654,10 @@ impl<'a, T: USBHardware> USB<'a, T> {
             match self.state.device_status {
                 DeviceStatus::Addressed => {
                     if configuration_index != 0 {
-                        self.hw.open_endpoint(EndpointType::Device);
+                        self.hw
+                            .open_endpoint(EndpointType::Device(DeviceEndpoint::System));
+                        self.hw
+                            .open_endpoint(EndpointType::Device(DeviceEndpoint::Keyboard));
                         self.send_control_zero_length_packet();
                         self.update_device_status(DeviceStatus::Configured);
                     } else {
@@ -670,7 +666,10 @@ impl<'a, T: USBHardware> USB<'a, T> {
                 }
                 DeviceStatus::Configured => {
                     if configuration_index == 0 {
-                        self.hw.close_endpoint(EndpointType::Device);
+                        self.hw
+                            .close_endpoint(EndpointType::Device(DeviceEndpoint::System));
+                        self.hw
+                            .close_endpoint(EndpointType::Device(DeviceEndpoint::Keyboard));
                         self.send_control_zero_length_packet();
                         self.update_device_status(DeviceStatus::Addressed);
                     } else {
@@ -689,11 +688,10 @@ impl<'a, T: USBHardware> USB<'a, T> {
             match self.state.device_status {
                 DeviceStatus::Addressed => {
                     self.state.configuration_index = 0;
-                    self.send_control_data(Some([0].as_ref()));
+                    self.send_control_data(&[0]);
                 }
                 DeviceStatus::Configured => {
-                    let configuration_index = [self.state.configuration_index];
-                    self.send_control_data(Some(configuration_index.as_ref()));
+                    self.send_control_data(&[self.state.configuration_index])
                 }
                 _ => self.control_endpoint_error(),
             }
@@ -701,11 +699,8 @@ impl<'a, T: USBHardware> USB<'a, T> {
     }
 
     fn handle_get_status(&mut self) {
-        match self.state.device_status {
-            DeviceStatus::Addressed | DeviceStatus::Configured => {
-                self.send_control_data(Some([3].as_ref()))
-            }
-            _ => {}
+        if let DeviceStatus::Addressed | DeviceStatus::Configured = self.state.device_status {
+            self.send_control_data(&[3]);
         }
     }
 
@@ -717,14 +712,13 @@ impl<'a, T: USBHardware> USB<'a, T> {
     }
 
     fn handle_clear_feature(&mut self, request_header: SetupPacket) {
-        match self.state.device_status {
-            DeviceStatus::Addressed | DeviceStatus::Configured => {
-                if request_header.value == 1 {
-                    // ACK
-                    self.send_control_zero_length_packet();
-                }
+        if let DeviceStatus::Addressed | DeviceStatus::Configured = self.state.device_status {
+            if request_header.value == 1 {
+                // ACK
+                self.send_control_zero_length_packet();
             }
-            _ => self.control_endpoint_error(),
+        } else {
+            self.control_endpoint_error();
         }
     }
 

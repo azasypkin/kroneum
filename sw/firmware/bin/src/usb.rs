@@ -1,9 +1,11 @@
-use crate::hal::stm32::{CRS, RCC};
-
-use crate::system::SystemHardwareImpl;
+use crate::{
+    hal::stm32::{CRS, RCC},
+    system::SystemHardwareImpl,
+};
+use core::convert::TryFrom;
 use kroneum_api::usb::{
-    EndpointDirection, EndpointStatus, EndpointType, Transaction, TransactionFlags, USBHardware,
-    UsbInterrupt,
+    endpoint::{EndpointDirection, EndpointStatus, EndpointType},
+    Transaction, TransactionFlags, USBHardware, UsbInterrupt,
 };
 
 const BTABLE_ADDRESS: usize = 0x4000_6000;
@@ -75,13 +77,15 @@ impl USBHardware for SystemHardwareImpl {
         // USB peripheral from the host PC) or two pending transactions are waiting to be processed.
         let istr_reg = self.usb.istr.read();
         let endpoint_index = istr_reg.ep_id().bits();
+        let endpoint = if let Ok(endpoint) = EndpointType::try_from(endpoint_index) {
+            endpoint
+        } else {
+            panic!("Unknown endpoint");
+        };
+
         let ep_reg = self.usb.epr[endpoint_index as usize].read();
         Transaction {
-            endpoint: match endpoint_index {
-                0 => EndpointType::Control,
-                1 => EndpointType::Device,
-                _ => panic!("Unknown endpoint"),
-            },
+            endpoint,
             direction: if istr_reg.dir().is_from() {
                 EndpointDirection::Receive
             } else {
@@ -101,12 +105,7 @@ impl USBHardware for SystemHardwareImpl {
         direction: EndpointDirection,
         status: EndpointStatus,
     ) {
-        let endpoint_index = match endpoint {
-            EndpointType::Control => 0,
-            EndpointType::Device => 1,
-        };
-
-        self.usb.epr[endpoint_index].modify(|r, w| {
+        self.usb.epr[Into::<u8>::into(endpoint) as usize].modify(|r, w| {
             let (rx, tx) = match direction {
                 EndpointDirection::Receive => (status_bits(r.stat_rx().bits(), status), 0b00),
                 EndpointDirection::Transmit => (0b00, status_bits(r.stat_tx().bits(), status)),
@@ -135,15 +134,11 @@ impl USBHardware for SystemHardwareImpl {
     }
 
     fn open_endpoint(&self, endpoint: EndpointType) {
-        let endpoint_index = match endpoint {
-            EndpointType::Control => 0,
-            EndpointType::Device => 1,
-        };
-
-        self.usb.epr[endpoint_index].modify(|r, w| {
+        let endpoint_index = Into::<u8>::into(endpoint);
+        self.usb.epr[endpoint_index as usize].modify(|r, w| {
             let (endpoint_type, endpoint_address) = match endpoint {
                 EndpointType::Control => (0b01, r.ea().bits()),
-                EndpointType::Device => (0b11, 0x1),
+                EndpointType::Device(_) => (0b11, endpoint_index),
             };
 
             w.ep_type()
@@ -162,12 +157,7 @@ impl USBHardware for SystemHardwareImpl {
     }
 
     fn close_endpoint(&self, endpoint: EndpointType) {
-        let endpoint_index = match endpoint {
-            EndpointType::Control => 0,
-            EndpointType::Device => 1,
-        };
-
-        self.usb.epr[endpoint_index].modify(|r, w| {
+        self.usb.epr[Into::<u8>::into(endpoint) as usize].modify(|r, w| {
             w.stat_tx()
                 .bits(status_bits(r.stat_tx().bits(), EndpointStatus::Disabled))
                 .stat_rx()
@@ -211,13 +201,8 @@ impl USBHardware for SystemHardwareImpl {
             EndpointDirection::Transmit => (true, false),
         };
 
-        let endpoint_index = match endpoint {
-            EndpointType::Control => 0,
-            EndpointType::Device => 1,
-        };
-
         let stat_bits = 0b00;
-        self.usb.epr[endpoint_index].modify(|_, w| {
+        self.usb.epr[Into::<u8>::into(endpoint) as usize].modify(|_, w| {
             w.ctr_rx()
                 .bit(rx_bit)
                 .ctr_tx()
