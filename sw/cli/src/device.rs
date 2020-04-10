@@ -154,6 +154,7 @@ impl Device {
     }
 
     pub fn adc_read(&self, channel: ADCChannel) -> Result<u16, String> {
+        info!("Reading ADC for {:?}.", channel);
         self.send_command(CommandPacket::ADC(ADCCommand::Read(channel)))
             .map(|response| (response[0] as u16) | ((response[1] as u16) << 8))
             .map_err(|_| "Failed to read ADC value".to_string())
@@ -182,25 +183,49 @@ impl Device {
             .and_then(|_| self.read())
             .and_then(|mut response| {
                 if response.len() == 0 || response[0] == 0xFF {
+                    error!("Failed to process packet {:?}.", response);
                     Err("Failed to process packet".to_string())
                 } else {
+                    info!("Successfully processed packet {:?}.", response);
                     Ok(response.drain(1..).collect())
                 }
             })
     }
 
     fn write(&self, packet: CommandPacket) -> Result<(), String> {
+        let packet_bytes = Array::from(packet);
         self.device
-            .write(Array::from(packet).as_ref())
-            .map(|_| ())
-            .or_else(|err| Err(format!("Failed to send data to device endpoint: {:?}", err)))
+            .write(packet_bytes.as_ref())
+            .map(|count| {
+                info!(
+                    "Successfully wrote {:?} ({}) bytes.",
+                    packet_bytes.as_ref(),
+                    count
+                );
+                ()
+            })
+            .or_else(|err| {
+                error!(
+                    "Failed to wrote {:?} ({}) bytes: {:?}",
+                    packet_bytes.as_ref(),
+                    packet_bytes.len(),
+                    err
+                );
+                Err(format!("Failed to send data to device endpoint: {:?}", err))
+            })
     }
 
     fn read(&self) -> Result<Vec<u8>, String> {
         let mut data = [0; 100];
         self.device
             .read_timeout(&mut data, 5000)
-            .or_else(|err| Err(format!("Failed to read data to device endpoint: {:?}", err)))
-            .map(|count| data[..count].to_vec())
+            .or_else(|err| {
+                error!("Failed to read bytes: {:?}", err);
+                Err(format!("Failed to read data to device endpoint: {:?}", err))
+            })
+            .map(|count| {
+                info!("Successfully read {} byte(s).", count);
+                data[..count].to_vec()
+            })
     }
 }

@@ -1,4 +1,8 @@
 #![deny(warnings)]
+
+#[macro_use]
+extern crate log;
+
 mod device;
 mod ui;
 
@@ -112,6 +116,8 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
 }
 
 fn main() -> Result<(), String> {
+    env_logger::init();
+
     let matches = App::new("Kroneum CLI")
         .version("0.1.0")
         .author("Aleh Zasypkin <aleh.zasypkin@gmail.com>")
