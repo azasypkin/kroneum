@@ -7,22 +7,22 @@
   },
   "version": "1.0.0",
   "dependencies": {
-    "@elastic/datemath": "^5.0.2",
-    "@elastic/eui": "^21.1.0",
+    "@elastic/datemath": "^5.0.3",
+    "@elastic/eui": "^22.3.0",
     "axios": "^0.19.2",
     "moment": "^2.24.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^2.24.0",
-    "@typescript-eslint/eslint-plugin": "^2.24.0",
+    "@typescript-eslint/parser": "^2.27.0",
+    "@typescript-eslint/eslint-plugin": "^2.27.0",
     "eslint": "^6.8.0",
-    "eslint-config-prettier": "^6.10.0",
+    "eslint-config-prettier": "^6.10.1",
     "eslint-plugin-prettier": "^3.1.2",
     "eslint-plugin-react": "^7.19.0",
     "parcel-bundler": "^1.12.4",
-    "prettier": "^1.19.1",
+    "prettier": "^2.0.4",
     "sass": "^1.26.3",
     "typescript": "^3.8.3"
   },

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
+
+import '@elastic/eui/dist/eui_theme_dark.css';
 import {
   EuiButton,
   EuiFieldText,
@@ -21,6 +23,7 @@ import {
   EuiText,
   EuiTitle,
 } from '@elastic/eui';
+
 import axios from 'axios';
 import { Note, Player } from './audio';
 
@@ -303,13 +306,13 @@ const DeviceDiagnosticsSection = () => {
                   value={echoStatus.bytesString}
                   name="text"
                   isInvalid={showError}
-                  onChange={ev =>
+                  onChange={(ev) =>
                     setEchoStatus({
                       ...echoStatus,
                       response: null,
                       isValid:
                         ev.target.value &&
-                        ev.target.value.split(',').every(value => {
+                        ev.target.value.split(',').every((value) => {
                           const intValue = parseInt(value.trim());
                           return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
                         }),
@@ -332,7 +335,7 @@ const DeviceDiagnosticsSection = () => {
                   axios
                     .post(
                       '/api/echo',
-                      echoStatus.bytesString.split(',').map(value => parseInt(value.trim())),
+                      echoStatus.bytesString.split(',').map((value) => parseInt(value.trim())),
                     )
                     .then(({ data }) => {
                       setEchoStatus({
@@ -460,13 +463,13 @@ const DeviceRadioSection = () => {
                   value={radioStatus.bytesString}
                   name="text"
                   isInvalid={showError}
-                  onChange={ev =>
+                  onChange={(ev) =>
                     setRadioStatus({
                       ...radioStatus,
                       response: null,
                       isValid:
                         ev.target.value &&
-                        ev.target.value.split(',').every(value => {
+                        ev.target.value.split(',').every((value) => {
                           const intValue = parseInt(value.trim());
                           return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
                         }),
@@ -489,7 +492,7 @@ const DeviceRadioSection = () => {
                   axios
                     .post(
                       '/api/radio/transmit',
-                      radioStatus.bytesString.split(',').map(value => parseInt(value.trim())),
+                      radioStatus.bytesString.split(',').map((value) => parseInt(value.trim())),
                     )
                     .then(({ data }) => {
                       setRadioStatus({
