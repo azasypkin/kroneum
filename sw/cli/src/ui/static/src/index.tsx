@@ -12,7 +12,15 @@ import {
   EuiTitle,
 } from '@elastic/eui';
 
-import { ADCSection, AlarmsSection, DiagnosticsSection, InfoSection, FlashSection, RadioSection } from './sections';
+import {
+  ADCSection,
+  AlarmsSection,
+  DiagnosticsSection,
+  InfoSection,
+  FlashSection,
+  KeyboardSection,
+  RadioSection,
+} from './sections';
 
 const IndexPage = () => {
   const tabs = [
@@ -40,6 +48,11 @@ const IndexPage = () => {
       id: 'radio',
       name: 'Radio',
       content: <RadioSection />,
+    },
+    {
+      id: 'keyboard',
+      name: 'Keyboard',
+      content: <KeyboardSection />,
     },
     {
       id: 'diagnostics',

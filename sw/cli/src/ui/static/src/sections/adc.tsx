@@ -41,7 +41,7 @@ export function ADCSection() {
   return (
     <EuiFlexItem>
       <EuiSpacer />
-      <EuiPanel style={{ maxWidth: 300 }}>
+      <EuiPanel>
         <EuiFormRow label="Ch#1 value" display="columnCompressed" style={{ alignItems: 'center' }}>
           <EuiText size="s">{adcStatus.response ?? 'Unknown'}</EuiText>
         </EuiFormRow>

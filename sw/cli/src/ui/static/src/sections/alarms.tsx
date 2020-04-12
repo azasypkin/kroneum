@@ -3,7 +3,7 @@ import { EuiFlexItem, EuiFormRow, EuiPanel, EuiSpacer, EuiText } from '@elastic/
 
 export function AlarmsSection() {
   const content = (
-    <EuiPanel style={{ maxWidth: 300 }}>
+    <EuiPanel>
       <EuiFormRow label="Hours" display="columnCompressed" style={{ alignItems: 'center' }}>
         <EuiText size="s">{'Unknown'}</EuiText>
       </EuiFormRow>

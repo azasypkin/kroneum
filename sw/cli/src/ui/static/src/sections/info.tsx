@@ -17,7 +17,7 @@ export function InfoSection() {
   }, []);
 
   const content = id ? (
-    <EuiPanel style={{ maxWidth: 300 }}>
+    <EuiPanel>
       <EuiFormRow label="Bus" display="columnCompressed" style={{ alignItems: 'center' }}>
         <EuiText size="s">{id?.bus ?? 'Unknown'}</EuiText>
       </EuiFormRow>
@@ -35,7 +35,7 @@ export function InfoSection() {
       </EuiFormRow>
     </EuiPanel>
   ) : (
-    <EuiPanel style={{ maxWidth: 300 }}>
+    <EuiPanel>
       <EuiLoadingContent lines={5} />
     </EuiPanel>
   );

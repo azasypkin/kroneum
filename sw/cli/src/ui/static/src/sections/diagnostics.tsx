@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { EuiButton, EuiFieldText, EuiFlexItem, EuiFormRow, EuiPanel, EuiPopover, EuiSpacer } from '@elastic/eui';
+import { EuiButton, EuiFieldText, EuiFlexItem, EuiFormRow, EuiPanel, EuiSpacer, EuiText } from '@elastic/eui';
 import { Note, Player } from '../audio';
 
 interface EchoStatus {
@@ -35,75 +35,64 @@ export function DiagnosticsSection() {
   });
 
   const showError = !echoStatus.isValid && echoStatus.bytesString.length > 0;
-
-  const [isEchoPopOverOpen, setIsEchoPopOverOpen] = useState<boolean>(false);
-  const echoButton = <EuiButton onClick={() => setIsEchoPopOverOpen(true)}>Send echo</EuiButton>;
-
   return (
-    <EuiFlexItem>
-      <EuiSpacer />
-      <EuiPanel style={{ maxWidth: 300 }}>
-        <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
-          <EuiButton onClick={() => axios.get('/api/beep')}>Send beep</EuiButton>
-        </EuiFormRow>
-        <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
-          <EuiButton
-            onClick={async () => {
-              Player.play(MELODY);
+    <>
+      <EuiFlexItem>
+        <EuiSpacer />
+        <EuiPanel>
+          <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
+            <EuiButton onClick={() => axios.get('/api/beep')}>Send beep</EuiButton>
+          </EuiFormRow>
+          <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
+            <EuiButton
+              onClick={async () => {
+                Player.play(MELODY);
 
-              await axios.post(
-                '/api/play',
-                MELODY.map(([note, duration]) => [note, duration * 400]),
-              );
-            }}
-          >
-            Play melody
-          </EuiButton>
-        </EuiFormRow>
-        <EuiFormRow style={{ alignItems: 'center' }} display="columnCompressed">
-          <EuiPopover
-            id="trapFocus"
-            ownFocus
-            button={echoButton}
-            isOpen={isEchoPopOverOpen}
-            closePopover={() => {
-              setIsEchoPopOverOpen(false);
-              setEchoStatus({
-                isInProgress: false,
-                bytesString: '',
-                isValid: false,
-                response: null,
-              });
-            }}
-          >
-            <EuiFormRow
-              style={{ minWidth: 300 }}
-              label="Bytes sequence to send"
-              helpText={echoStatus.response ? `Response: [${echoStatus.response.join(', ')}]` : ''}
-              isInvalid={showError}
-              error={['Bytes should be a comma separated list of `u8` values.']}
+                await axios.post(
+                  '/api/play',
+                  MELODY.map(([note, duration]) => [note, duration * 400]),
+                );
+              }}
             >
-              <EuiFieldText
-                placeholder="Enter comma separated `u8` numbers..."
-                value={echoStatus.bytesString}
-                name="text"
-                isInvalid={showError}
-                onChange={(ev) => {
-                  setEchoStatus({
-                    ...echoStatus,
-                    response: null,
-                    isValid:
-                      ev.target.value &&
-                      ev.target.value.split(',').every((value) => {
-                        const intValue = parseInt(value.trim());
-                        return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
-                      }),
-                    bytesString: ev.target.value,
-                  });
-                }}
-              />
-            </EuiFormRow>
-            <EuiSpacer />
+              Play melody
+            </EuiButton>
+          </EuiFormRow>
+        </EuiPanel>
+      </EuiFlexItem>
+      <EuiFlexItem>
+        <EuiSpacer />
+        <EuiPanel>
+          <EuiFormRow
+            style={{ alignItems: 'center' }}
+            display="columnCompressed"
+            label="Bytes to send"
+            isInvalid={showError}
+            error={['Should be a comma separated list of `u8` values.']}
+          >
+            <EuiFieldText
+              placeholder="Enter comma separated `u8` numbers..."
+              value={echoStatus.bytesString}
+              name="text"
+              isInvalid={showError}
+              onChange={(ev) => {
+                setEchoStatus({
+                  ...echoStatus,
+                  response: null,
+                  isValid:
+                    ev.target.value &&
+                    ev.target.value.split(',').every((value) => {
+                      const intValue = parseInt(value.trim());
+                      return Number.isInteger(intValue) && intValue >= 0 && intValue < 256;
+                    }),
+                  bytesString: ev.target.value,
+                });
+              }}
+            />
+          </EuiFormRow>
+          <EuiFormRow label="Response" display="columnCompressed">
+            <EuiText>{echoStatus.response ? `[${echoStatus.response.join(', ')}]` : 'n/a'}</EuiText>
+          </EuiFormRow>
+          <EuiFormRow>
             <EuiButton
               isDisabled={!echoStatus.isValid}
               isLoading={echoStatus.isInProgress}
@@ -128,11 +117,11 @@ export function DiagnosticsSection() {
                   });
               }}
             >
-              Send
+              Send echo
             </EuiButton>
-          </EuiPopover>
-        </EuiFormRow>
-      </EuiPanel>
-    </EuiFlexItem>
+          </EuiFormRow>
+        </EuiPanel>
+      </EuiFlexItem>
+    </>
   );
 }

@@ -81,6 +81,14 @@ async fn get_id() -> impl Responder {
     HttpResponse::Ok().json(device.get_identifier())
 }
 
+async fn send_key(key_code_and_delay: web::Json<(u8, u8)>) -> impl Responder {
+    let device = Device::create().unwrap();
+    device
+        .keyboard_key((key_code_and_delay.0).0, (key_code_and_delay.0).1)
+        .unwrap();
+    HttpResponse::NoContent()
+}
+
 #[actix_rt::main]
 pub async fn run_server(port: u16) -> Result<(), String> {
     let ui_url = format!("127.0.0.1:{}", port);
@@ -95,6 +103,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/radio/transmit", web::post().to(radio_transmit))
             .route("/api/radio/status", web::get().to(radio_status))
             .route("/api/adc/{channel}", web::get().to(adc))
+            .route("/api/key", web::post().to(send_key))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })
     .bind(&ui_url)

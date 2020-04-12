@@ -9,7 +9,7 @@ export function FlashSection() {
   }, []);
 
   const content = slots ? (
-    <EuiPanel style={{ maxWidth: 300 }}>
+    <EuiPanel>
       {slots.map((slotContent, slotIndex) => {
         return (
           <EuiFormRow
@@ -24,7 +24,7 @@ export function FlashSection() {
       })}
     </EuiPanel>
   ) : (
-    <EuiPanel style={{ maxWidth: 300 }}>
+    <EuiPanel>
       <EuiLoadingContent lines={5} />
     </EuiPanel>
   );
