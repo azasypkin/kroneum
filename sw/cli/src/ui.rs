@@ -1,9 +1,9 @@
-use crate::device::{Device, DeviceIdentifier};
+use crate::device::Device;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use core::convert::TryFrom;
 use kroneum_api::{adc::ADCChannel, beeper::tone::Tone, flash::storage_slot::StorageSlot};
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::Deserialize;
 
 #[derive(Deserialize)]
 struct ADCParams {
@@ -65,24 +65,20 @@ async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
     HttpResponse::NoContent()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DeviceInfo {
-    identifier: DeviceIdentifier,
-    flash: Vec<u8>,
+async fn get_flash() -> impl Responder {
+    let device = Device::create().unwrap();
+    HttpResponse::Ok().json(vec![
+        device.read_flash(StorageSlot::One).unwrap(),
+        device.read_flash(StorageSlot::Two).unwrap(),
+        device.read_flash(StorageSlot::Three).unwrap(),
+        device.read_flash(StorageSlot::Four).unwrap(),
+        device.read_flash(StorageSlot::Five).unwrap(),
+    ])
 }
 
-async fn get_info() -> impl Responder {
+async fn get_id() -> impl Responder {
     let device = Device::create().unwrap();
-    HttpResponse::Ok().json(DeviceInfo {
-        identifier: device.get_identifier(),
-        flash: vec![
-            device.read_flash(StorageSlot::One).unwrap(),
-            device.read_flash(StorageSlot::Two).unwrap(),
-            device.read_flash(StorageSlot::Three).unwrap(),
-            device.read_flash(StorageSlot::Four).unwrap(),
-            device.read_flash(StorageSlot::Five).unwrap(),
-        ],
-    })
+    HttpResponse::Ok().json(device.get_identifier())
 }
 
 #[actix_rt::main]
@@ -92,7 +88,8 @@ pub async fn run_server(port: u16) -> Result<(), String> {
         App::new()
             .route("/api/beep", web::get().to(beep))
             .route("/api/play", web::post().to(play))
-            .route("/api/info", web::get().to(get_info))
+            .route("/api/flash", web::get().to(get_flash))
+            .route("/api/id", web::get().to(get_id))
             .route("/api/echo", web::post().to(echo))
             .route("/api/radio/receive", web::get().to(radio_receive))
             .route("/api/radio/transmit", web::post().to(radio_transmit))
