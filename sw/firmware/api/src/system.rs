@@ -12,7 +12,8 @@ use timer::{Timer, TimerHardware};
 use usb::{
     command_packet::CommandPacket,
     commands::{
-        ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, RadioCommand, SystemCommand,
+        ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, KeyboardCommand, RadioCommand,
+        SystemCommand,
     },
     endpoint::DeviceEndpoint,
     USBHardware, UsbState, USB,
@@ -208,6 +209,19 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     Err(_) => self.usb().send(DeviceEndpoint::System, &[0xFF]),
                 };
             }
+            Some(CommandPacket::Keyboard(command)) => match command {
+                KeyboardCommand::Key(key_code, delay) => {
+                    self.systick.delay(delay as u32 * 1000);
+
+                    self.usb()
+                        .send(DeviceEndpoint::Keyboard, &[0, 0, key_code, 0, 0, 0, 0, 0]);
+                    self.systick.delay(10);
+                    self.usb()
+                        .send(DeviceEndpoint::Keyboard, &[0, 0, 0, 0, 0, 0, 0, 0]);
+
+                    self.usb().send(DeviceEndpoint::System, &[0x00]);
+                }
+            },
             _ => {}
         }
 

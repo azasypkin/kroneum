@@ -1,5 +1,6 @@
 use super::commands::{
-    ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, RadioCommand, SystemCommand,
+    ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, KeyboardCommand, RadioCommand,
+    SystemCommand,
 };
 use array::Array;
 use core::convert::TryFrom;
@@ -13,6 +14,7 @@ pub enum CommandPacket {
     Flash(FlashCommand),
     System(SystemCommand),
     Radio(RadioCommand),
+    Keyboard(KeyboardCommand),
 }
 
 impl From<CommandPacket> for Array<u8> {
@@ -48,6 +50,11 @@ impl From<CommandPacket> for Array<u8> {
                 array.unshift(0x6);
                 array
             }
+            CommandPacket::Keyboard(command) => {
+                let mut array = Array::from(command);
+                array.unshift(0x7);
+                array
+            }
         }
     }
 }
@@ -63,6 +70,7 @@ impl TryFrom<Array<u8>> for CommandPacket {
             Some(0x4) => Ok(CommandPacket::Flash(FlashCommand::try_from(value)?)),
             Some(0x5) => Ok(CommandPacket::ADC(ADCCommand::try_from(value)?)),
             Some(0x6) => Ok(CommandPacket::Radio(RadioCommand::try_from(value)?)),
+            Some(0x7) => Ok(CommandPacket::Keyboard(KeyboardCommand::try_from(value)?)),
             _ => Err(USBError::InvalidCommand),
         }
     }
@@ -307,17 +315,51 @@ mod tests {
     }
 
     #[test]
+    fn keyboard_command() {
+        assert_eq!(
+            CommandPacket::try_from([7, 1, 1, 1].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(1, 1)))
+        );
+        assert_eq!(
+            CommandPacket::try_from([7, 1, 3, 2].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(3, 2)))
+        );
+        assert_eq!(
+            CommandPacket::try_from([7, 1, 2, 3].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(2, 3)))
+        );
+
+        assert_eq!(
+            CommandPacket::try_from([7].as_ref()),
+            Err(USBError::InvalidCommand)
+        );
+        assert_eq!(
+            CommandPacket::try_from([7, 1].as_ref()),
+            Err(USBError::InvalidCommand)
+        );
+        assert_eq!(
+            CommandPacket::try_from([7, 1, 2].as_ref()),
+            Err(USBError::InvalidCommand)
+        );
+
+        assert_eq!(
+            Array::from(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2))).as_ref(),
+            [7, 1, 1, 2]
+        );
+    }
+
+    #[test]
     fn invalid_command() {
         assert_eq!(
             CommandPacket::try_from([0].as_ref()),
             Err(USBError::InvalidCommand)
         );
         assert_eq!(
-            CommandPacket::try_from([7].as_ref()),
+            CommandPacket::try_from([8].as_ref()),
             Err(USBError::InvalidCommand)
         );
         assert_eq!(
-            CommandPacket::try_from([8, 9, 10].as_ref()),
+            CommandPacket::try_from([9, 10, 11].as_ref()),
             Err(USBError::InvalidCommand)
         );
     }
