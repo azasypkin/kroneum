@@ -210,14 +210,30 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                 };
             }
             Some(CommandPacket::Keyboard(command)) => match command {
-                KeyboardCommand::Key(key_code, delay) => {
-                    self.systick.delay(delay as u32 * 1000);
+                KeyboardCommand::Key(modifiers, key_code, delay) => {
+                    if delay > 0 {
+                        self.systick.delay(delay as u32 * 1000);
+                    }
 
-                    self.usb()
-                        .send(DeviceEndpoint::Keyboard, &[0, 0, key_code, 0, 0, 0, 0, 0]);
+                    self.usb().send(
+                        DeviceEndpoint::Keyboard,
+                        &[0x01, modifiers, 0, key_code, 0, 0, 0, 0, 0],
+                    );
                     self.systick.delay(10);
                     self.usb()
                         .send(DeviceEndpoint::Keyboard, &[0, 0, 0, 0, 0, 0, 0, 0]);
+
+                    self.usb().send(DeviceEndpoint::System, &[0x00]);
+                }
+                KeyboardCommand::Media(key_code, delay) => {
+                    if delay > 0 {
+                        self.systick.delay(delay as u32 * 1000);
+                    }
+
+                    self.usb()
+                        .send(DeviceEndpoint::Keyboard, &[0x02, key_code as u8]);
+                    self.systick.delay(10);
+                    self.usb().send(DeviceEndpoint::Keyboard, &[0x02, 0x0]);
 
                     self.usb().send(DeviceEndpoint::System, &[0x00]);
                 }

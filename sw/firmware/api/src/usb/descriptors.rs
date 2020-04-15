@@ -1,3 +1,4 @@
+use super::endpoint::DeviceEndpoint;
 use config::{DEVICE_PID, DEVICE_VID};
 
 /*
@@ -75,7 +76,7 @@ pub const CONF_DESC: [u8; 66] = [
     0x01, // bConfigurationValue
     0x04, // iConfiguration (String Index)
     0x80, // bmAttributes
-    0xFA, // bMaxPower 500mA
+    0x0F, // bMaxPower 30mA
     // System Interface
     0x09, // bLength
     0x04, // bDescriptorType (Interface)
@@ -85,7 +86,7 @@ pub const CONF_DESC: [u8; 66] = [
     0x03, // bInterfaceClass
     0x00, // bInterfaceSubClass 1=BOOT, 0=no boot
     0x00, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
-    0x00, // iInterface (String Index)
+    0x05, // iInterface (String Index)
     // System HID descriptor
     0x09, // bLength
     0x21, // bDescriptorType (HID)
@@ -94,8 +95,8 @@ pub const CONF_DESC: [u8; 66] = [
     0x00, // bCountryCode
     0x01, // bNumDescriptors
     0x22, // bDescriptorType[0] (HID)
-    0x20,
-    0x00, // wDescriptorLength[0] 32
+    SYSTEM_HID_REPORT_DESC.len() as u8,
+    0x00, // wDescriptorLength[0]
     // System IN endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
@@ -103,7 +104,7 @@ pub const CONF_DESC: [u8; 66] = [
     0x03, // bmAttributes (Interrupt)
     MAX_PACKET_SIZE as u8,
     0x00, // wMaxPacketSize 64
-    0x20, // bInterval 1 (unit depends on device speed)
+    0x0A, // bInterval 10 (unit depends on device speed)
     // System OUT endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
@@ -111,7 +112,7 @@ pub const CONF_DESC: [u8; 66] = [
     0x03, // bmAttributes (Interrupt)
     MAX_PACKET_SIZE as u8,
     0x00, // wMaxPacketSize 64
-    0x20, // bInterval 1 (unit depends on device speed),
+    0x0A, // bInterval 10 (unit depends on device speed),
     // Keyboard Interface
     0x09, // bLength
     0x04, // bDescriptorType (Interface)
@@ -121,17 +122,17 @@ pub const CONF_DESC: [u8; 66] = [
     0x03, // bInterfaceClass
     0x01, // bInterfaceSubClass 1=BOOT, 0=no boot
     0x01, // bInterfaceProtocol 0=none, 1=keyboard, 2=mouse
-    0x00, // iInterface (String Index)
+    0x05, // iInterface (String Index)
     // Keyboard HID descriptor
     0x09, // bLength
     0x21, // bDescriptorType (HID)
     0x11,
-    0x01, // bcdHID 1.11
-    0x00, // bCountryCode
-    0x01, // bNumDescriptors
-    0x22, // bDescriptorType[0] (HID)
-    0x3F,
-    0x00, // wDescriptorLength[0] 63
+    0x01,                                 // bcdHID 1.11
+    0x00,                                 // bCountryCode
+    0x01,                                 // bNumDescriptors
+    0x22,                                 // bDescriptorType[0] (HID)
+    KEYBOARD_HID_REPORT_DESC.len() as u8, // wDescriptorLength[0]
+    0x00,
     // Keyboard IN endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType (Endpoint)
@@ -142,53 +143,72 @@ pub const CONF_DESC: [u8; 66] = [
     0x0A, // bInterval 10 (unit depends on device speed, expressed in milliseconds),
 ];
 
+pub fn get_hid_descriptor(device_endpoint: DeviceEndpoint) -> &'static [u8] {
+    match device_endpoint {
+        DeviceEndpoint::System => &SYSTEM_HID_DESC,
+        DeviceEndpoint::Keyboard => &KEYBOARD_HID_DESC,
+    }
+}
+
 // The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
-pub const SYSTEM_HID_DESC: [u8; 9] = [
+const SYSTEM_HID_DESC: [u8; 9] = [
     0x09, // bLength: CUSTOM_HID Descriptor size
     0x21, // bDescriptorType (HID)
-    0x11, 0x01, // bcdHID 1.11
+    0x11,
+    0x01, // bcdHID 1.11
     0x00, // bCountryCode
     0x01, // bNumDescriptors
     0x22, // bDescriptorType[0] (HID)
-    0x20, 0x00, // wDescriptorLength[0] 32
+    SYSTEM_HID_REPORT_DESC.len() as u8,
+    0x00, // wDescriptorLength[0]
 ];
 
 // The HID descriptor (this is a copy of the descriptor embedded in the above configuration descriptor.
-pub const KEYBOARD_HID_DESC: [u8; 9] = [
+const KEYBOARD_HID_DESC: [u8; 9] = [
     0x09, // bLength: CUSTOM_HID Descriptor size
     0x21, // bDescriptorType (HID)
-    0x11, 0x01, // bcdHID 1.11
-    0x00, // bCountryCode
-    0x01, // bNumDescriptors
-    0x22, // bDescriptorType[0] (HID)
-    0x3F, 0x00, // wDescriptorLength[0] 63
+    0x11, // bcdHID 1.11
+    0x01,
+    0x00,                                 // bCountryCode
+    0x01,                                 // bNumDescriptors
+    0x22,                                 // bDescriptorType[0] (HID)
+    KEYBOARD_HID_REPORT_DESC.len() as u8, // wDescriptorLength[0]
+    0x00,
 ];
 
-pub const SYSTEM_REPORT_DESC: [u8; 32] = [
-    0x05, 0x01, // USAGE_PAGE (Generic Desktop)
-    0x09, 0x00, // USAGE (Undefined)
+pub fn get_hid_report_descriptor(device_endpoint: DeviceEndpoint) -> &'static [u8] {
+    match device_endpoint {
+        DeviceEndpoint::System => &SYSTEM_HID_REPORT_DESC,
+        DeviceEndpoint::Keyboard => &KEYBOARD_HID_REPORT_DESC,
+    }
+}
+
+const SYSTEM_HID_REPORT_DESC: [u8; 33] = [
+    0x06, 0x00, 0xFF, // USAGE_PAGE (Vendor Defined Page)
+    0x09, 0x01, // USAGE (Vendor Usage)
     0xa1, 0x01, // COLLECTION (Application)
     0x15, 0x00, //   LOGICAL_MINIMUM (0)
     0x26, 0xff, 0x00, //   LOGICAL_MAXIMUM (255)
     // IN report
     0x85, 0x01, //   REPORT_ID (1)
     0x75, 0x08, //   REPORT_SIZE (8)
-    0x95, 0x3f, // REPORT_COUNT (this is the byte length)
-    0x09, 0x00, //   USAGE (Undefined)
+    0x95, 0x3f, //   REPORT_COUNT (this is the byte length)
+    0x09, 0x01, //   USAGE (Vendor Usage)
     0x81, 0x82, //   INPUT (Data,Var,Abs,Vol)
     // OUT report
     0x85, 0x02, //   REPORT_ID (2)
     0x75, 0x08, //   REPORT_SIZE (8)
     0x95, 0x3f, // REPORT_COUNT (this is the byte length)
-    0x09, 0x00, //   USAGE (Undefined)
+    0x09, 0x01, //   USAGE (Vendor Usage)
     0x91, 0x82, //   OUTPUT (Data,Var,Abs,Vol)
     0xc0, // END_COLLECTION
 ];
 
-pub const KEYBOARD_REPORT_DESC: [u8; 63] = [
+const KEYBOARD_HID_REPORT_DESC: [u8; 100] = [
     0x05, 0x01, // USAGE_PAGE (Generic Desktop)
     0x09, 0x06, // USAGE (Keyboard)
     0xa1, 0x01, // COLLECTION (Application)
+    0x85, 0x01, //   Report ID (0x01)
     0x05, 0x07, //   Usage Page (Key Codes)
     0x19, 0xE0, //   Usage Minimum (224)
     0x29, 0xE7, //   Usage Maximum (231)
@@ -218,6 +238,24 @@ pub const KEYBOARD_REPORT_DESC: [u8; 63] = [
     0x29, 0x65, //   Usage Maximum (101)
     0x81, 0x00, //   Input (Data, Array), Key arrays (6 bytes)
     0xc0, // END_COLLECTION
+    0x05, 0x0C, // Usage Page (Consumer)
+    0x09, 0x01, // Usage (Consumer Control)
+    0xA1, 0x01, // Collection (Application)
+    0x85, 0x02, //   Report ID (2)
+    0x05, 0x0C, //   Usage Page (Consumer)
+    0x15, 0x00, //   Logical Minimum (0)
+    0x25, 0x01, //   Logical Maximum (1)
+    0x75, 0x01, //   Report Size (1)
+    0x95, 0x07, //   Report Count (7)
+    0x09, 0xE9, //   Usage (Volume Increment) 0x01
+    0x09, 0xEA, //   Usage (Volume Decrement) 0x02
+    0x09, 0xE2, //   Usage (Mute) 0x04
+    0x09, 0xB5, //   Usage (Scan Next Track) 0x08
+    0x09, 0xB6, //   Usage (Scan Previous Track) 0x10
+    0x09, 0xCD, //   Usage (Play/Pause) 0x20
+    0x09, 0xB7, //   Usage (Stop) 0x40
+    0x81, 0x02, //   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0xC0, // End Collection
 ];
 
 #[cfg(test)]
@@ -251,11 +289,13 @@ mod tests {
 
     #[test]
     fn descriptors_with_correct_length() {
+        let system_hid_descriptor = get_hid_descriptor(DeviceEndpoint::System);
+        let keyboard_hid_descriptor = get_hid_descriptor(DeviceEndpoint::Keyboard);
         let descriptors: [&[u8]; 4] = [
             &LANG_ID_DESCRIPTOR,
             &DEV_DESC,
-            &SYSTEM_HID_DESC,
-            &KEYBOARD_HID_DESC,
+            system_hid_descriptor,
+            keyboard_hid_descriptor,
         ];
 
         for descriptor in descriptors.iter() {
@@ -267,12 +307,12 @@ mod tests {
 
         // HID reports lengths.
         assert_eq!(
-            SYSTEM_HID_DESC[SYSTEM_HID_DESC.len() - 2],
-            SYSTEM_REPORT_DESC.len() as u8
+            system_hid_descriptor[system_hid_descriptor.len() - 2],
+            get_hid_report_descriptor(DeviceEndpoint::System).len() as u8
         );
         assert_eq!(
-            KEYBOARD_HID_DESC[KEYBOARD_HID_DESC.len() - 2],
-            KEYBOARD_REPORT_DESC.len() as u8
+            keyboard_hid_descriptor[keyboard_hid_descriptor.len() - 2],
+            get_hid_report_descriptor(DeviceEndpoint::Keyboard).len() as u8
         );
     }
 }

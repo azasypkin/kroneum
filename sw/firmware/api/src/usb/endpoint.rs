@@ -78,8 +78,8 @@ pub enum EndpointStatus {
 pub(crate) enum ControlEndpointStatus {
     /// Control endpoint is idling.
     Idle,
-    /// Control endpoint received setup packet of the specified length.
-    Setup(u16),
+    /// Control endpoint received setup packet.
+    Setup,
     /// Control endpoint is sending data TO the HOST.
     DataIn,
     /// Control endpoint is receiving data FROM the HOST.

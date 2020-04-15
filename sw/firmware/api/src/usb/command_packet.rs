@@ -317,16 +317,16 @@ mod tests {
     #[test]
     fn keyboard_command() {
         assert_eq!(
-            CommandPacket::try_from([7, 1, 1, 1].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(1, 1)))
+            CommandPacket::try_from([7, 1, 1, 2, 3].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2, 3)))
         );
         assert_eq!(
-            CommandPacket::try_from([7, 1, 3, 2].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(3, 2)))
+            CommandPacket::try_from([7, 1, 3, 2, 1].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(3, 2, 1)))
         );
         assert_eq!(
-            CommandPacket::try_from([7, 1, 2, 3].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(2, 3)))
+            CommandPacket::try_from([7, 1, 2, 3, 1].as_ref()),
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(2, 3, 1)))
         );
 
         assert_eq!(
@@ -341,10 +341,14 @@ mod tests {
             CommandPacket::try_from([7, 1, 2].as_ref()),
             Err(USBError::InvalidCommand)
         );
+        assert_eq!(
+            CommandPacket::try_from([7, 1, 2, 3].as_ref()),
+            Err(USBError::InvalidCommand)
+        );
 
         assert_eq!(
-            Array::from(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2))).as_ref(),
-            [7, 1, 1, 2]
+            Array::from(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2, 3))).as_ref(),
+            [7, 1, 1, 2, 3]
         );
     }
 

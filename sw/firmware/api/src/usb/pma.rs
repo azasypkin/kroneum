@@ -57,13 +57,30 @@ impl PacketMemoryAreaAccessor {
 
     pub fn read(&self, endpoint: EndpointType, offset: u16) -> u16 {
         assert_eq!((offset & 0x01), 0);
-        let base_address = self.u16((Into::<u8>::into(endpoint) * 8 + 4) as usize);
-        self.u16((base_address + offset) as usize)
+        let base_offset = self.u16((Into::<u8>::into(endpoint) * 8 + 4) as usize);
+        self.u16((base_offset + offset) as usize)
     }
 
-    pub fn write(&self, endpoint: EndpointType, buf: &[u8]) {
-        let base_address = self.u16((Into::<u8>::into(endpoint) * 8) as usize);
-        self.write_buffer_u8(base_address as usize, buf);
+    pub fn write<'a, T: IntoIterator<Item = &'a u8>>(
+        &self,
+        endpoint: EndpointType,
+        buf: T,
+    ) -> usize {
+        let base_offset = self.u16((Into::<u8>::into(endpoint) * 8) as usize) as usize;
+        let mut offset = 0;
+
+        let mut iter = buf.into_iter();
+        while let Some(low) = iter.next() {
+            let high = iter.next();
+            self.set_u16(
+                (base_offset + offset) & !1,
+                (u16::from(*high.unwrap_or_else(|| &0)) << 8) | u16::from(*low),
+            );
+
+            offset += if high.is_none() { 1 } else { 2 };
+        }
+
+        offset
     }
 
     fn u16(&self, offset: usize) -> u16 {
@@ -74,27 +91,6 @@ impl PacketMemoryAreaAccessor {
     fn set_u16(&self, offset: usize, val: u16) {
         assert_eq!((offset & 0x01), 0);
         self.cells[offset >> 1].set(val);
-    }
-
-    fn write_buffer_u8(&self, base_offset: usize, buf: &[u8]) {
-        let mut last_value: u16 = 0;
-        let mut last_offset: usize = 0;
-
-        for (current_offset, value) in buf.iter().enumerate() {
-            last_offset = current_offset;
-            if current_offset & 1 == 0 {
-                last_value = u16::from(*value);
-            } else {
-                self.set_u16(
-                    (base_offset + current_offset) & !1,
-                    last_value | (u16::from(*value) << 8),
-                );
-            }
-        }
-
-        if last_offset & 1 == 0 {
-            self.set_u16(base_offset + last_offset, last_value);
-        }
     }
 }
 
@@ -268,11 +264,17 @@ mod tests {
 
         pma.init(&SUPPORTED_ENDPOINTS);
 
-        pma.write(EndpointType::Control, &[1, 2, 3, 4]);
-        pma.write(EndpointType::Device(DeviceEndpoint::System), &[5, 6, 7, 8]);
-        pma.write(
-            EndpointType::Device(DeviceEndpoint::Keyboard),
-            &[9, 10, 11, 12],
+        assert_eq!(pma.write(EndpointType::Control, &[1, 2, 3, 4]), 4);
+        assert_eq!(
+            pma.write(EndpointType::Device(DeviceEndpoint::System), &[5, 6, 7, 8]),
+            4
+        );
+        assert_eq!(
+            pma.write(
+                EndpointType::Device(DeviceEndpoint::Keyboard),
+                &[9, 10, 11, 12],
+            ),
+            4
         );
 
         assert_eq!(
@@ -284,6 +286,40 @@ mod tests {
                 9 | (10 << 8),
                 11 | (12 << 8)
             ],
+            [
+                sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize],
+                sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize + 1],
+                sandbox[(DEVICE_SYSTEM_IN_PMA_ADDRESS >> 1) as usize],
+                sandbox[(DEVICE_SYSTEM_IN_PMA_ADDRESS >> 1) as usize + 1],
+                sandbox[(DEVICE_KEYBOARD_IN_PMA_ADDRESS >> 1) as usize],
+                sandbox[(DEVICE_KEYBOARD_IN_PMA_ADDRESS >> 1) as usize + 1]
+            ]
+        );
+    }
+
+    #[test]
+    fn correctly_writes_even_data() {
+        let sandbox: [u16; 256] = [0; 256];
+        let sandbox_address: usize = &sandbox as *const _ as usize;
+        let pma = PacketMemoryArea {
+            base_address: sandbox_address,
+        };
+
+        pma.init(&SUPPORTED_ENDPOINTS);
+
+        assert_eq!(pma.write(EndpointType::Control, &[]), 0);
+        assert_eq!(pma.write(EndpointType::Control, &[1, 2, 3]), 3);
+        assert_eq!(
+            pma.write(EndpointType::Device(DeviceEndpoint::System), &[4, 5, 6]),
+            3
+        );
+        assert_eq!(
+            pma.write(EndpointType::Device(DeviceEndpoint::Keyboard), &[7, 8, 9],),
+            3
+        );
+
+        assert_eq!(
+            [1 | (2 << 8), 3, 4 | (5 << 8), 6, 7 | (8 << 8), 9],
             [
                 sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize],
                 sandbox[(CONTROL_IN_PMA_ADDRESS >> 1) as usize + 1],
