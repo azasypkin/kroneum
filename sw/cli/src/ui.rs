@@ -1,13 +1,50 @@
 use crate::device::Device;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use bit_field::BitField;
 use core::convert::TryFrom;
+use kroneum_api::usb::commands::MediaKey;
 use kroneum_api::{adc::ADCChannel, beeper::tone::Tone, flash::storage_slot::StorageSlot};
 use serde_derive::Deserialize;
 
 #[derive(Deserialize)]
 struct ADCParams {
     channel: u8,
+}
+
+#[derive(Deserialize)]
+struct KeyModifiers {
+    #[serde(rename(deserialize = "leftCtrl"))]
+    left_ctrl: bool,
+    #[serde(rename(deserialize = "leftShift"))]
+    left_shift: bool,
+    #[serde(rename(deserialize = "leftAlt"))]
+    left_alt: bool,
+    #[serde(rename(deserialize = "leftGUI"))]
+    left_gui: bool,
+    #[serde(rename(deserialize = "rightCtrl"))]
+    right_ctrl: bool,
+    #[serde(rename(deserialize = "rightShift"))]
+    right_shift: bool,
+    #[serde(rename(deserialize = "rightAlt"))]
+    right_alt: bool,
+    #[serde(rename(deserialize = "rightGUI"))]
+    right_gui: bool,
+}
+
+#[derive(Deserialize)]
+struct KeyParams {
+    #[serde(rename(deserialize = "keyCode"))]
+    key_code: u8,
+    delay: u8,
+    modifiers: KeyModifiers,
+}
+
+#[derive(Deserialize)]
+struct MediaKeyParams {
+    #[serde(rename(deserialize = "keyCode"))]
+    key_code: u8,
+    delay: u8,
 }
 
 async fn adc(params: web::Path<ADCParams>) -> impl Responder {
@@ -81,12 +118,38 @@ async fn get_id() -> impl Responder {
     HttpResponse::Ok().json(device.get_identifier())
 }
 
-async fn send_key(key_code_and_delay: web::Json<(u8, u8)>) -> impl Responder {
+async fn send_key(params: web::Json<KeyParams>) -> impl Responder {
     let device = Device::create().unwrap();
+
+    let mut modifiers = 0u8;
+    modifiers.set_bit(0, params.modifiers.left_ctrl);
+    modifiers.set_bit(1, params.modifiers.left_shift);
+    modifiers.set_bit(2, params.modifiers.left_alt);
+    modifiers.set_bit(3, params.modifiers.left_gui);
+    modifiers.set_bit(4, params.modifiers.right_ctrl);
+    modifiers.set_bit(5, params.modifiers.right_shift);
+    modifiers.set_bit(6, params.modifiers.right_alt);
+    modifiers.set_bit(7, params.modifiers.right_gui);
+
     device
-        .keyboard_key((key_code_and_delay.0).0, (key_code_and_delay.0).1)
+        .keyboard_key(modifiers, params.key_code, params.delay)
         .unwrap();
     HttpResponse::NoContent()
+}
+
+async fn send_media_key(params: web::Json<MediaKeyParams>) -> impl Responder {
+    match MediaKey::try_from(params.key_code) {
+        Ok(media_key) => {
+            Device::create()
+                .unwrap()
+                .keyboard_media_key(media_key, params.delay)
+                .unwrap();
+            HttpResponse::NoContent().finish()
+        }
+        Err(_) => {
+            HttpResponse::BadRequest().body(format!("Not supported media key: {}", params.key_code))
+        }
+    }
 }
 
 #[actix_rt::main]
@@ -104,6 +167,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/radio/status", web::get().to(radio_status))
             .route("/api/adc/{channel}", web::get().to(adc))
             .route("/api/key", web::post().to(send_key))
+            .route("/api/media_key", web::post().to(send_media_key))
             .service(fs::Files::new("/", "./src/ui/static/dist").index_file("index.html"))
     })
     .bind(&ui_url)
