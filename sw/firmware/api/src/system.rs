@@ -217,11 +217,11 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
 
                     self.usb().send(
                         DeviceEndpoint::Keyboard,
-                        &[0x01, modifiers, 0, key_code, 0, 0, 0, 0, 0],
+                        &[0x01, modifiers.into(), 0, key_code, 0, 0, 0, 0, 0],
                     );
                     self.systick.delay(10);
                     self.usb()
-                        .send(DeviceEndpoint::Keyboard, &[0, 0, 0, 0, 0, 0, 0, 0]);
+                        .send(DeviceEndpoint::Keyboard, &[0x01, 0, 0, 0, 0, 0, 0, 0, 0]);
 
                     self.usb().send(DeviceEndpoint::System, &[0x00]);
                 }

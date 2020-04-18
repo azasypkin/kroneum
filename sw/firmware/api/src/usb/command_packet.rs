@@ -91,6 +91,7 @@ mod tests {
     use beeper::{note::Note, tone::Tone};
     use flash::storage_slot::StorageSlot;
     use time::Time;
+    use usb::commands::KeyModifiers;
 
     #[test]
     fn beeper_command() {
@@ -318,15 +319,54 @@ mod tests {
     fn keyboard_command() {
         assert_eq!(
             CommandPacket::try_from([7, 1, 1, 2, 3].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2, 3)))
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(
+                KeyModifiers {
+                    left_ctrl: true,
+                    left_shift: false,
+                    left_alt: false,
+                    left_gui: false,
+                    right_ctrl: false,
+                    right_shift: false,
+                    right_alt: false,
+                    right_gui: false
+                },
+                2,
+                3
+            )))
         );
         assert_eq!(
             CommandPacket::try_from([7, 1, 3, 2, 1].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(3, 2, 1)))
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(
+                KeyModifiers {
+                    left_ctrl: true,
+                    left_shift: true,
+                    left_alt: false,
+                    left_gui: false,
+                    right_ctrl: false,
+                    right_shift: false,
+                    right_alt: false,
+                    right_gui: false
+                },
+                2,
+                1
+            )))
         );
         assert_eq!(
             CommandPacket::try_from([7, 1, 2, 3, 1].as_ref()),
-            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(2, 3, 1)))
+            Ok(CommandPacket::Keyboard(KeyboardCommand::Key(
+                KeyModifiers {
+                    left_ctrl: false,
+                    left_shift: true,
+                    left_alt: false,
+                    left_gui: false,
+                    right_ctrl: false,
+                    right_shift: false,
+                    right_alt: false,
+                    right_gui: false
+                },
+                3,
+                1
+            )))
         );
 
         assert_eq!(
@@ -347,7 +387,21 @@ mod tests {
         );
 
         assert_eq!(
-            Array::from(CommandPacket::Keyboard(KeyboardCommand::Key(1, 2, 3))).as_ref(),
+            Array::from(CommandPacket::Keyboard(KeyboardCommand::Key(
+                KeyModifiers {
+                    left_ctrl: true,
+                    left_shift: false,
+                    left_alt: false,
+                    left_gui: false,
+                    right_ctrl: false,
+                    right_shift: false,
+                    right_alt: false,
+                    right_gui: false
+                },
+                2,
+                3
+            )))
+            .as_ref(),
             [7, 1, 1, 2, 3]
         );
     }
