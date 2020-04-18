@@ -77,12 +77,10 @@ async fn echo(info: web::Json<Vec<u8>>) -> impl Responder {
 }
 
 async fn radio_transmit(info: web::Json<Vec<u8>>) -> impl Responder {
-    HttpResponse::Ok().json(
-        Device::create()
-            .unwrap()
-            .radio_transmit(info.as_ref())
-            .unwrap(),
-    )
+    match Device::create().unwrap().radio_transmit(info.as_ref()) {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(message) => HttpResponse::InternalServerError().body(message),
+    }
 }
 
 async fn radio_receive() -> impl Responder {

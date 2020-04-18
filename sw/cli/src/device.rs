@@ -96,9 +96,12 @@ impl Device {
             return Err("Alarm is limited to 23h 59m 59s".to_string());
         }
 
-        if let Ok(_) = self.send_command(CommandPacket::Alarm(AlarmCommand::Set(
-            Time::from_seconds(duration_sec as u32),
-        ))) {
+        if self
+            .send_command(CommandPacket::Alarm(AlarmCommand::Set(Time::from_seconds(
+                duration_sec as u32,
+            ))))
+            .is_ok()
+        {
             Ok(())
         } else {
             Err("Failed to set alarm".to_string())
@@ -111,7 +114,7 @@ impl Device {
         }
 
         if let Ok(response) = self.send_command(CommandPacket::Flash(FlashCommand::Read(slot))) {
-            if response.len() > 0 {
+            if !response.is_empty() {
                 return Ok(response[0]);
             }
         }
@@ -204,7 +207,7 @@ impl Device {
         self.write(packet)
             .and_then(|_| self.read())
             .and_then(|mut response| {
-                if response.len() == 0 || response[0] == 0xFF {
+                if response.is_empty() || response[0] == 0xFF {
                     error!("Failed to process packet {:?}.", response);
                     Err("Failed to process packet".to_string())
                 } else {
@@ -224,7 +227,6 @@ impl Device {
                     packet_bytes.as_ref(),
                     count
                 );
-                ()
             })
             .or_else(|err| {
                 error!(
