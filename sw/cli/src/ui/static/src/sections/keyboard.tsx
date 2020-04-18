@@ -42,13 +42,16 @@ export function KeyboardSection() {
     rightGUI: false,
   });
 
-  const onMediaKey = useCallback((mediaKey: number) => {
-    setLoadingState({ mediaKey: true });
-    axios
-      .post('/api/media_key', { keyCode: mediaKey, delay })
-      .then(() => setLoadingState({ mediaKey: false }))
-      .catch(() => setLoadingState({ mediaKey: false }));
-  }, []);
+  const onMediaKey = useCallback(
+    (mediaKey: number) => {
+      setLoadingState({ mediaKey: true });
+      axios
+        .post('/api/media_key', { keyCode: mediaKey, delay })
+        .then(() => setLoadingState({ mediaKey: false }))
+        .catch(() => setLoadingState({ mediaKey: false }));
+    },
+    [delay],
+  );
 
   const isDelayValid = delay >= 0 && delay <= 2;
   const isKeyCodeValid = keyCode >= 0 && keyCode <= 255;

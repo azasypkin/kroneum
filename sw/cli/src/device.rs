@@ -13,8 +13,8 @@ use kroneum_api::{
     usb::{
         command_packet::CommandPacket,
         commands::{
-            ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, KeyboardCommand, MediaKey,
-            RadioCommand, SystemCommand,
+            ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, KeyModifiers, KeyboardCommand,
+            MediaKey, RadioCommand, SystemCommand,
         },
     },
 };
@@ -179,7 +179,12 @@ impl Device {
         .map_err(|_| "Failed to transmit data over radio".to_string())
     }
 
-    pub fn keyboard_key(&self, modifiers: u8, key_code: u8, delay_s: u8) -> Result<(), String> {
+    pub fn keyboard_key(
+        &self,
+        modifiers: KeyModifiers,
+        key_code: u8,
+        delay_s: u8,
+    ) -> Result<(), String> {
         self.send_command(CommandPacket::Keyboard(KeyboardCommand::Key(
             modifiers, key_code, delay_s,
         )))
