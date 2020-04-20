@@ -1,11 +1,13 @@
 mod system_hardware;
 mod system_info;
+mod system_mode;
+mod system_state;
 
 use adc::ADC;
 use array::Array;
 use bare_metal::CriticalSection;
-use beeper::{melody::Melody, BeeperState, PWMBeeper};
-use buttons::{ButtonPressType, Buttons, ButtonsPoll, ButtonsState};
+use beeper::{melody::Melody, PWMBeeper};
+use buttons::{ButtonPressType, Buttons, ButtonsPoll};
 use flash::Flash;
 use radio::Radio;
 use rtc::RTC;
@@ -19,37 +21,11 @@ use usb::{
         SystemCommand,
     },
     endpoint::DeviceEndpoint,
-    UsbState, USB,
+    USB,
 };
 
 pub use self::{system_hardware::SystemHardware, system_info::SystemInfo};
-
-#[derive(Debug, Copy, Clone)]
-enum SystemMode {
-    Idle,
-    Setup(u32),
-    Alarm(Time, Melody),
-    Config,
-}
-
-#[derive(Copy, Clone)]
-pub struct SystemState {
-    mode: SystemMode,
-    usb_state: UsbState,
-    beeper_state: BeeperState,
-    buttons_state: ButtonsState,
-}
-
-impl Default for SystemState {
-    fn default() -> Self {
-        SystemState {
-            mode: SystemMode::Idle,
-            usb_state: UsbState::default(),
-            beeper_state: BeeperState::default(),
-            buttons_state: ButtonsState::default(),
-        }
-    }
-}
+use self::{system_mode::SystemMode, system_state::SystemState};
 
 pub struct System<T: SystemHardware, S: SysTickHardware> {
     hw: T,
@@ -100,7 +76,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     pub fn handle_usb_packet(&mut self, cs: &CriticalSection) {
         self.usb().interrupt();
 
-        match self.state.usb_state.command {
+        match self.state.peripherals.usb.command {
             Some(CommandPacket::Beeper(command)) => {
                 match command {
                     BeeperCommand::Beep(n_beeps) => {
@@ -233,7 +209,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
             _ => {}
         }
 
-        self.state.usb_state.command = None;
+        self.state.peripherals.usb.command = None;
     }
 
     /// Handles SysTick event and stops the counter.
@@ -380,12 +356,16 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
 
     /// Creates an instance of `Beeper` controller.
     fn beeper(&mut self) -> PWMBeeper<T, S> {
-        PWMBeeper::new(&self.hw, &mut self.systick, &mut self.state.beeper_state)
+        PWMBeeper::new(
+            &self.hw,
+            &mut self.systick,
+            &mut self.state.peripherals.beeper,
+        )
     }
 
     /// Creates an instance of `Buttons` controller.
     fn buttons(&mut self) -> Buttons<T> {
-        Buttons::new(&self.hw, &mut self.state.buttons_state)
+        Buttons::new(&self.hw, &mut self.state.peripherals.buttons)
     }
 
     /// Creates an instance of `Flash` controller.
@@ -395,7 +375,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
 
     /// Creates an instance of `USB` controller.
     fn usb(&mut self) -> USB<T> {
-        USB::new(&self.hw, &mut self.state.usb_state)
+        USB::new(&self.hw, &mut self.state.peripherals.usb)
     }
 }
 
