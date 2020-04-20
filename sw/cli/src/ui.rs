@@ -1,4 +1,4 @@
-use crate::device::Device;
+use crate::device::{Device, DeviceInfo};
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use core::convert::TryFrom;
@@ -8,7 +8,7 @@ use kroneum_api::{
     flash::storage_slot::StorageSlot,
     usb::commands::{KeyModifiers, MediaKey},
 };
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 struct ADCParams {
@@ -50,6 +50,19 @@ struct MediaKeyParams {
     #[serde(rename(deserialize = "keyCode"))]
     key_code: u8,
     delay: u8,
+}
+
+#[derive(Serialize)]
+struct SystemInfoResponse {
+    id: String,
+    #[serde(rename(serialize = "flashSizeKb"))]
+    flash_size_kb: u16,
+}
+
+#[derive(Serialize)]
+struct InfoResponse {
+    device: DeviceInfo,
+    system: SystemInfoResponse,
 }
 
 async fn adc(params: web::Path<ADCParams>) -> impl Responder {
@@ -116,9 +129,24 @@ async fn get_flash() -> impl Responder {
     ])
 }
 
-async fn get_id() -> impl Responder {
+async fn get_info() -> impl Responder {
     let device = Device::create().unwrap();
-    HttpResponse::Ok().json(device.get_identifier())
+    match device.system_get_info() {
+        Ok(system) => {
+            let mut system_id = [0u8; 16];
+            system.id.iter().enumerate().for_each(|(index, byte)| {
+                system_id[index + 4] = *byte;
+            });
+            HttpResponse::Ok().json(InfoResponse {
+                device: device.get_info(),
+                system: SystemInfoResponse {
+                    id: format!("{:#x?}", u128::from_be_bytes(system_id)),
+                    flash_size_kb: system.flash_size_kb,
+                },
+            })
+        }
+        Err(message) => HttpResponse::InternalServerError().body(message),
+    }
 }
 
 async fn send_key(params: web::Json<KeyParams>) -> impl Responder {
@@ -152,7 +180,7 @@ pub async fn run_server(port: u16) -> Result<(), String> {
             .route("/api/beep", web::get().to(beep))
             .route("/api/play", web::post().to(play))
             .route("/api/flash", web::get().to(get_flash))
-            .route("/api/id", web::get().to(get_id))
+            .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
             .route("/api/radio/receive", web::get().to(radio_receive))
             .route("/api/radio/transmit", web::post().to(radio_transmit))

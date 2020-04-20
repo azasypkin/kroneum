@@ -3,7 +3,7 @@ use std::fmt;
 
 /// Describes main parameters of the Kroneum device.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DeviceIdentifier {
+pub struct DeviceInfo {
     pub bus: u8,
     pub address: u8,
     #[serde(rename(serialize = "vendorID"))]
@@ -13,7 +13,7 @@ pub struct DeviceIdentifier {
     pub manufacturer: String,
 }
 
-impl fmt::Display for DeviceIdentifier {
+impl fmt::Display for DeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

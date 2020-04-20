@@ -1,6 +1,6 @@
 mod device_identifier;
 
-pub use self::device_identifier::DeviceIdentifier;
+pub use self::device_identifier::DeviceInfo;
 
 use hidapi::{HidApi, HidDevice};
 use kroneum_api::{
@@ -9,6 +9,7 @@ use kroneum_api::{
     beeper::tone::Tone,
     config::{DEVICE_PID, DEVICE_VID},
     flash::storage_slot::StorageSlot,
+    system::SystemInfo,
     time::Time,
     usb::{
         command_packet::CommandPacket,
@@ -18,6 +19,7 @@ use kroneum_api::{
         },
     },
 };
+use std::convert::TryFrom;
 use std::time::Duration;
 
 const MAX_ALARM_SECONDS: u64 = 3600 * 24;
@@ -52,8 +54,8 @@ impl Device {
 }
 
 impl Device {
-    pub fn get_identifier(&self) -> DeviceIdentifier {
-        DeviceIdentifier {
+    pub fn get_info(&self) -> DeviceInfo {
+        DeviceInfo {
             bus: 0,
             address: 0,
             vendor_id: DEVICE_VID,
@@ -147,6 +149,15 @@ impl Device {
             data,
         ))))
         .map_err(|_| "Failed to send/receive echo data".to_string())
+    }
+
+    pub fn system_get_info(&self) -> Result<SystemInfo, String> {
+        self.send_command(CommandPacket::System(SystemCommand::GetInfo))
+            .map_err(|_| "Failed to get system info".to_string())
+            .and_then(|response| {
+                SystemInfo::try_from(Array::from(&response))
+                    .map_err(|_| "Received corrupted system info".to_string())
+            })
     }
 
     pub fn adc_read(&self, channel: ADCChannel) -> Result<u16, String> {

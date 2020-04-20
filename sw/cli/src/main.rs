@@ -27,7 +27,7 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
         }
         ("info", _) => {
             let device = Device::create()?;
-            println!("Kroneum ({})", device.get_identifier(),);
+            println!("Kroneum ({})", device.get_info(),);
         }
         ("alarm", Some(matches)) => match matches.value_of("ACTION").unwrap_or_else(|| "get") {
             "set" => {

@@ -2,36 +2,45 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { EuiFlexItem, EuiFormRow, EuiLoadingContent, EuiPanel, EuiSpacer, EuiText } from '@elastic/eui';
 
-interface DeviceID {
-  bus: number;
-  address: number;
-  vendorID: number;
-  productID: number;
-  manufacturer: string;
+interface Info {
+  device: {
+    bus: number;
+    address: number;
+    vendorID: number;
+    productID: number;
+    manufacturer: string;
+  };
+  system: { id: string; flashSizeKb: number };
 }
 
 export function InfoSection() {
-  const [id, setID] = useState<DeviceID | null>(null);
+  const [info, setInfo] = useState<Info | null>(null);
   useEffect(() => {
-    axios.get('/api/id').then(({ data }) => setID(data));
+    axios.get('/api/info').then(({ data }) => setInfo(data));
   }, []);
 
-  const content = id ? (
+  const content = info ? (
     <EuiPanel>
       <EuiFormRow label="Bus" display="columnCompressed" style={{ alignItems: 'center' }}>
-        <EuiText size="s">{id?.bus ?? 'Unknown'}</EuiText>
+        <EuiText size="s">{info.device.bus ?? 'Unknown'}</EuiText>
       </EuiFormRow>
       <EuiFormRow label="Address" display="columnCompressed" style={{ alignItems: 'center' }}>
-        <EuiText size="s">{id?.address ?? 'Unknown'}</EuiText>
+        <EuiText size="s">{info.device.address ?? 'Unknown'}</EuiText>
       </EuiFormRow>
       <EuiFormRow label="Vendor ID" display="columnCompressed" style={{ alignItems: 'center' }}>
-        <EuiText size="s">{id ? `0x${id.vendorID.toString(16).toUpperCase()}` : 'Unknown'}</EuiText>
+        <EuiText size="s">{info ? `0x${info.device.vendorID.toString(16).toUpperCase()}` : 'Unknown'}</EuiText>
       </EuiFormRow>
       <EuiFormRow label="Product ID" display="columnCompressed" style={{ alignItems: 'center' }}>
-        <EuiText size="s">{id ? `0x${id.productID.toString(16).toUpperCase()}` : 'Unknown'}</EuiText>
+        <EuiText size="s">{info ? `0x${info.device.productID.toString(16).toUpperCase()}` : 'Unknown'}</EuiText>
       </EuiFormRow>
       <EuiFormRow label="Manufacturer" display="columnCompressed" style={{ alignItems: 'center' }}>
-        <EuiText size="s">{id?.manufacturer ?? 'Unknown'}</EuiText>
+        <EuiText size="s">{info.device.manufacturer ?? 'Unknown'}</EuiText>
+      </EuiFormRow>
+      <EuiFormRow label="System ID" display="columnCompressed" style={{ alignItems: 'center' }}>
+        <EuiText size="s">{info.system.id ?? 'Unknown'}</EuiText>
+      </EuiFormRow>
+      <EuiFormRow label="Flash Size" display="columnCompressed" style={{ alignItems: 'center' }}>
+        <EuiText size="s">{`${info.system.flashSizeKb} KB` ?? 'Unknown'}</EuiText>
       </EuiFormRow>
     </EuiPanel>
   ) : (
