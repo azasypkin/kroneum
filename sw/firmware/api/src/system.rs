@@ -1,6 +1,6 @@
 mod system_hardware;
 mod system_info;
-mod system_mode;
+mod system_role;
 mod system_state;
 
 use adc::ADC;
@@ -25,7 +25,10 @@ use usb::{
 };
 
 pub use self::{system_hardware::SystemHardware, system_info::SystemInfo};
-use self::{system_mode::SystemMode, system_state::SystemState};
+use self::{
+    system_role::{SystemRole, TimerMode},
+    system_state::SystemState,
+};
 
 pub struct System<T: SystemHardware, S: SysTickHardware> {
     hw: T,
@@ -41,19 +44,22 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
             systick,
         };
 
-        system.set_mode(SystemMode::Idle);
+        system.set_role(SystemRole::Timer(TimerMode::Idle));
 
         system
     }
 
     pub fn handle_alarm(&mut self) {
-        if let SystemMode::Alarm(_, melody) = self.state.mode {
+        if let SystemRole::Timer(TimerMode::Alarm(_, melody)) = self.state.role {
             self.beeper().play_and_repeat(melody, 2);
 
             self.rtc().teardown();
 
             // Snooze alarm for 10 seconds.
-            self.set_mode(SystemMode::Alarm(Time::from_seconds(10), Melody::Beep));
+            self.set_role(SystemRole::Timer(TimerMode::Alarm(
+                Time::from_seconds(10),
+                Melody::Beep,
+            )));
         }
     }
 
@@ -101,7 +107,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     // We should send OK response before we enter Alarm mode and USB will be disabled.
                     self.usb().send(DeviceEndpoint::System, &[0x00]);
                     self.systick.delay(100);
-                    self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                    self.set_role(SystemRole::Timer(TimerMode::Alarm(time, Melody::Alarm)));
                 } else {
                     self.usb().send(DeviceEndpoint::System, &[0xFF]);
                 }
@@ -237,10 +243,10 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     /// sleep to enable timers and enter it as soon as all tasks are completed.
     pub fn sleep(&mut self) {
         match (
-            self.state.mode,
+            self.state.role,
             self.beeper().is_playing() || self.buttons().is_polling(),
         ) {
-            (SystemMode::Config, _) | (_, true) => self.hw.exit_deep_sleep(),
+            (SystemRole::Controller, _) | (_, true) => self.hw.exit_deep_sleep(),
             _ => self.hw.enter_deep_sleep(),
         }
     }
@@ -253,39 +259,48 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     fn poll_buttons(&mut self) {
         match self.buttons().poll() {
             ButtonsPoll::Ready((button_i, button_x, _)) => {
-                match (self.state.mode, button_i, button_x) {
-                    (SystemMode::Config, ButtonPressType::Long, ButtonPressType::Long)
-                    | (SystemMode::Alarm(_, _), ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Idle)
+                match (self.state.role, button_i, button_x) {
+                    (SystemRole::Controller, ButtonPressType::Long, ButtonPressType::Long)
+                    | (
+                        SystemRole::Timer(TimerMode::Alarm(_, _)),
+                        ButtonPressType::Long,
+                        ButtonPressType::Long,
+                    ) => self.set_role(SystemRole::Timer(TimerMode::Idle)),
+                    (
+                        SystemRole::Timer(TimerMode::Idle),
+                        ButtonPressType::Long,
+                        ButtonPressType::Long,
+                    ) => self.set_role(SystemRole::Controller),
+                    (
+                        SystemRole::Timer(TimerMode::Setup(counter)),
+                        ButtonPressType::Long,
+                        ButtonPressType::Long,
+                    ) => self.set_role(SystemRole::Timer(TimerMode::Alarm(
+                        Time::from_hours(counter),
+                        Melody::Alarm,
+                    ))),
+                    (SystemRole::Timer(TimerMode::Idle), ButtonPressType::Long, _)
+                    | (SystemRole::Timer(TimerMode::Idle), _, ButtonPressType::Long) => {
+                        self.set_role(SystemRole::Timer(TimerMode::Setup(0)));
                     }
-                    (SystemMode::Idle, ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Config)
+                    (SystemRole::Timer(TimerMode::Alarm(_, _)), ButtonPressType::Long, _)
+                    | (SystemRole::Timer(TimerMode::Alarm(_, _)), _, ButtonPressType::Long) => {
+                        self.set_role(SystemRole::Timer(TimerMode::Idle));
                     }
-                    (SystemMode::Setup(counter), ButtonPressType::Long, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Alarm(Time::from_hours(counter), Melody::Alarm))
-                    }
-                    (SystemMode::Idle, ButtonPressType::Long, _)
-                    | (SystemMode::Idle, _, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Setup(0));
-                    }
-                    (SystemMode::Alarm(_, _), ButtonPressType::Long, _)
-                    | (SystemMode::Alarm(_, _), _, ButtonPressType::Long) => {
-                        self.set_mode(SystemMode::Idle);
-                    }
-                    (SystemMode::Setup(counter), ButtonPressType::Long, _)
-                    | (SystemMode::Setup(counter), _, ButtonPressType::Long) => {
+                    (SystemRole::Timer(TimerMode::Setup(counter)), ButtonPressType::Long, _)
+                    | (SystemRole::Timer(TimerMode::Setup(counter)), _, ButtonPressType::Long) => {
                         let time = match button_i {
                             ButtonPressType::Long => Time::from_seconds(counter as u32),
                             _ => Time::from_minutes(counter as u32),
                         };
 
-                        self.set_mode(SystemMode::Alarm(time, Melody::Alarm));
+                        self.set_role(SystemRole::Timer(TimerMode::Alarm(time, Melody::Alarm)));
                     }
-                    (SystemMode::Setup(counter), ButtonPressType::Short, _) => {
-                        self.set_mode(SystemMode::Setup(counter + 1))
+                    (SystemRole::Timer(TimerMode::Setup(counter)), ButtonPressType::Short, _) => {
+                        self.set_role(SystemRole::Timer(TimerMode::Setup(counter + 1)))
                     }
-                    (SystemMode::Setup(counter), _, ButtonPressType::Short) => {
-                        self.set_mode(SystemMode::Setup(counter + 10))
+                    (SystemRole::Timer(TimerMode::Setup(counter)), _, ButtonPressType::Short) => {
+                        self.set_role(SystemRole::Timer(TimerMode::Setup(counter + 10)))
                     }
                     _ => {}
                 }
@@ -297,30 +312,31 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     }
 
     /// Switches system to a new mode.
-    fn set_mode(&mut self, mode: SystemMode) {
-        match &mode {
-            SystemMode::Idle => {
+    fn set_role(&mut self, role: SystemRole) {
+        match &role {
+            SystemRole::Timer(TimerMode::Idle) => {
                 self.usb().teardown();
                 self.rtc().teardown();
 
                 // If we are exiting `Config`, `Setup` or `Alarm` mode let's play special signal.
-                if let SystemMode::Setup(_) | SystemMode::Alarm(_, _) | SystemMode::Config =
-                    self.state.mode
+                if let SystemRole::Timer(TimerMode::Setup(_))
+                | SystemRole::Timer(TimerMode::Alarm(_, _))
+                | SystemRole::Controller = self.state.role
                 {
                     self.beeper().play(Melody::Reset)
                 }
             }
-            SystemMode::Config => {
+            SystemRole::Controller => {
                 self.beeper().play(Melody::Reset);
                 self.usb().setup();
             }
-            SystemMode::Setup(0) => self.beeper().play(Melody::Setup),
-            SystemMode::Setup(c) if *c > 0 => self.beeper().play(Melody::Beep),
-            SystemMode::Alarm(time, _) => {
+            SystemRole::Timer(TimerMode::Setup(0)) => self.beeper().play(Melody::Setup),
+            SystemRole::Timer(TimerMode::Setup(c)) if *c > 0 => self.beeper().play(Melody::Beep),
+            SystemRole::Timer(TimerMode::Alarm(time, _)) => {
                 // We don't need to additionally beep if we transition from one Alarm mode to
                 // another that means we're in a Snooze mode.
-                match self.state.mode {
-                    SystemMode::Alarm(_, _) => {}
+                match self.state.role {
+                    SystemRole::Timer(TimerMode::Alarm(_, _)) => {}
                     _ => self.beeper().play(Melody::Setup),
                 }
 
@@ -332,7 +348,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
             _ => {}
         }
 
-        self.state.mode = mode;
+        self.state.role = role;
     }
 
     /// Creates an instance of `ADC` controller.

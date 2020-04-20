@@ -1,4 +1,4 @@
-use super::SystemMode;
+use super::system_role::{SystemRole, TimerMode};
 use beeper::BeeperState;
 use buttons::ButtonsState;
 use usb::UsbState;
@@ -12,14 +12,14 @@ pub struct PeripheralStates {
 
 #[derive(Copy, Clone)]
 pub struct SystemState {
-    pub mode: SystemMode,
+    pub role: SystemRole,
     pub peripherals: PeripheralStates,
 }
 
 impl Default for SystemState {
     fn default() -> Self {
         SystemState {
-            mode: SystemMode::Idle,
+            role: SystemRole::Timer(TimerMode::Idle),
             peripherals: PeripheralStates {
                 usb: UsbState::default(),
                 beeper: BeeperState::default(),
