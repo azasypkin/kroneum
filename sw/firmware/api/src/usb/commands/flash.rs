@@ -27,8 +27,14 @@ impl TryFrom<Array<u8>> for FlashCommand {
 
     fn try_from(mut value: Array<u8>) -> Result<Self, Self::Error> {
         match (value.shift(), value.len()) {
-            (Some(0x1), 1) => Ok(FlashCommand::Read(value[0].into())),
-            (Some(0x2), 2) => Ok(FlashCommand::Write(value[0].into(), value[1])),
+            (Some(0x1), 1) => match StorageSlot::try_from(value[0]) {
+                Ok(slot) => Ok(FlashCommand::Read(slot)),
+                Err(_) => Err(USBError::InvalidCommand),
+            },
+            (Some(0x2), 2) => match StorageSlot::try_from(value[0]) {
+                Ok(slot) => Ok(FlashCommand::Write(slot, value[1])),
+                Err(_) => Err(USBError::InvalidCommand),
+            },
             (Some(0x3), 0) => Ok(FlashCommand::EraseAll),
             _ => Err(USBError::InvalidCommand),
         }
@@ -51,11 +57,11 @@ mod tests {
     fn read_command() {
         assert_eq!(
             FlashCommand::try_from([1, 0x2f].as_ref()),
-            Ok(FlashCommand::Read(StorageSlot::Two))
+            Ok(FlashCommand::Read(StorageSlot::Custom(2)))
         );
 
         assert_eq!(
-            Array::from(FlashCommand::Read(StorageSlot::Five)).as_ref(),
+            Array::from(FlashCommand::Read(StorageSlot::Custom(5))).as_ref(),
             [1, 0x5f]
         );
     }
@@ -63,17 +69,17 @@ mod tests {
     #[test]
     fn write_command() {
         assert_eq!(
-            FlashCommand::try_from([2, 0x1f, 8].as_ref()),
-            Ok(FlashCommand::Write(StorageSlot::One, 8))
+            FlashCommand::try_from([2, 0xaf, 8].as_ref()),
+            Ok(FlashCommand::Write(StorageSlot::Configuration, 8))
         );
         assert_eq!(
             FlashCommand::try_from([2, 0x3f, 22].as_ref()),
-            Ok(FlashCommand::Write(StorageSlot::Three, 22))
+            Ok(FlashCommand::Write(StorageSlot::Custom(3), 22))
         );
 
         assert_eq!(
-            Array::from(FlashCommand::Write(StorageSlot::One, 5)).as_ref(),
-            [2, 0x1f, 5]
+            Array::from(FlashCommand::Write(StorageSlot::Configuration, 5)).as_ref(),
+            [2, 0xaf, 5]
         );
     }
 

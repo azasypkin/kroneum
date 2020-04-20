@@ -118,7 +118,7 @@ mod tests {
             [0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff]
         );
 
-        assert_eq!(storage.read(StorageSlot::One), None);
+        assert_eq!(storage.read(StorageSlot::Configuration), None);
     }
 
     #[test]
@@ -142,35 +142,35 @@ mod tests {
         let page1_slice = &page1[..6];
         let page2_slice = &page2[..6];
 
-        assert_eq!(storage.read(StorageSlot::One), None);
-        assert_eq!(storage.write(StorageSlot::One, 2).is_ok(), true);
-        assert_eq!(storage.read(StorageSlot::One), Some(2));
+        assert_eq!(storage.read(StorageSlot::Configuration), None);
+        assert_eq!(storage.write(StorageSlot::Configuration, 2).is_ok(), true);
+        assert_eq!(storage.read(StorageSlot::Configuration), Some(2));
         assert_eq!(
             page1_slice,
-            [0x0fff, 0xffff, 0x1f02, 0xffff, 0xffff, 0xffff]
+            [0x0fff, 0xffff, 0xaf02, 0xffff, 0xffff, 0xffff]
         );
         assert_eq!(
             page2_slice,
             [0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff]
         );
 
-        assert_eq!(storage.write(StorageSlot::One, 3).is_ok(), true);
-        assert_eq!(storage.read(StorageSlot::One), Some(3));
+        assert_eq!(storage.write(StorageSlot::Configuration, 3).is_ok(), true);
+        assert_eq!(storage.read(StorageSlot::Configuration), Some(3));
         assert_eq!(
             page1_slice,
-            [0x0fff, 0xffff, 0x1f02, 0x1f03, 0xffff, 0xffff]
+            [0x0fff, 0xffff, 0xaf02, 0xaf03, 0xffff, 0xffff]
         );
         assert_eq!(
             page2_slice,
             [0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff]
         );
 
-        assert_eq!(storage.write(StorageSlot::Two, 4).is_ok(), true);
-        assert_eq!(storage.read(StorageSlot::One), Some(3));
-        assert_eq!(storage.read(StorageSlot::Two), Some(4));
+        assert_eq!(storage.write(StorageSlot::Custom(2), 4).is_ok(), true);
+        assert_eq!(storage.read(StorageSlot::Configuration), Some(3));
+        assert_eq!(storage.read(StorageSlot::Custom(2)), Some(4));
         assert_eq!(
             page1_slice,
-            [0x0fff, 0xffff, 0x1f02, 0x1f03, 0x2f04, 0xffff]
+            [0x0fff, 0xffff, 0xaf02, 0xaf03, 0x2f04, 0xffff]
         );
         assert_eq!(
             page2_slice,
@@ -198,12 +198,12 @@ mod tests {
 
         // Fill all memory slots.
         for _ in 0..510 {
-            assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
+            assert_eq!(storage.write(StorageSlot::Configuration, 1).is_ok(), true);
         }
 
         // Now we can't write anymore
-        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
-        assert_eq!(&page1[510..], [0x1f01, 0x1f01])
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_err(), true);
+        assert_eq!(&page1[510..], [0xaf01, 0xaf01])
     }
 
     #[test]
@@ -225,19 +225,19 @@ mod tests {
         };
 
         // Fill all memory slots, but the latest one.
-        assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Two, 2).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(2), 2).is_ok(), true);
 
         for _ in 0..506 {
-            assert_eq!(storage.write(StorageSlot::Two, 3).is_ok(), true);
+            assert_eq!(storage.write(StorageSlot::Custom(2), 3).is_ok(), true);
         }
 
         // Fill remaining slots.
-        assert_eq!(storage.write(StorageSlot::Three, 4).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Five, 15).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(3), 4).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(5), 15).is_ok(), true);
 
         // Now we can't write anymore
-        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_err(), true);
 
         let page1_slice = &page1[508..];
         assert_eq!(page1_slice, [0x2f03, 0x2f03, 0x3f04, 0x5f0f]);
@@ -254,13 +254,13 @@ mod tests {
         assert_eq!(page1_slice, [0x2f03, 0x2f03, 0x3f04, 0x5f0f]);
         assert_eq!(
             page2_slice,
-            [0x0fff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0xffff, 0xffff]
+            [0x0fff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0xaf01, 0xffff, 0xffff]
         );
 
-        assert_eq!(storage.write(StorageSlot::Two, 10).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(2), 10).is_ok(), true);
         assert_eq!(
             page2_slice,
-            [0x0fff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0x2f0a, 0xffff]
+            [0x0fff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0xaf01, 0x2f0a, 0xffff]
         );
     }
 
@@ -283,37 +283,37 @@ mod tests {
         };
 
         // Fill all memory slots, but the latest one.
-        assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Two, 2).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(2), 2).is_ok(), true);
 
         for _ in 0..506 {
-            assert_eq!(storage.write(StorageSlot::Two, 3).is_ok(), true);
+            assert_eq!(storage.write(StorageSlot::Custom(2), 3).is_ok(), true);
         }
 
         // Fill remaining slots.
-        assert_eq!(storage.write(StorageSlot::Three, 4).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Five, 15).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(3), 4).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(5), 15).is_ok(), true);
 
         // Now we can't write anymore
-        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_err(), true);
 
         assert_eq!(storage.rollover().is_ok(), true);
 
         // Fill next page.
         // Fill all memory slots, but the latest one.
-        assert_eq!(storage.write(StorageSlot::One, 10).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Two, 20).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 10).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(2), 20).is_ok(), true);
 
         for _ in 0..502 {
-            assert_eq!(storage.write(StorageSlot::Two, 30).is_ok(), true);
+            assert_eq!(storage.write(StorageSlot::Custom(2), 30).is_ok(), true);
         }
 
         // Fill remaining slots.
-        assert_eq!(storage.write(StorageSlot::Three, 40).is_ok(), true);
-        assert_eq!(storage.write(StorageSlot::Five, 55).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(3), 40).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Custom(5), 55).is_ok(), true);
 
         // Now we can't write anymore
-        assert_eq!(storage.write(StorageSlot::One, 1).is_err(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_err(), true);
 
         // Erase first page
         for i in 0..(PAGE_SIZE / 2) {
@@ -322,15 +322,15 @@ mod tests {
 
         assert_eq!(storage.rollover().is_ok(), true);
 
-        assert_eq!(storage.write(StorageSlot::One, 1).is_ok(), true);
+        assert_eq!(storage.write(StorageSlot::Configuration, 1).is_ok(), true);
 
-        assert_eq!(storage.read(StorageSlot::One), Some(1));
-        assert_eq!(storage.read(StorageSlot::Two), Some(30));
-        assert_eq!(storage.read(StorageSlot::Three), Some(40));
-        assert_eq!(storage.read(StorageSlot::Five), Some(55));
+        assert_eq!(storage.read(StorageSlot::Configuration), Some(1));
+        assert_eq!(storage.read(StorageSlot::Custom(2)), Some(30));
+        assert_eq!(storage.read(StorageSlot::Custom(3)), Some(40));
+        assert_eq!(storage.read(StorageSlot::Custom(5)), Some(55));
         assert_eq!(
             &page1[..7],
-            [0x0fff, 0xffff, 0x5f37, 0x3f28, 0x2f1e, 0x1f0a, 0x1f01]
+            [0x0fff, 0xffff, 0x5f37, 0x3f28, 0x2f1e, 0xaf0a, 0xaf01]
         );
     }
 }

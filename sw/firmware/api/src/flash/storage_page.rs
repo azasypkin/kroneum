@@ -182,7 +182,7 @@ mod tests {
             memory_slice,
             [0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff]
         );
-        assert_eq!(page.read(0x1f), None);
+        assert_eq!(page.read(0xaf), None);
     }
 
     #[test]
@@ -195,27 +195,27 @@ mod tests {
 
         let memory_slice = &memory_sandbox[..6];
 
-        assert_eq!(page.read(0x1f), None);
-        assert_eq!(page.write(0x1f, 2).is_ok(), true);
-        assert_eq!(page.read(0x1f), Some(2));
+        assert_eq!(page.read(0xaf), None);
+        assert_eq!(page.write(0xaf, 2).is_ok(), true);
+        assert_eq!(page.read(0xaf), Some(2));
         assert_eq!(
             memory_slice,
-            [0xffff, 0xffff, 0x1f02, 0xffff, 0xffff, 0xffff]
+            [0xffff, 0xffff, 0xaf02, 0xffff, 0xffff, 0xffff]
         );
 
-        assert_eq!(page.write(0x1f, 3).is_ok(), true);
-        assert_eq!(page.read(0x1f), Some(3));
+        assert_eq!(page.write(0xaf, 3).is_ok(), true);
+        assert_eq!(page.read(0xaf), Some(3));
         assert_eq!(
             memory_slice,
-            [0xffff, 0xffff, 0x1f02, 0x1f03, 0xffff, 0xffff]
+            [0xffff, 0xffff, 0xaf02, 0xaf03, 0xffff, 0xffff]
         );
 
         assert_eq!(page.write(0x2f, 4).is_ok(), true);
-        assert_eq!(page.read(0x1f), Some(3));
+        assert_eq!(page.read(0xaf), Some(3));
         assert_eq!(page.read(0x2f), Some(4));
         assert_eq!(
             memory_slice,
-            [0xffff, 0xffff, 0x1f02, 0x1f03, 0x2f04, 0xffff]
+            [0xffff, 0xffff, 0xaf02, 0xaf03, 0x2f04, 0xffff]
         );
     }
 
@@ -228,14 +228,14 @@ mod tests {
         };
 
         // Fill all memory slots, but the latest one.
-        assert_eq!(page.write(0x1f, 1).is_ok(), true);
+        assert_eq!(page.write(0xaf, 1).is_ok(), true);
         assert_eq!(page.write(0x2f, 2).is_ok(), true);
         for _ in 0..506 {
             assert_eq!(page.write(0x2f, 3).is_ok(), true);
         }
         assert_eq!(page.write(0x3f, 4).is_ok(), true);
 
-        assert_eq!(page.read(0x1f), Some(1));
+        assert_eq!(page.read(0xaf), Some(1));
         assert_eq!(page.read(0x2f), Some(3));
         assert_eq!(page.read(0x3f), Some(4));
 
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(memory_slice, [0x2f03, 0x2f03, 0x3f04, 0x5f0f]);
 
         // Now we can't write anymore
-        let write_result = page.write(0x1f, 1);
+        let write_result = page.write(0xaf, 1);
         assert_eq!(write_result.is_err(), true);
     }
 
@@ -281,7 +281,7 @@ mod tests {
             size: PAGE_SIZE,
         };
 
-        assert_eq!(page1.write(0x1f, 1).is_ok(), true);
+        assert_eq!(page1.write(0xaf, 1).is_ok(), true);
         assert_eq!(page1.write(0x2f, 2).is_ok(), true);
         assert_eq!(page1.write(0x2f, 3).is_ok(), true);
         assert_eq!(page1.write(0x3f, 4).is_ok(), true);
@@ -290,7 +290,7 @@ mod tests {
         let page_1_slice = &page1_sandbox[..8];
         assert_eq!(
             page_1_slice,
-            [0xffff, 0xffff, 0x1f01, 0x2f02, 0x2f03, 0x3f04, 0x5f0f, 0xffff]
+            [0xffff, 0xffff, 0xaf01, 0x2f02, 0x2f03, 0x3f04, 0x5f0f, 0xffff]
         );
 
         let page2_sandbox: [u16; PAGE_SIZE / 2] = [0xffff; PAGE_SIZE / 2];
@@ -303,13 +303,13 @@ mod tests {
         let page_2_slice = &page2_sandbox[..8];
         assert_eq!(
             page_2_slice,
-            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0xffff, 0xffff]
+            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0xaf01, 0xffff, 0xffff]
         );
 
         assert_eq!(page2.write(0x2f, 10).is_ok(), true);
         assert_eq!(
             page_2_slice,
-            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0x1f01, 0x2f0a, 0xffff]
+            [0xffff, 0xffff, 0x5f0f, 0x3f04, 0x2f03, 0xaf01, 0x2f0a, 0xffff]
         );
     }
 }

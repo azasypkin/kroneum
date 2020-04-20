@@ -205,30 +205,35 @@ mod tests {
     #[test]
     fn flash_command() {
         assert_eq!(
-            CommandPacket::try_from([4, 1, 0x1f].as_ref()),
-            Ok(CommandPacket::Flash(FlashCommand::Read(StorageSlot::One)))
+            CommandPacket::try_from([4, 1, 0xaf].as_ref()),
+            Ok(CommandPacket::Flash(FlashCommand::Read(
+                StorageSlot::Configuration
+            )))
         );
 
         assert_eq!(
-            Array::from(CommandPacket::Flash(FlashCommand::Read(StorageSlot::One))).as_ref(),
-            [4, 1, 0x1f]
+            Array::from(CommandPacket::Flash(FlashCommand::Read(
+                StorageSlot::Configuration
+            )))
+            .as_ref(),
+            [4, 1, 0xaf]
         );
 
         assert_eq!(
-            CommandPacket::try_from([4, 2, 0x1f, 5].as_ref()),
+            CommandPacket::try_from([4, 2, 0xaf, 5].as_ref()),
             Ok(CommandPacket::Flash(FlashCommand::Write(
-                StorageSlot::One,
+                StorageSlot::Configuration,
                 5
             )))
         );
 
         assert_eq!(
             Array::from(CommandPacket::Flash(FlashCommand::Write(
-                StorageSlot::One,
+                StorageSlot::Configuration,
                 5
             )))
             .as_ref(),
-            [4, 2, 0x1f, 5]
+            [4, 2, 0xaf, 5]
         );
 
         assert_eq!(

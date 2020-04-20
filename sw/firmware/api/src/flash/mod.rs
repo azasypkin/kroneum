@@ -134,18 +134,18 @@ mod tests {
         };
         let flash = Flash::new(&flash_hw_mock);
 
-        assert_eq!(flash.read(StorageSlot::One), None);
-        assert_eq!(flash.read(StorageSlot::Two), None);
+        assert_eq!(flash.read(StorageSlot::Configuration), None);
+        assert_eq!(flash.read(StorageSlot::Custom(2)), None);
 
-        page1[2] = 0x1f0f;
+        page1[2] = 0xaf0f;
 
-        assert_eq!(flash.read(StorageSlot::One), Some(0x0f));
-        assert_eq!(flash.read(StorageSlot::Two), None);
+        assert_eq!(flash.read(StorageSlot::Configuration), Some(0x0f));
+        assert_eq!(flash.read(StorageSlot::Custom(2)), None);
 
         page1[3] = 0x2f01;
 
-        assert_eq!(flash.read(StorageSlot::One), Some(0x0f));
-        assert_eq!(flash.read(StorageSlot::Two), Some(0x01));
+        assert_eq!(flash.read(StorageSlot::Configuration), Some(0x0f));
+        assert_eq!(flash.read(StorageSlot::Custom(2)), Some(0x01));
     }
 
     #[test]
@@ -159,9 +159,9 @@ mod tests {
         };
 
         let flash = Flash::new(&flash_hw_mock);
-        assert_eq!(flash.write(StorageSlot::One, 10).is_ok(), true);
+        assert_eq!(flash.write(StorageSlot::Configuration, 10).is_ok(), true);
 
-        assert_eq!(page1[..4], [0x0fff, 0xffff, 0x1f0a, 0xffff]);
+        assert_eq!(page1[..4], [0x0fff, 0xffff, 0xaf0a, 0xffff]);
         assert_eq!(
             flash.hw.data.borrow().calls.logs(),
             [Some(Call::EnableWriteMode), Some(Call::DisableWriteMode)]
@@ -184,12 +184,12 @@ mod tests {
         page1[0] = 0x0fff;
         page1[1] = 0x0001;
         for i in 2..(PAGE_SIZE / 2) {
-            page1[i] = 0x1f12;
+            page1[i] = 0xaf12;
         }
 
-        assert_eq!(flash.write(StorageSlot::Two, 0x17).is_ok(), true);
+        assert_eq!(flash.write(StorageSlot::Custom(2), 0x17).is_ok(), true);
 
-        assert_eq!(page2[..5], [0x0fff, 0xffff, 0x1f12, 0x2f17, 0xffff]);
+        assert_eq!(page2[..5], [0x0fff, 0xffff, 0xaf12, 0x2f17, 0xffff]);
         assert_eq!(
             flash.hw.data.borrow().calls.logs(),
             [
