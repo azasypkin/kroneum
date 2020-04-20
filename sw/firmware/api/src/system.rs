@@ -1,16 +1,17 @@
+mod system_hardware;
 mod system_info;
 
-use adc::{ADCHardware, ADC};
+use adc::ADC;
 use array::Array;
 use bare_metal::CriticalSection;
-use beeper::{melody::Melody, BeeperState, PWMBeeper, PWMBeeperHardware};
-use buttons::{ButtonPressType, Buttons, ButtonsHardware, ButtonsPoll, ButtonsState};
-use flash::{Flash, FlashHardware};
-use radio::{Radio, RadioHardware};
-use rtc::{RTCHardware, RTC};
+use beeper::{melody::Melody, BeeperState, PWMBeeper};
+use buttons::{ButtonPressType, Buttons, ButtonsPoll, ButtonsState};
+use flash::Flash;
+use radio::Radio;
+use rtc::RTC;
 use systick::{SysTick, SysTickHardware};
 use time::Time;
-use timer::{Timer, TimerHardware};
+use timer::Timer;
 use usb::{
     command_packet::CommandPacket,
     commands::{
@@ -18,10 +19,10 @@ use usb::{
         SystemCommand,
     },
     endpoint::DeviceEndpoint,
-    USBHardware, UsbState, USB,
+    UsbState, USB,
 };
 
-pub use self::system_info::SystemInfo;
+pub use self::{system_hardware::SystemHardware, system_info::SystemInfo};
 
 #[derive(Debug, Copy, Clone)]
 enum SystemMode {
@@ -48,36 +49,6 @@ impl Default for SystemState {
             buttons_state: ButtonsState::default(),
         }
     }
-}
-
-/// Describes the SystemControl hardware management interface.
-pub trait SystemHardware:
-    ADCHardware
-    + ButtonsHardware
-    + FlashHardware
-    + PWMBeeperHardware
-    + RTCHardware
-    + RadioHardware
-    + USBHardware
-    + TimerHardware
-{
-    /// Forces system to enter StandBy mode.
-    fn enter_deep_sleep(&mut self);
-
-    /// Forces system to exit StandBy mode.
-    fn exit_deep_sleep(&mut self);
-
-    /// Performs system software reset.
-    fn reset(&mut self);
-
-    /// Returns a 12-byte unique device ID.
-    fn device_id(&self) -> &'static [u8; 12];
-
-    /// Returns a string with a hex-encoded unique device ID.
-    fn device_id_hex(&self) -> &'static str;
-
-    /// Returns the Flash memory size of the device in Kilobytes.
-    fn flash_size_kb(&self) -> u16;
 }
 
 pub struct System<T: SystemHardware, S: SysTickHardware> {
