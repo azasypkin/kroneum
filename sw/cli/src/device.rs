@@ -109,10 +109,6 @@ impl Device {
     }
 
     pub fn read_flash(&self, slot: StorageSlot) -> Result<u8, String> {
-        if let StorageSlot::Unknown = slot {
-            return Err("Unknown memory slot is provided".to_string());
-        }
-
         if let Ok(response) = self.send_command(CommandPacket::Flash(FlashCommand::Read(slot))) {
             if !response.is_empty() {
                 return Ok(response[0]);
@@ -123,10 +119,6 @@ impl Device {
     }
 
     pub fn write_flash(&self, slot: StorageSlot, value: u8) -> Result<(), String> {
-        if let StorageSlot::Unknown = slot {
-            return Err("Unknown memory slot is provided".to_string());
-        }
-
         let packet = CommandPacket::Flash(FlashCommand::Write(slot, value));
         self.send_command(packet).map(|_| ()).map_err(|_| {
             format!(

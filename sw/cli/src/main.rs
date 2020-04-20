@@ -61,15 +61,16 @@ fn process_command(matches: ArgMatches) -> Result<(), String> {
             }
             operation => {
                 let device = Device::create()?;
-                let slot: StorageSlot = matches
-                    .value_of("SLOT")
-                    .ok_or_else(|| "<SLOT> argument is not provided.".to_string())
-                    .and_then(|slot_str| {
-                        u8::from_str_radix(&slot_str[2..], 16).or_else(|err| {
-                            Err(format!("Failed to parse <SLOT> argument: {:?}", err))
-                        })
-                    })?
-                    .into();
+                let slot = StorageSlot::Custom(
+                    matches
+                        .value_of("SLOT")
+                        .ok_or_else(|| "<SLOT> argument is not provided.".to_string())
+                        .and_then(|slot_str| {
+                            u8::from_str_radix(&slot_str[2..], 16).or_else(|err| {
+                                Err(format!("Failed to parse <SLOT> argument: {:?}", err))
+                            })
+                        })?,
+                );
 
                 match operation {
                     "write" => {
@@ -166,7 +167,7 @@ fn main() -> Result<(), String> {
                     Arg::with_name("SLOT")
                         .index(2)
                         .required_ifs(&[("ACTION", "read"), ("ACTION", "write")])
-                        .possible_values(&["0x1f", "0x2f", "0x3f", "0x4f", "0x5f"])
+                        .possible_values(&["1", "2", "3", "4"])
                         .help("Address of the memory slot."),
                 )
                 .arg(

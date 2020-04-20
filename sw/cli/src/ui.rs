@@ -108,11 +108,11 @@ async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
 async fn get_flash() -> impl Responder {
     let device = Device::create().unwrap();
     HttpResponse::Ok().json(vec![
-        device.read_flash(StorageSlot::One).unwrap(),
-        device.read_flash(StorageSlot::Two).unwrap(),
-        device.read_flash(StorageSlot::Three).unwrap(),
-        device.read_flash(StorageSlot::Four).unwrap(),
-        device.read_flash(StorageSlot::Five).unwrap(),
+        device.read_flash(StorageSlot::Configuration).unwrap(),
+        device.read_flash(StorageSlot::Custom(1)).unwrap(),
+        device.read_flash(StorageSlot::Custom(2)).unwrap(),
+        device.read_flash(StorageSlot::Custom(3)).unwrap(),
+        device.read_flash(StorageSlot::Custom(4)).unwrap(),
     ])
 }
 

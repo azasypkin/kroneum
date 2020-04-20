@@ -14,7 +14,7 @@ export function FlashSection() {
         return (
           <EuiFormRow
             key={slotIndex}
-            label={`Slot#${slotIndex + 1}`}
+            label={slotIndex === 0 ? 'Configuration Slot' : `Custom Slot#${slotIndex}`}
             display="columnCompressed"
             style={{ alignItems: 'center' }}
           >
