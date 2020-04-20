@@ -6,6 +6,7 @@ use usb::usb_error::USBError;
 pub enum SystemCommand {
     Reset,
     Echo(Array<u8>),
+    GetInfo,
 }
 
 impl From<SystemCommand> for Array<u8> {
@@ -16,6 +17,7 @@ impl From<SystemCommand> for Array<u8> {
                 echo_data.unshift(2);
                 echo_data
             }
+            SystemCommand::GetInfo => [3].as_ref().into(),
         }
     }
 }
@@ -27,6 +29,7 @@ impl TryFrom<Array<u8>> for SystemCommand {
         match (value.shift(), value.len()) {
             (Some(0x1), 0) => Ok(SystemCommand::Reset),
             (Some(0x2), n_echo_bytes) if n_echo_bytes > 0 => Ok(SystemCommand::Echo(value)),
+            (Some(0x3), 0) => Ok(SystemCommand::GetInfo),
             _ => Err(USBError::InvalidCommand),
         }
     }
@@ -69,17 +72,27 @@ mod tests {
     }
 
     #[test]
+    fn get_info_command() {
+        assert_eq!(
+            SystemCommand::try_from([3].as_ref()),
+            Ok(SystemCommand::GetInfo)
+        );
+
+        assert_eq!(Array::from(SystemCommand::GetInfo).as_ref(), [3]);
+    }
+
+    #[test]
     fn invalid_command() {
         assert_eq!(
             SystemCommand::try_from([0].as_ref()),
             Err(USBError::InvalidCommand)
         );
         assert_eq!(
-            SystemCommand::try_from([3].as_ref()),
+            SystemCommand::try_from([4].as_ref()),
             Err(USBError::InvalidCommand)
         );
         assert_eq!(
-            SystemCommand::try_from([4, 5, 6].as_ref()),
+            SystemCommand::try_from([5, 6, 7].as_ref()),
             Err(USBError::InvalidCommand)
         );
     }

@@ -171,4 +171,16 @@ impl SystemHardware for SystemHardwareImpl {
     fn reset(&mut self) {
         SCB::sys_reset();
     }
+
+    fn device_id(&self) -> &'static [u8; 12] {
+        stm32_device_signature::device_id()
+    }
+
+    fn device_id_hex(&self) -> &'static str {
+        stm32_device_signature::device_id_hex()
+    }
+
+    fn flash_size_kb(&self) -> u16 {
+        stm32_device_signature::flash_size_kb()
+    }
 }

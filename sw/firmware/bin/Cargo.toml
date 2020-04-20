@@ -16,6 +16,7 @@ kroneum-api = { version = "0.1.0", path = "../api" }
 panic-reset = "0.1.0"
 vcell = "0.1.2"
 embedded-hal = "0.2.3"
+stm32-device-signature = {version = "0.3.0", features = ["stm32f0"] }
 stm32f0xx-hal = {version = "0.16.0", features = ["stm32f042", "rt"], git = "https://github.com/azasypkin/stm32f0xx-hal", branch = "fix-rcc-pub"}
 
 [dev-dependencies]

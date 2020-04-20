@@ -1,3 +1,5 @@
+mod system_info;
+
 use adc::{ADCHardware, ADC};
 use array::Array;
 use bare_metal::CriticalSection;
@@ -18,6 +20,8 @@ use usb::{
     endpoint::DeviceEndpoint,
     USBHardware, UsbState, USB,
 };
+
+pub use self::system_info::SystemInfo;
 
 #[derive(Debug, Copy, Clone)]
 enum SystemMode {
@@ -65,6 +69,15 @@ pub trait SystemHardware:
 
     /// Performs system software reset.
     fn reset(&mut self);
+
+    /// Returns a 12-byte unique device ID.
+    fn device_id(&self) -> &'static [u8; 12];
+
+    /// Returns a string with a hex-encoded unique device ID.
+    fn device_id_hex(&self) -> &'static str;
+
+    /// Returns the Flash memory size of the device in Kilobytes.
+    fn flash_size_kb(&self) -> u16;
 }
 
 pub struct System<T: SystemHardware, S: SysTickHardware> {
@@ -155,6 +168,14 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
                     self.usb().send(DeviceEndpoint::System, &[0x00]);
                     self.systick.delay(100);
                     self.reset();
+                } else if let SystemCommand::GetInfo = command {
+                    let mut array: Array<u8> = (SystemInfo {
+                        id: *self.hw.device_id(),
+                        flash_size_kb: self.hw.flash_size_kb(),
+                    })
+                    .into();
+                    array.unshift(0x00);
+                    self.usb().send(DeviceEndpoint::System, array.as_ref());
                 } else {
                     self.usb().send(DeviceEndpoint::System, &[0xFF]);
                 }
