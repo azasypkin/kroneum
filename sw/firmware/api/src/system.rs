@@ -4,29 +4,19 @@ mod system_role;
 mod system_state;
 
 use adc::ADC;
-use array::Array;
 use bare_metal::CriticalSection;
-use beeper::{melody::Melody, PWMBeeper};
-use buttons::{ButtonPressType, Buttons, ButtonsPoll};
-use flash::Flash;
+use beeper::PWMBeeper;
+use buttons::{Buttons, ButtonsPoll};
+use flash::{storage_slot::StorageSlot, Flash};
 use radio::Radio;
 use rtc::RTC;
 use systick::{SysTick, SysTickHardware};
-use time::Time;
 use timer::Timer;
-use usb::{
-    command_packet::CommandPacket,
-    commands::{
-        ADCCommand, AlarmCommand, BeeperCommand, FlashCommand, KeyboardCommand, RadioCommand,
-        SystemCommand,
-    },
-    endpoint::DeviceEndpoint,
-    USB,
-};
+use usb::USB;
 
 pub use self::{system_hardware::SystemHardware, system_info::SystemInfo};
 use self::{
-    system_role::{SystemRole, TimerMode},
+    system_role::{ControllerSystemRoleHandler, SystemRole, TimerSystemRoleHandler},
     system_state::SystemState,
 };
 
@@ -44,22 +34,19 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
             systick,
         };
 
-        system.set_role(SystemRole::Timer(TimerMode::Idle));
+        system.switch_to_role(
+            system
+                .flash()
+                .read(StorageSlot::Configuration)
+                .map_or_else(SystemRole::default, SystemRole::from),
+        );
 
         system
     }
 
     pub fn handle_alarm(&mut self) {
-        if let SystemRole::Timer(TimerMode::Alarm(_, melody)) = self.state.role {
-            self.beeper().play_and_repeat(melody, 2);
-
-            self.rtc().teardown();
-
-            // Snooze alarm for 10 seconds.
-            self.set_role(SystemRole::Timer(TimerMode::Alarm(
-                Time::from_seconds(10),
-                Melody::Beep,
-            )));
+        if let SystemRole::Timer = self.state.role {
+            TimerSystemRoleHandler::on_alarm(self);
         }
     }
 
@@ -80,142 +67,9 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     }
 
     pub fn handle_usb_packet(&mut self, cs: &CriticalSection) {
-        self.usb().interrupt();
-
-        match self.state.peripherals.usb.command {
-            Some(CommandPacket::Beeper(command)) => {
-                match command {
-                    BeeperCommand::Beep(n_beeps) => {
-                        self.beeper()
-                            .play_and_repeat(Melody::Beep, n_beeps as usize);
-                    }
-                    BeeperCommand::Melody(tones) => {
-                        self.beeper().play(Melody::Custom(tones));
-                    }
-                };
-
-                self.usb().send(DeviceEndpoint::System, &[0x00]);
-            }
-            Some(CommandPacket::Alarm(command)) => {
-                if let AlarmCommand::Get = command {
-                    let alarm = self.rtc().alarm();
-                    self.usb().send(
-                        DeviceEndpoint::System,
-                        &[0x00, alarm.hours, alarm.minutes, alarm.seconds],
-                    );
-                } else if let AlarmCommand::Set(time) = command {
-                    // We should send OK response before we enter Alarm mode and USB will be disabled.
-                    self.usb().send(DeviceEndpoint::System, &[0x00]);
-                    self.systick.delay(100);
-                    self.set_role(SystemRole::Timer(TimerMode::Alarm(time, Melody::Alarm)));
-                } else {
-                    self.usb().send(DeviceEndpoint::System, &[0xFF]);
-                }
-            }
-            Some(CommandPacket::System(command)) => {
-                if let SystemCommand::Echo(mut echo_data) = command {
-                    echo_data.unshift(0x00);
-                    self.usb().send(DeviceEndpoint::System, echo_data.as_ref());
-                } else if let SystemCommand::Reset = command {
-                    // We should send OK response before we reset.
-                    self.usb().send(DeviceEndpoint::System, &[0x00]);
-                    self.systick.delay(100);
-                    self.reset();
-                } else if let SystemCommand::GetInfo = command {
-                    let mut array: Array<u8> = (SystemInfo {
-                        id: *self.hw.device_id(),
-                        flash_size_kb: self.hw.flash_size_kb(),
-                    })
-                    .into();
-                    array.unshift(0x00);
-                    self.usb().send(DeviceEndpoint::System, array.as_ref());
-                } else {
-                    self.usb().send(DeviceEndpoint::System, &[0xFF]);
-                }
-            }
-            Some(CommandPacket::Flash(command)) => {
-                let response = match command {
-                    FlashCommand::Read(storage_slot) => Ok(Array::from(
-                        [self.flash().read(storage_slot).unwrap_or_else(|| 0)].as_ref(),
-                    )),
-                    FlashCommand::Write(storage_slot, value) => self
-                        .flash()
-                        .write(storage_slot, value)
-                        .map(|_| Array::new()),
-                    FlashCommand::EraseAll => {
-                        self.flash().erase_all();
-                        Ok(Array::new())
-                    }
-                };
-
-                match response {
-                    Ok(mut array) => {
-                        array.unshift(0x00);
-                        self.usb().send(DeviceEndpoint::System, array.as_ref());
-                    }
-                    Err(_) => self.usb().send(DeviceEndpoint::System, &[0xFF]),
-                };
-            }
-            Some(CommandPacket::ADC(command)) => {
-                let response = match command {
-                    ADCCommand::Read(channel) => {
-                        let value = self.adc().read(channel);
-                        Array::from(&[0x00, (value & 0xff) as u8, ((value & 0xff00) >> 8) as u8])
-                    }
-                };
-
-                self.usb().send(DeviceEndpoint::System, response.as_ref());
-            }
-            Some(CommandPacket::Radio(command)) => {
-                let response = match command {
-                    RadioCommand::Transmit(data) => {
-                        self.radio().transmit(cs, data).map(|_| Array::new())
-                    }
-                    RadioCommand::Receive => self.radio().receive(cs),
-                    RadioCommand::Status => self.radio().status(cs),
-                };
-
-                match response {
-                    Ok(mut array) => {
-                        array.unshift(0x00);
-                        self.usb().send(DeviceEndpoint::System, array.as_ref());
-                    }
-                    Err(_) => self.usb().send(DeviceEndpoint::System, &[0xFF]),
-                };
-            }
-            Some(CommandPacket::Keyboard(command)) => match command {
-                KeyboardCommand::Key(modifiers, key_code, delay) => {
-                    if delay > 0 {
-                        self.systick.delay(delay as u32 * 1000);
-                    }
-
-                    self.usb().send(
-                        DeviceEndpoint::Keyboard,
-                        &[0x01, modifiers.into(), 0, key_code, 0, 0, 0, 0, 0],
-                    );
-                    self.systick.delay(10);
-                    self.usb()
-                        .send(DeviceEndpoint::Keyboard, &[0x01, 0, 0, 0, 0, 0, 0, 0, 0]);
-
-                    self.usb().send(DeviceEndpoint::System, &[0x00]);
-                }
-                KeyboardCommand::Media(key_code, delay) => {
-                    if delay > 0 {
-                        self.systick.delay(delay as u32 * 1000);
-                    }
-
-                    self.usb()
-                        .send(DeviceEndpoint::Keyboard, &[0x02, key_code as u8]);
-                    self.systick.delay(10);
-                    self.usb().send(DeviceEndpoint::Keyboard, &[0x02, 0x0]);
-
-                    self.usb().send(DeviceEndpoint::System, &[0x00]);
-                }
-            },
-            _ => {}
+        if let SystemRole::Controller = self.state.role {
+            ControllerSystemRoleHandler::on_usb_packet(self, cs);
         }
-
-        self.state.peripherals.usb.command = None;
     }
 
     /// Handles SysTick event and stops the counter.
@@ -259,51 +113,14 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
     fn poll_buttons(&mut self) {
         match self.buttons().poll() {
             ButtonsPoll::Ready((button_i, button_x, _)) => {
-                match (self.state.role, button_i, button_x) {
-                    (SystemRole::Controller, ButtonPressType::Long, ButtonPressType::Long)
-                    | (
-                        SystemRole::Timer(TimerMode::Alarm(_, _)),
-                        ButtonPressType::Long,
-                        ButtonPressType::Long,
-                    ) => self.set_role(SystemRole::Timer(TimerMode::Idle)),
-                    (
-                        SystemRole::Timer(TimerMode::Idle),
-                        ButtonPressType::Long,
-                        ButtonPressType::Long,
-                    ) => self.set_role(SystemRole::Controller),
-                    (
-                        SystemRole::Timer(TimerMode::Setup(counter)),
-                        ButtonPressType::Long,
-                        ButtonPressType::Long,
-                    ) => self.set_role(SystemRole::Timer(TimerMode::Alarm(
-                        Time::from_hours(counter),
-                        Melody::Alarm,
-                    ))),
-                    (SystemRole::Timer(TimerMode::Idle), ButtonPressType::Long, _)
-                    | (SystemRole::Timer(TimerMode::Idle), _, ButtonPressType::Long) => {
-                        self.set_role(SystemRole::Timer(TimerMode::Setup(0)));
+                match self.state.role {
+                    SystemRole::Timer => {
+                        TimerSystemRoleHandler::on_buttons_press(self, (button_i, button_x))
                     }
-                    (SystemRole::Timer(TimerMode::Alarm(_, _)), ButtonPressType::Long, _)
-                    | (SystemRole::Timer(TimerMode::Alarm(_, _)), _, ButtonPressType::Long) => {
-                        self.set_role(SystemRole::Timer(TimerMode::Idle));
+                    SystemRole::Controller => {
+                        ControllerSystemRoleHandler::on_buttons_press(self, (button_i, button_x))
                     }
-                    (SystemRole::Timer(TimerMode::Setup(counter)), ButtonPressType::Long, _)
-                    | (SystemRole::Timer(TimerMode::Setup(counter)), _, ButtonPressType::Long) => {
-                        let time = match button_i {
-                            ButtonPressType::Long => Time::from_seconds(counter as u32),
-                            _ => Time::from_minutes(counter as u32),
-                        };
-
-                        self.set_role(SystemRole::Timer(TimerMode::Alarm(time, Melody::Alarm)));
-                    }
-                    (SystemRole::Timer(TimerMode::Setup(counter)), ButtonPressType::Short, _) => {
-                        self.set_role(SystemRole::Timer(TimerMode::Setup(counter + 1)))
-                    }
-                    (SystemRole::Timer(TimerMode::Setup(counter)), _, ButtonPressType::Short) => {
-                        self.set_role(SystemRole::Timer(TimerMode::Setup(counter + 10)))
-                    }
-                    _ => {}
-                }
+                };
             }
             ButtonsPoll::Pending(pending_time) => self.timer().start(pending_time),
         }
@@ -311,53 +128,24 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         self.buttons().reactivate();
     }
 
-    /// Switches system to a new mode.
-    fn set_role(&mut self, role: SystemRole) {
-        match &role {
-            SystemRole::Timer(TimerMode::Idle) => {
-                self.usb().teardown();
-                self.rtc().teardown();
-
-                // If we are exiting `Config`, `Setup` or `Alarm` mode let's play special signal.
-                if let SystemRole::Timer(TimerMode::Setup(_))
-                | SystemRole::Timer(TimerMode::Alarm(_, _))
-                | SystemRole::Controller = self.state.role
-                {
-                    self.beeper().play(Melody::Reset)
-                }
-            }
-            SystemRole::Controller => {
-                self.beeper().play(Melody::Reset);
-                self.usb().setup();
-            }
-            SystemRole::Timer(TimerMode::Setup(0)) => self.beeper().play(Melody::Setup),
-            SystemRole::Timer(TimerMode::Setup(c)) if *c > 0 => self.beeper().play(Melody::Beep),
-            SystemRole::Timer(TimerMode::Alarm(time, _)) => {
-                // We don't need to additionally beep if we transition from one Alarm mode to
-                // another that means we're in a Snooze mode.
-                match self.state.role {
-                    SystemRole::Timer(TimerMode::Alarm(_, _)) => {}
-                    _ => self.beeper().play(Melody::Setup),
-                }
-
-                let rtc = self.rtc();
-                rtc.setup();
-                rtc.set_time(Time::default());
-                rtc.set_alarm(*time);
-            }
-            _ => {}
-        }
-
+    /// Switches system to a new role.
+    fn switch_to_role(&mut self, role: SystemRole) {
+        self.state.role_state = None;
         self.state.role = role;
+
+        match self.state.role {
+            SystemRole::Timer => self.usb().teardown(),
+            SystemRole::Controller => self.usb().setup(),
+        };
     }
 
     /// Creates an instance of `ADC` controller.
-    fn adc(&mut self) -> ADC<T> {
+    fn adc(&self) -> ADC<T> {
         ADC::new(&self.hw)
     }
 
     /// Creates an instance of `RTC` controller.
-    fn rtc(&mut self) -> RTC<T> {
+    fn rtc(&self) -> RTC<T> {
         RTC::new(&self.hw)
     }
 
@@ -366,7 +154,7 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         Radio::new(&mut self.hw, &mut self.systick)
     }
 
-    fn timer(&mut self) -> Timer<T> {
+    fn timer(&self) -> Timer<T> {
         Timer::new(&self.hw)
     }
 
@@ -375,23 +163,23 @@ impl<T: SystemHardware, S: SysTickHardware> System<T, S> {
         PWMBeeper::new(
             &self.hw,
             &mut self.systick,
-            &mut self.state.peripherals.beeper,
+            &mut self.state.peripherals_states.beeper,
         )
     }
 
     /// Creates an instance of `Buttons` controller.
     fn buttons(&mut self) -> Buttons<T> {
-        Buttons::new(&self.hw, &mut self.state.peripherals.buttons)
+        Buttons::new(&self.hw, &mut self.state.peripherals_states.buttons)
     }
 
     /// Creates an instance of `Flash` controller.
-    fn flash(&mut self) -> Flash<T> {
+    fn flash(&self) -> Flash<T> {
         Flash::new(&self.hw)
     }
 
     /// Creates an instance of `USB` controller.
     fn usb(&mut self) -> USB<T> {
-        USB::new(&self.hw, &mut self.state.peripherals.usb)
+        USB::new(&self.hw, &mut self.state.peripherals_states.usb)
     }
 }
 
