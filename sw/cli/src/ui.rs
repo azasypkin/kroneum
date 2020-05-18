@@ -6,6 +6,7 @@ use kroneum_api::{
     adc::ADCChannel,
     beeper::tone::Tone,
     flash::storage_slot::StorageSlot,
+    time::Time,
     usb::commands::{KeyModifiers, MediaKey},
 };
 use serde_derive::{Deserialize, Serialize};
@@ -65,11 +66,46 @@ struct InfoResponse {
     system: SystemInfoResponse,
 }
 
+#[derive(Deserialize)]
+struct SetAlarmParams {
+    alarm: String,
+}
+
+#[derive(Deserialize)]
+struct WriteFlashParams {
+    slot: u8,
+    value: u8,
+}
+
 async fn adc(params: web::Path<ADCParams>) -> impl Responder {
     match ADCChannel::try_from(params.channel) {
         Ok(channel) => {
             HttpResponse::Ok().json(Device::create().unwrap().adc_read(channel).unwrap())
         }
+        Err(message) => HttpResponse::BadRequest().body(message),
+    }
+}
+
+async fn alarm_get() -> impl Responder {
+    let device = Device::create().unwrap();
+    let alarm = Time::from_seconds(device.get_alarm().unwrap().as_secs() as u32);
+    HttpResponse::Ok().json(format!(
+        "{:02}h {:02}m {:02}s",
+        alarm.hours, alarm.minutes, alarm.seconds
+    ))
+}
+
+async fn alarm_set(alarm: web::Json<SetAlarmParams>) -> impl Responder {
+    match alarm
+        .0
+        .alarm
+        .parse::<humantime::Duration>()
+        .or_else(|err| Err(format!("Failed to parse alarm: {:?}", err)))
+    {
+        Ok(duration) => match Device::create().unwrap().set_alarm(duration.into()) {
+            Ok(_) => HttpResponse::NoContent().finish(),
+            Err(message) => HttpResponse::InternalServerError().body(message),
+        },
         Err(message) => HttpResponse::BadRequest().body(message),
     }
 }
@@ -118,7 +154,7 @@ async fn play(tones: web::Json<Vec<(u8, u8)>>) -> impl Responder {
     HttpResponse::NoContent()
 }
 
-async fn get_flash() -> impl Responder {
+async fn flash_read() -> impl Responder {
     let device = Device::create().unwrap();
     HttpResponse::Ok().json(vec![
         device.read_flash(StorageSlot::Configuration).unwrap(),
@@ -127,6 +163,25 @@ async fn get_flash() -> impl Responder {
         device.read_flash(StorageSlot::Custom(3)).unwrap(),
         device.read_flash(StorageSlot::Custom(4)).unwrap(),
     ])
+}
+
+async fn flash_write(flash: web::Json<WriteFlashParams>) -> impl Responder {
+    match StorageSlot::try_from(flash.slot) {
+        Ok(slot) => match Device::create().unwrap().write_flash(slot, flash.value) {
+            Ok(_) => HttpResponse::NoContent().finish(),
+            Err(message) => HttpResponse::InternalServerError().body(message),
+        },
+        Err(_) => {
+            HttpResponse::BadRequest().body(format!("Failed to parse slot: {:?}", flash.slot))
+        }
+    }
+}
+
+async fn flash_erase() -> impl Responder {
+    match Device::create().unwrap().erase_flash() {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(message) => HttpResponse::InternalServerError().body(message),
+    }
 }
 
 async fn get_info() -> impl Responder {
@@ -177,9 +232,13 @@ pub async fn run_server(port: u16) -> Result<(), String> {
     let ui_url = format!("127.0.0.1:{}", port);
     let http_server = HttpServer::new(|| {
         App::new()
+            .route("/api/alarm", web::get().to(alarm_get))
+            .route("/api/alarm/set", web::post().to(alarm_set))
             .route("/api/beep", web::get().to(beep))
             .route("/api/play", web::post().to(play))
-            .route("/api/flash", web::get().to(get_flash))
+            .route("/api/flash", web::get().to(flash_read))
+            .route("/api/flash/write", web::post().to(flash_write))
+            .route("/api/flash/erase", web::post().to(flash_erase))
             .route("/api/info", web::get().to(get_info))
             .route("/api/echo", web::post().to(echo))
             .route("/api/radio/receive", web::get().to(radio_receive))
