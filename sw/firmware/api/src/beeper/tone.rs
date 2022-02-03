@@ -43,6 +43,24 @@ mod tests {
     }
 
     #[test]
+    fn properly_calculates_frequency_2() {
+        assert_eq!(Tone::new(Note::A5 as u8, 0).frequency(), 880);
+        assert_eq!(Tone::new(Note::ASharp5 as u8, 0).frequency(), 932);
+        assert_eq!(Tone::new(Note::B5 as u8, 0).frequency(), 988);
+        assert_eq!(Tone::new(Note::C6 as u8, 0).frequency(), 1047);
+        assert_eq!(Tone::new(Note::CSharp6 as u8, 0).frequency(), 1109);
+        assert_eq!(Tone::new(Note::D6 as u8, 0).frequency(), 1175);
+        assert_eq!(Tone::new(Note::DSharp6 as u8, 0).frequency(), 1245);
+        assert_eq!(Tone::new(Note::E6 as u8, 0).frequency(), 1319);
+        assert_eq!(Tone::new(Note::F6 as u8, 0).frequency(), 1397);
+        assert_eq!(Tone::new(Note::FSharp6 as u8, 0).frequency(), 1480);
+        assert_eq!(Tone::new(Note::G6 as u8, 0).frequency(), 1568);
+        assert_eq!(Tone::new(Note::GSharp6 as u8, 0).frequency(), 1661);
+        assert_eq!(Tone::new(Note::A6 as u8, 0).frequency(), 1760);
+        assert_eq!(Tone::new(Note::G5 as u8, 0).frequency(), 1760);
+    }
+
+    #[test]
     fn properly_keeps_note_and_duration() {
         let tone = Tone::new(Note::Silence as u8, 0);
         assert_eq!(tone.duration, 0);
